@@ -1,10 +1,11 @@
 //! Moteurs de reconnaissance proposés, emplacement de leurs modèles et téléchargement.
 
 use std::io::Read;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::progress::data_dir;
 
@@ -47,6 +48,20 @@ impl Engine {
             Engine::WhisperSmall => 190_085_487,
             Engine::WhisperBase => 59_707_625,
             Engine::Vosk => 42_233_323,
+        }
+    }
+
+    /// Empreinte SHA-256 du fichier téléchargé. Celles de Whisper sont publiées par
+    /// Hugging Face ; Vosk n'en publie pas, c'est celle de l'archive officielle.
+    fn sha256(self) -> &'static str {
+        match self {
+            Engine::WhisperSmall => {
+                "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb"
+            }
+            Engine::WhisperBase => {
+                "422f1ae452ade6f30a004d7e5c6a43195e4433bc370bf23fac9cc591f01a8898"
+            }
+            Engine::Vosk => "cabf6180e177eb9b3a9a9d43a437bd5e549f3a7d09525e5d69a3fed787be12ad",
         }
     }
 
@@ -152,6 +167,14 @@ pub fn download(engine: Engine, mut progress: impl FnMut(f32)) -> Result<(), Str
         return Err(message.trim().to_owned());
     }
 
+    let digest = sha256_file(&part).map_err(|e| e.to_string())?;
+    if digest != engine.sha256() {
+        let _ = std::fs::remove_file(&part);
+        return Err(
+            "le fichier reçu est corrompu ou a été modifié (empreinte SHA-256 incorrecte)".into(),
+        );
+    }
+
     match engine {
         Engine::Vosk => {
             let archive = std::fs::File::open(&part).map_err(|e| e.to_string())?;
@@ -166,5 +189,49 @@ pub fn download(engine: Engine, mut progress: impl FnMut(f32)) -> Result<(), Str
         Ok(())
     } else {
         Err("modèle incomplet".into())
+    }
+}
+
+fn sha256_file(path: &Path) -> std::io::Result<String> {
+    let mut file = std::fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = vec![0u8; 1 << 16];
+    loop {
+        let n = file.read(&mut buffer)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buffer[..n]);
+    }
+    Ok(hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sha256_of_known_content() {
+        let path = std::env::temp_dir().join(format!("geo-learner-sha-{}", std::process::id()));
+        std::fs::write(&path, b"abc").unwrap();
+        let digest = sha256_file(&path).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(
+            digest,
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    /// Télécharge réellement Whisper base (60 Mo) et vérifie son empreinte :
+    /// `cargo test -p geo-learner -- --ignored downloads --nocapture`.
+    #[test]
+    #[ignore]
+    fn downloads_and_verifies_a_model() {
+        download(Engine::WhisperBase, |_| {}).unwrap();
+        assert!(Engine::WhisperBase.installed());
     }
 }

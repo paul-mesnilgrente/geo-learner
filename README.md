@@ -40,7 +40,8 @@ marquant une courte pause entre deux noms. Tout est fait localement :
 | Whisper base | `ggml-base-q5_1` (whisper.cpp) | 60 Mo | Idem, plus rapide et moins précis |
 | Vosk | `vosk-model-small-fr-0.22` (via `utter`) | 42 Mo | Grammaire limitée aux noms de pays, instantané |
 
-Les modèles se téléchargent depuis l'écran d'accueil, avec le `curl` du système.
+Les modèles se téléchargent depuis l'écran d'accueil, avec le `curl` du système. Leur empreinte
+SHA-256 est vérifiée avant installation : un fichier corrompu ou modifié est rejeté.
 
 Pour le diagnostic :
 - `GEO_VOICE_DUMP=<dossier>` enregistre chaque phrase captée (fichier WAV et sa transcription) ;
