@@ -1,0 +1,4 @@
+# Windows : le runtime Visual C++ est intégré à l'exécutable. Sinon il dépendrait de
+# VCRUNTIME140.dll, absent d'un Windows fraîchement installé.
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]

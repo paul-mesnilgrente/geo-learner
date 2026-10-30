@@ -1,0 +1,7 @@
+{
+  "_comment": "Identité du paquet : à remplacer par les valeurs de Partner Center (Gestion des produits > Identité du produit) une fois le nom réservé.",
+  "identityName": "A-REMPLACER.GeoLearner",
+  "publisher": "CN=00000000-0000-0000-0000-000000000000",
+  "publisherDisplayName": "Paul Mesnilgrente",
+  "displayName": "GeoLearner"
+}

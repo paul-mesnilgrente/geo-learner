@@ -21,6 +21,9 @@ pub static WORLD: LazyLock<World> = LazyLock::new(|| {
 });
 
 fn main() -> iced::Result {
+    let size = iced::Size::new(1360.0, 860.0);
+    #[cfg(debug_assertions)]
+    let size = dev::window_size().unwrap_or(size);
     iced::application(app::App::new, app::App::update, app::App::view)
         .title(app::App::title)
         .theme(app::App::theme)
@@ -30,8 +33,14 @@ fn main() -> iced::Result {
         .font(include_bytes!("../../../assets/fonts/Inter-Bold.ttf").as_slice())
         .default_font(style::FONT)
         .window(iced::window::Settings {
-            size: iced::Size::new(1360.0, 860.0),
+            size,
             min_size: Some(iced::Size::new(960.0, 640.0)),
+            icon: iced::window::icon::from_rgba(
+                include_bytes!("../../../assets/icon-64.rgba").to_vec(),
+                64,
+                64,
+            )
+            .ok(),
             ..Default::default()
         })
         .antialiasing(true)

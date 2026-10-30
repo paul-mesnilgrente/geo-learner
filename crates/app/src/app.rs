@@ -220,6 +220,9 @@ impl App {
             self.voice.speaking = true;
             self.voice.level = 0.4;
         }
+        if let Some(seconds) = demo.elapsed {
+            game.started -= Duration::from_secs(seconds);
+        }
         if demo.give_up {
             game.quiz.give_up();
         }

@@ -41,6 +41,15 @@ jobs:
       - name: Compilation release
         run: cargo build --release -p geo-learner
 
+      - name: Aucune dépendance au runtime Visual C++ (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dumpbin = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -find "VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" | Select-Object -First 1
+          $deps = & $dumpbin /dependents target\release\geo-learner.exe
+          $deps
+          if ($deps -match "VCRUNTIME|MSVCP") { throw "L'exécutable dépend encore du runtime Visual C++" }
+
       - name: Exécutable
         uses: actions/upload-artifact@v4
         with:

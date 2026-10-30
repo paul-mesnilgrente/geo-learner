@@ -1,0 +1,34 @@
+name: Paquet Microsoft Store
+
+# Construit le paquet MSIX (non signé : le Store le signe) sur un tag de version ou à la demande.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  msix:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Compilation release
+        run: cargo build --release -p geo-learner
+
+      - name: Paquet MSIX
+        shell: pwsh
+        run: ./scripts/package-msix.ps1
+
+      - name: Paquet
+        uses: actions/upload-artifact@v4
+        with:
+          name: geo-learner-msix
+          path: target/msix/*.msix
+          if-no-files-found: error

@@ -25,6 +25,8 @@ pub struct Demo {
     pub typed: Vec<String>,
     /// Code du premier pays à deviner (modes Nommer et Localiser).
     pub target: Option<String>,
+    /// Temps de jeu déjà écoulé, en secondes.
+    pub elapsed: Option<u64>,
 }
 
 pub fn demo() -> Option<Demo> {
@@ -56,11 +58,19 @@ pub fn demo() -> Option<Demo> {
             "giveup" => demo.give_up = true,
             "summary" => demo.summary = true,
             "target" => demo.target = Some(value.to_owned()),
+            "elapsed" => demo.elapsed = value.parse().ok(),
             "type" => demo.typed = value.split('|').map(str::to_owned).collect(),
             _ => {}
         }
     }
     Some(demo)
+}
+
+/// Taille de fenêtre imposée (`GEO_WINDOW=1920x1080`), pour les captures du Store.
+pub fn window_size() -> Option<iced::Size> {
+    let spec = std::env::var("GEO_WINDOW").ok()?;
+    let (w, h) = spec.split_once('x')?;
+    Some(iced::Size::new(w.parse().ok()?, h.parse().ok()?))
 }
 
 pub fn shot_path() -> Option<String> {

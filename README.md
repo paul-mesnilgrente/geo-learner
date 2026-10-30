@@ -77,6 +77,16 @@ cargo test --workspace                 # tests
 
 Le binaire release fait environ 11 Mo. La carte et les polices sont intégrées, pas les modèles vocaux.
 
+## Microsoft Store
+
+Le paquet MSIX, les logos, la politique de confidentialité et la fiche du Store sont prêts.
+La marche à suivre (compte Partner Center, identité du paquet, soumission) est décrite dans
+[`docs/microsoft-store.md`](docs/microsoft-store.md). L'icône est générée à partir des contours
+Natural Earth par `scripts/make-icon.py` (Inkscape et ImageMagick).
+
+Sous Windows, l'exécutable intègre le runtime Visual C++ (`crt-static`, voir `.cargo/config.toml`) :
+il ne dépend pas de `VCRUNTIME140.dll`, ce que la CI vérifie.
+
 ## Intégration continue
 
 `.github/workflows/ci.yml` compile et teste l'application sous **Linux et Windows** à chaque push :
@@ -111,6 +121,17 @@ utile pour vérifier un rendu sans cliquer :
 ```sh
 GEO_DEMO="mode=free;region=europe;answers=FRA,DEU" GEO_SHOT=/tmp/shot.png cargo run -p geo-learner
 ```
+
+Paramètres de `GEO_DEMO`, séparés par `;` :
+- `mode` et `region` : la partie à lancer ;
+- `answers` : codes des pays déjà joués ;
+- `target` : premier pays à deviner ;
+- `type=a|b` : saisie simulée au clavier ;
+- `zoom=lon,lat,z` : position de la caméra ;
+- `elapsed` : temps déjà écoulé, en secondes ;
+- `giveup`, `summary` : partie abandonnée, bilan affiché.
+
+`GEO_WINDOW=1600x900` impose la taille de la fenêtre.
 
 ## Choix techniques
 
