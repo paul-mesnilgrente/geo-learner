@@ -27,20 +27,21 @@ fn project_raw(lon: f32, lat: f32) -> [f32; 2] {
 
 /// Projette un anneau en évitant qu'il ne soit coupé en deux par l'antiméridien de la projection :
 /// les longitudes sont « déroulées » pour rester continues, quitte à sortir de [-180, 180].
-pub fn project_ring(ring: &[[f32; 2]], center: f32, out: &mut Vec<[f32; 2]>) {
+///
+/// `anchor` (longitude du pays) place l'anneau du même côté que le reste du pays : les îles
+/// de Kiribati restent groupées, même de part et d'autre de la coupure.
+pub fn project_ring(ring: &[[f32; 2]], center: f32, anchor: f32, out: &mut Vec<[f32; 2]>) {
     out.clear();
-    let mut prev: Option<f32> = None;
+    let mut prev = wrap(anchor, center);
     for &[lon, lat] in ring {
         let mut l = wrap(lon, center);
-        if let Some(p) = prev {
-            while l - p > 180.0 {
-                l -= 360.0;
-            }
-            while p - l > 180.0 {
-                l += 360.0;
-            }
+        while l - prev > 180.0 {
+            l -= 360.0;
         }
-        prev = Some(l);
+        while prev - l > 180.0 {
+            l += 360.0;
+        }
+        prev = l;
         out.push(project_raw(l, lat));
     }
 }
@@ -99,9 +100,25 @@ mod tests {
             [179.5, -16.0],
         ];
         let mut out = Vec::new();
-        project_ring(&ring, 0.0, &mut out);
+        project_ring(&ring, 0.0, 179.0, &mut out);
         let width = out.iter().map(|p| p[0]).fold(f32::MIN, f32::max)
             - out.iter().map(|p| p[0]).fold(f32::MAX, f32::min);
         assert!(width < 0.1, "l'anneau a été déchiré : largeur {width}");
+    }
+
+    #[test]
+    fn anchor_keeps_islands_with_their_country() {
+        // Île à 157° O d'un pays ancré à 173° E (Kiribati), méridien central à 11° E :
+        // elle passe à l'est de la coupure, à côté du reste du pays.
+        let mut out = Vec::new();
+        project_ring(&[[-157.0, 1.8]], 11.0, 173.0, &mut out);
+        let east = project(173.0, 1.8, 11.0)[0];
+        assert!(
+            out[0][0] > east,
+            "{} devrait être à l'est de {east}",
+            out[0][0]
+        );
+        // Sans pays à l'est, Samoa (172° O) tombe aussi à l'est avec ce méridien central.
+        assert!(project(-172.4, -13.6, 11.0)[0] > 2.5);
     }
 }

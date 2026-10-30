@@ -91,6 +91,8 @@ struct Game {
     view: iced::Rectangle,
     camera: Camera,
     animation: Option<Animation>,
+    /// L'utilisateur a déplacé la carte lui-même depuis le dernier cadrage automatique.
+    manual_camera: bool,
     map_size: Size,
     hover: Option<map::Place>,
     cache: Cache,
@@ -289,6 +291,7 @@ impl App {
                         }
                         _ => Camera::fit(game.view),
                     };
+                    game.manual_camera = !matches!(message, Message::ResetView);
                     game.animate_to(to);
                 }
                 return operation::focus(ANSWER_INPUT);
@@ -342,6 +345,7 @@ impl App {
         match event {
             MapEvent::Camera(camera) => {
                 game.animation = None;
+                game.manual_camera = true;
                 game.camera = camera;
                 game.cache.clear();
             }
@@ -1083,7 +1087,7 @@ impl App {
         .width(Fill)
         .height(Fill)
         .align_x(Horizontal::Right)
-        .align_y(Vertical::Center)
+        .align_y(Vertical::Bottom)
         .padding(16);
 
         let mut layers = stack![map, controls];
@@ -1465,6 +1469,7 @@ impl Game {
             view,
             camera: Camera::fit(view),
             animation: None,
+            manual_camera: false,
             map_size: Size::ZERO,
             hover: None,
             cache: Cache::new(),
@@ -1521,12 +1526,29 @@ impl Game {
             return;
         }
         let core = self.projection.core(target);
-        let t = Transform::new(self.camera, self.view, self.map_size);
-        let extent = core.width.max(core.height) * t.scale;
-        if !t.shows(core, 60.0) || extent < 10.0 {
-            let to = self
-                .camera
-                .focus(core, self.view, self.map_size, 30.0, 10.0);
+        let visible = |camera: Camera| {
+            let t = Transform::new(camera, self.view, self.map_size);
+            t.shows(core, 60.0) && core.width.max(core.height) * t.scale >= 10.0
+        };
+        let to = if self.manual_camera {
+            // L'utilisateur a pris la main : on ne bouge que si le pays est caché ou trop petit.
+            if visible(self.camera) {
+                self.manual_camera = false;
+                return;
+            }
+            self.camera
+                .focus(core, self.view, self.map_size, 30.0, 10.0)
+        } else {
+            // Cadrage automatique : la vue d'ensemble dès qu'elle suffit, sinon le zoom minimal.
+            let overview = Camera::fit(self.view);
+            if visible(overview) {
+                overview
+            } else {
+                overview.focus(core, self.view, self.map_size, 30.0, 10.0)
+            }
+        };
+        self.manual_camera = false;
+        if to != self.camera {
             self.animate_to(to);
         }
     }

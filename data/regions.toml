@@ -5,10 +5,12 @@
 #          à partir des pays de la zone.
 # center : méridien central de la projection (par défaut : milieu du cadrage).
 
+# Méridien central à 11° E : la coupure passe à 169° O, dans le Pacifique presque vide,
+# et laisse Samoa, Tonga ou Niue à l'est avec leurs voisins.
 [world]
 name = "Monde entier"
-view = [-180, -57, 180, 84]
-center = 0
+view = [-169, -57, 191, 84]
+center = 11
 
 [[continent]]
 id = "afrique"

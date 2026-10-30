@@ -77,6 +77,20 @@ cargo test --workspace                 # tests
 
 Le binaire release fait environ 11 Mo. La carte et les polices sont intégrées, pas les modèles vocaux.
 
+## Intégration continue
+
+`.github/workflows/ci.yml` compile et teste l'application sous **Linux et Windows** à chaque push :
+formatage, clippy (sans avertissement), tests, puis compilation release. Les exécutables produits
+sont téléchargeables dans l'onglet *Actions* de GitHub (artefacts `geo-learner-Windows` et
+`geo-learner-Linux`).
+
+Pour vérifier localement que le code compile pour Windows :
+
+```sh
+rustup target add x86_64-pc-windows-msvc
+cargo clippy --workspace --all-targets --target x86_64-pc-windows-msvc
+```
+
 ## Organisation
 
 ```

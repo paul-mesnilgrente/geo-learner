@@ -5,6 +5,7 @@
 # sub  : sous-région (voir regions.toml)
 # aka  : autres noms acceptés (la casse, les accents, les tirets et les articles sont ignorés)
 # say  : formes orales supplémentaires pour la reconnaissance vocale
+# label: point de référence [lon, lat] si celui de Natural Earth ne convient pas
 
 countries = [
   { code = "AFG", name = "Afghanistan", sub = "asie-sud" },
@@ -99,7 +100,7 @@ countries = [
   { code = "KAZ", name = "Kazakhstan", sub = "asie-centrale" },
   { code = "KEN", name = "Kenya", sub = "afr-est" },
   { code = "KGZ", name = "Kirghizistan", sub = "asie-centrale", aka = ["Kirghizstan", "Kirghizie"] },
-  { code = "KIR", name = "Kiribati", sub = "micronesie" },
+  { code = "KIR", name = "Kiribati", sub = "micronesie", label = [173.0, 1.4] },  # Tarawa, la capitale
   { code = "KOS", name = "Kosovo", sub = "balkans" },
   { code = "KWT", name = "Koweït", sub = "moyen-orient" },
   { code = "LAO", name = "Laos", sub = "asie-se" },

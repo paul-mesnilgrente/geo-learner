@@ -31,7 +31,8 @@ struct ProjShape {
     lo: Vec<Vec<Point>>,
     /// Boîte englobante de tous les anneaux (coordonnées projetées, y vers le haut).
     bbox: Rectangle,
-    /// Boîte englobante du plus grand anneau : mesure la taille « visible » du pays.
+    /// Boîte englobante de la partie principale (l'anneau du point d'étiquette) : mesure la
+    /// taille « visible » du pays et sert à le cadrer.
     core: Rectangle,
     label: Point,
 }
@@ -41,12 +42,12 @@ impl Projection {
         let countries = world
             .countries
             .iter()
-            .map(|c| ProjShape::new(&c.shape, Some(c.label), center))
+            .map(|c| ProjShape::new(&c.shape, c.label, center))
             .collect();
         let territories = world
             .territories
             .iter()
-            .map(|t| ProjShape::new(&t.shape, Some(t.label), center))
+            .map(|t| ProjShape::new(&t.shape, t.label, center))
             .collect();
         Self {
             countries,
@@ -64,13 +65,13 @@ impl Projection {
 }
 
 impl ProjShape {
-    fn new(shape: &Shape, label: Option<[f32; 2]>, center: f32) -> Self {
+    fn new(shape: &Shape, [lon, lat]: [f32; 2], center: f32) -> Self {
         let mut buf = Vec::new();
         let mut convert = |rings: &[Vec<[f32; 2]>]| -> Vec<Vec<Point>> {
             rings
                 .iter()
                 .map(|r| {
-                    project_ring(r, center, &mut buf);
+                    project_ring(r, center, lon, &mut buf);
                     buf.iter().map(|&[x, y]| Point::new(x, y)).collect()
                 })
                 .collect()
@@ -78,18 +79,26 @@ impl ProjShape {
         let hi = convert(&shape.rings);
         let lo = convert(&shape.rings_lo);
         let bbox = bounds(hi.iter().flatten());
+        let [x, y] = project(lon, lat, center);
+        let label = Point::new(x, y);
+        // Partie principale : l'anneau qui contient le point d'étiquette, sinon le plus proche.
         let core = hi
             .iter()
             .map(|r| bounds(r.iter()))
-            .max_by(|a, b| a.area().total_cmp(&b.area()))
+            .min_by(|a, b| {
+                let da = if a.contains(label) {
+                    0.0
+                } else {
+                    a.center().distance(label)
+                };
+                let db = if b.contains(label) {
+                    0.0
+                } else {
+                    b.center().distance(label)
+                };
+                da.total_cmp(&db).then(b.area().total_cmp(&a.area()))
+            })
             .unwrap_or(bbox);
-        let label = match label {
-            Some([lon, lat]) => {
-                let [x, y] = project(lon, lat, center);
-                Point::new(x, y)
-            }
-            None => bbox.center(),
-        };
         Self {
             hi,
             lo,

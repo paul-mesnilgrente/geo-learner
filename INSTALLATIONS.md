@@ -5,6 +5,7 @@ Tout a été installé dans le dossier utilisateur : rien n'a été installé av
 | Élément | Emplacement | Taille approx. | Pour le désinstaller |
 |---|---|---|---|
 | Toolchain Rust via **rustup** (rustc 1.99, cargo, clippy, rustfmt) | `~/.rustup`, `~/.cargo/bin` | ~310 Mo | `rustup self uninstall` |
+| Cible Rust `x86_64-pc-windows-msvc` (vérification de la compilation Windows) | `~/.rustup/toolchains/…/lib/rustlib/x86_64-pc-windows-msvc` | ~55 Mo | `rustup target remove x86_64-pc-windows-msvc` |
 | Cache des crates téléchargées (iced, cpal, utter…) | `~/.cargo/registry` | ~350 Mo | supprimé avec rustup, ou `rm -rf ~/.cargo/registry` |
 | Modèle vocal Vosk français (téléchargé par l'application) | `~/.local/share/geo-learner/models/vosk-model-small-fr-0.22` | ~65 Mo | `rm -rf ~/.local/share/geo-learner/models` |
 | **CMake 4.4.5** (binaire officiel Kitware), installé pour whisper.cpp, **plus nécessaire** depuis le retrait de Whisper | `~/.local/opt/cmake-4.4.5-linux-x86_64/` | ~135 Mo | `rm -rf ~/.local/opt/cmake-4.4.5-linux-x86_64` |

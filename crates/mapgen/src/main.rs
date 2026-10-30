@@ -34,6 +34,7 @@ struct CountryDef {
     aka: Vec<String>,
     #[serde(default)]
     say: Vec<String>,
+    label: Option<[f32; 2]>,
 }
 
 #[derive(Deserialize)]
@@ -228,7 +229,7 @@ fn build(defs: &CountriesFile, zones: &RegionsFile, features: &Value) -> Result<
             answers,
             spoken,
             sub: sub_index(&def.sub)?,
-            label: labels[i].unwrap_or([0.0, 0.0]),
+            label: def.label.or(labels[i]).unwrap_or([0.0, 0.0]),
             shape: make_shape(std::mem::take(&mut rings[i])),
         });
     }
