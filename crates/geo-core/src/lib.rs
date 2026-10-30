@@ -1,0 +1,41 @@
+//! Cœur de GeoLearner : données, reconnaissance des réponses et logique de quiz,
+//! sans dépendance à l'interface graphique.
+
+pub mod matcher;
+pub mod normalize;
+pub mod projection;
+pub mod quiz;
+pub mod world;
+
+pub use matcher::Matcher;
+pub use normalize::normalize;
+pub use quiz::{Mark, Mode, Outcome, Quiz};
+pub use world::{Country, Region, RegionKind, Shape, World};
+
+#[cfg(test)]
+mod testing {
+    use crate::world::{Country, Shape, World};
+
+    pub fn world_with(countries: &[(&str, &[&str])]) -> World {
+        World {
+            countries: countries
+                .iter()
+                .map(|(code, answers)| Country {
+                    code: code.to_string(),
+                    name: code.to_string(),
+                    answers: answers.iter().map(|a| a.to_string()).collect(),
+                    spoken: vec![],
+                    sub: 0,
+                    label: [0.0, 0.0],
+                    shape: Shape {
+                        rings: vec![],
+                        rings_lo: vec![],
+                        main: vec![],
+                    },
+                })
+                .collect(),
+            territories: vec![],
+            regions: vec![],
+        }
+    }
+}

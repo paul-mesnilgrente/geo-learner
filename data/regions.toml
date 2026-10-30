@@ -1,0 +1,198 @@
+# Zones sélectionnables dans le menu.
+#
+# view   : cadrage [lon_min, lat_min, lon_max, lat_max] ; les longitudes peuvent dépasser 180
+#          pour les zones qui chevauchent l'antiméridien. Sans `view`, le cadrage est calculé
+#          à partir des pays de la zone.
+# center : méridien central de la projection (par défaut : milieu du cadrage).
+
+[world]
+name = "Monde entier"
+view = [-180, -57, 180, 84]
+center = 0
+
+[[continent]]
+id = "afrique"
+name = "Afrique"
+view = [-26, -36, 60, 38]
+
+[[continent]]
+id = "am-nord"
+name = "Amérique du Nord"
+view = [-170, 5, -52, 75]
+
+[[continent]]
+id = "am-sud"
+name = "Amérique du Sud"
+view = [-84, -56, -32, 13]
+
+[[continent]]
+id = "asie"
+name = "Asie"
+view = [25, -11, 150, 56]
+
+[[continent]]
+id = "europe"
+name = "Europe"
+view = [-25, 34, 45, 71]
+
+[[continent]]
+id = "oceanie"
+name = "Océanie"
+view = [110, -48, 205, 16]
+
+[[sub]]
+id = "afr-nord"
+name = "Afrique du Nord"
+continent = "afrique"
+
+[[sub]]
+id = "afr-ouest"
+name = "Afrique de l'Ouest"
+continent = "afrique"
+
+[[sub]]
+id = "afr-centre"
+name = "Afrique centrale"
+continent = "afrique"
+
+[[sub]]
+id = "afr-est"
+name = "Afrique de l'Est"
+continent = "afrique"
+view = [21, -27, 60, 19]
+
+[[sub]]
+id = "afr-australe"
+name = "Afrique australe"
+continent = "afrique"
+
+[[sub]]
+id = "am-nord"
+name = "Canada, États-Unis, Mexique"
+continent = "am-nord"
+view = [-170, 13, -52, 75]
+
+[[sub]]
+id = "am-centrale"
+name = "Amérique centrale"
+continent = "am-nord"
+
+[[sub]]
+id = "caraibes"
+name = "Caraïbes"
+continent = "am-nord"
+
+[[sub]]
+id = "am-sud"
+name = "Amérique du Sud"
+continent = "am-sud"
+hidden = true
+
+[[sub]]
+id = "asie-est"
+name = "Asie de l'Est"
+continent = "asie"
+
+[[sub]]
+id = "asie-se"
+name = "Asie du Sud-Est"
+continent = "asie"
+
+[[sub]]
+id = "asie-sud"
+name = "Asie du Sud"
+continent = "asie"
+
+[[sub]]
+id = "asie-centrale"
+name = "Asie centrale"
+continent = "asie"
+
+[[sub]]
+id = "moyen-orient"
+name = "Moyen-Orient"
+continent = "asie"
+
+[[sub]]
+id = "caucase"
+name = "Caucase"
+continent = "asie"
+
+[[sub]]
+id = "eur-nord"
+name = "Europe du Nord"
+continent = "europe"
+
+[[sub]]
+id = "eur-ouest"
+name = "Europe de l'Ouest"
+continent = "europe"
+
+[[sub]]
+id = "eur-sud"
+name = "Europe du Sud"
+continent = "europe"
+
+[[sub]]
+id = "balkans"
+name = "Balkans"
+continent = "europe"
+
+[[sub]]
+id = "eur-est"
+name = "Europe de l'Est"
+continent = "europe"
+view = [12, 41, 60, 66]
+
+[[sub]]
+id = "oc-ausnz"
+name = "Australie et Nouvelle-Zélande"
+continent = "oceanie"
+view = [110, -48, 180, -9]
+
+[[sub]]
+id = "melanesie"
+name = "Mélanésie"
+continent = "oceanie"
+view = [138, -24, 184, 0]
+
+[[sub]]
+id = "micronesie"
+name = "Micronésie"
+continent = "oceanie"
+view = [128, -12, 212, 16]
+
+[[sub]]
+id = "polynesie"
+name = "Polynésie"
+continent = "oceanie"
+view = [168, -25, 196, -4]
+
+[[group]]
+id = "petites-antilles"
+name = "Petites Antilles"
+continent = "am-nord"
+members = ["ATG", "KNA", "DMA", "LCA", "VCT", "BRB", "GRD", "TTO"]
+
+[[group]]
+id = "grandes-antilles"
+name = "Grandes Antilles et Bahamas"
+continent = "am-nord"
+members = ["CUB", "JAM", "HTI", "DOM", "BHS"]
+
+[[group]]
+id = "ue"
+name = "Union européenne"
+continent = "europe"
+view = [-25, 34, 35, 71]
+members = [
+  "AUT", "BEL", "BGR", "HRV", "CYP", "CZE", "DNK", "EST", "FIN", "FRA", "DEU", "GRC", "HUN", "IRL",
+  "ITA", "LVA", "LTU", "LUX", "MLT", "NLD", "POL", "PRT", "ROU", "SVK", "SVN", "ESP", "SWE",
+]
+
+[[group]]
+id = "iles-afrique"
+name = "Îles africaines"
+continent = "afrique"
+view = [-27, -26, 60, 18]
+members = ["CPV", "STP", "COM", "MDG", "MUS", "SYC"]

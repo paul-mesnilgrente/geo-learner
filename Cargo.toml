@@ -1,0 +1,35 @@
+[workspace]
+resolver = "3"
+members = ["crates/geo-core", "crates/mapgen", "crates/app"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[workspace.dependencies]
+geo-core = { path = "crates/geo-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+postcard = { version = "1", features = ["alloc"] }
+
+[profile.release]
+opt-level = "s"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+# Le décodeur vocal et le rendu de la carte restent optimisés pour la vitesse.
+[profile.release.package.utter]
+opt-level = 3
+
+[profile.release.package.tiny-skia]
+opt-level = 3
+
+[profile.release.package.tiny-skia-path]
+opt-level = 3
+
+# Le décodeur vocal est très lent sans optimisations, même en debug.
+[profile.dev.package.utter]
+opt-level = 3
