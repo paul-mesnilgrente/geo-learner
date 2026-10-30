@@ -57,7 +57,7 @@ pub fn with_alpha(c: Color, a: f32) -> Color {
     Color { a, ..c }
 }
 
-fn mix(a: Color, b: Color, t: f32) -> Color {
+pub fn mix(a: Color, b: Color, t: f32) -> Color {
     Color {
         r: a.r + (b.r - a.r) * t,
         g: a.g + (b.g - a.g) * t,

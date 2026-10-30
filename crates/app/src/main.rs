@@ -37,3 +37,26 @@ fn main() -> iced::Result {
         .antialiasing(true)
         .run()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::WORLD;
+
+    fn owner(territory: &str) -> Option<&'static str> {
+        let t = WORLD
+            .territories
+            .iter()
+            .find(|t| t.name == territory)
+            .expect(territory);
+        t.owner.map(|o| WORLD.countries[o].name.as_str())
+    }
+
+    #[test]
+    fn territories_follow_their_sovereign() {
+        assert_eq!(owner("Groenland"), Some("Danemark"));
+        assert_eq!(owner("Porto Rico"), Some("États-Unis"));
+        assert_eq!(owner("Nouvelle-Calédonie"), Some("France"));
+        assert_eq!(owner("Sint Maarten"), Some("Pays-Bas"));
+        assert_eq!(owner("Sahara occidental"), None);
+    }
+}

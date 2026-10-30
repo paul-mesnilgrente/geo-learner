@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::error::Error;
 
-use geo_core::world::{Country, Region, RegionKind, Ring, Shape, World};
+use geo_core::world::{Country, Region, RegionKind, Ring, Shape, Territory, World};
 use geo_core::{Matcher, normalize};
 use serde::Deserialize;
 use serde_json::Value;
@@ -86,7 +86,7 @@ fn main() -> Result<()> {
             .countries
             .iter()
             .map(|c| &c.shape)
-            .chain(&world.territories)
+            .chain(world.territories.iter().map(|t| &t.shape))
             .flat_map(|s| if lo { &s.rings_lo } else { &s.rings })
             .map(Vec::len)
             .sum()
@@ -138,6 +138,16 @@ fn build(defs: &CountriesFile, zones: &RegionsFile, features: &Value) -> Result<
     let mut rings: Vec<Vec<Ring>> = vec![Vec::new(); defs.countries.len()];
     let mut labels: Vec<Option<[f32; 2]>> = vec![None; defs.countries.len()];
     let mut english: Vec<Option<String>> = vec![None; defs.countries.len()];
+    // Territoire → partie principale (HOMEPART) de son État souverain.
+    let mut homes: HashMap<&str, &str> = HashMap::new();
+    for feature in features["features"].as_array().ok_or("GeoJSON invalide")? {
+        let props = &feature["properties"];
+        if props["HOMEPART"].as_i64() == Some(1)
+            && let (Some(sov), Some(code)) = (props["SOV_A3"].as_str(), props["ADM0_A3"].as_str())
+        {
+            homes.insert(sov, code);
+        }
+    }
     let mut territories = Vec::new();
 
     for feature in features["features"].as_array().ok_or("GeoJSON invalide")? {
@@ -161,7 +171,32 @@ fn build(defs: &CountriesFile, zones: &RegionsFile, features: &Value) -> Result<
                     english[i] = props["NAME_EN"].as_str().map(str::to_owned);
                 }
             }
-            None => territories.push(make_shape(polygons)),
+            None => {
+                let owner = props["SOV_A3"]
+                    .as_str()
+                    .and_then(|sov| homes.get(sov))
+                    .and_then(|home| index.get(home).copied());
+                let mut name = props["NAME_FR"].as_str().unwrap_or(code).to_owned();
+                if code == "SXM" {
+                    // Natural Earth nomme aussi « Saint-Martin » la partie néerlandaise.
+                    name = "Sint Maarten".into();
+                }
+                let name = capitalize(&name);
+                let mut answers = vec![normalize(&name)];
+                if let Some(en) = props["NAME_EN"].as_str() {
+                    push_unique(&mut answers, normalize(en));
+                }
+                territories.push(Territory {
+                    name,
+                    answers,
+                    owner,
+                    label: [
+                        props["LABEL_X"].as_f64().unwrap_or(0.0) as f32,
+                        props["LABEL_Y"].as_f64().unwrap_or(0.0) as f32,
+                    ],
+                    shape: make_shape(polygons),
+                });
+            }
         }
     }
 
@@ -284,6 +319,14 @@ fn build(defs: &CountriesFile, zones: &RegionsFile, features: &Value) -> Result<
         territories,
         regions,
     })
+}
+
+fn capitalize(name: &str) -> String {
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().chain(chars).collect(),
+        None => String::new(),
+    }
 }
 
 fn push_unique(list: &mut Vec<String>, value: String) {

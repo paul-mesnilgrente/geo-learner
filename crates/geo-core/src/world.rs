@@ -32,6 +32,18 @@ pub struct Country {
     pub shape: Shape,
 }
 
+/// Territoire dépendant d'un pays du quiz (ou sans souveraineté reconnue).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Territory {
+    pub name: String,
+    /// Noms acceptés, normalisés : taper « Groenland » explique à qui il appartient.
+    pub answers: Vec<String>,
+    /// Pays souverain (index dans `countries`), s'il fait partie du quiz.
+    pub owner: Option<usize>,
+    pub label: [f32; 2],
+    pub shape: Shape,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RegionKind {
     World,
@@ -60,8 +72,8 @@ pub struct Region {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct World {
     pub countries: Vec<Country>,
-    /// Terres qui ne sont pas des pays du quiz (Groenland, Sahara occidental…).
-    pub territories: Vec<Shape>,
+    /// Terres qui ne sont pas des pays du quiz (Groenland, Porto Rico, Sahara occidental…).
+    pub territories: Vec<Territory>,
     pub regions: Vec<Region>,
 }
 

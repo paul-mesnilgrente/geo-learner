@@ -46,7 +46,7 @@ impl Projection {
         let territories = world
             .territories
             .iter()
-            .map(|s| ProjShape::new(s, None, center))
+            .map(|t| ProjShape::new(&t.shape, Some(t.label), center))
             .collect();
         Self {
             countries,
@@ -255,10 +255,26 @@ impl Transform {
     }
 }
 
+/// Ce qui se trouve sous le curseur.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Place {
+    Country(usize),
+    Territory(usize),
+}
+
+impl Place {
+    pub fn country(self) -> Option<usize> {
+        match self {
+            Place::Country(c) => Some(c),
+            Place::Territory(_) => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum MapEvent {
     Camera(Camera),
-    Hover(Option<usize>),
+    Hover(Option<Place>),
     Click(Option<usize>),
     Resized(Size),
 }
@@ -278,7 +294,7 @@ pub struct MapView<'a> {
     pub view: Rectangle,
     pub camera: Camera,
     pub quiz: &'a Quiz,
-    pub hover: Option<usize>,
+    pub hover: Option<Place>,
     /// Pays à faire deviner (mode Nommer).
     pub target: Option<usize>,
     pub flash: Option<Flash>,
@@ -369,19 +385,69 @@ impl MapView<'_> {
         self.reveal_all || !matches!(self.quiz.mark(country), Some(Mark::Pending))
     }
 
-    fn hit(&self, t: &Transform, screen: Point) -> Option<usize> {
+    fn hit(&self, t: &Transform, screen: Point) -> Option<Place> {
         for &c in self.quiz.members() {
             if self.is_tiny(c, t)
                 && t.to_screen(self.projection.label(c)).distance(screen) <= MARKER_RADIUS + 5.0
             {
-                return Some(c);
+                return Some(Place::Country(c));
             }
         }
         let p = t.to_world(screen);
+        let inside = |shape: &ProjShape| shape.bbox.contains(p) && contains(&shape.hi, p);
         self.projection
             .countries
             .iter()
-            .position(|shape| shape.bbox.contains(p) && contains(&shape.hi, p))
+            .position(inside)
+            .map(Place::Country)
+            .or_else(|| {
+                self.projection
+                    .territories
+                    .iter()
+                    .position(inside)
+                    .map(Place::Territory)
+            })
+    }
+
+    /// Couleur d'un territoire : celle de son pays une fois celui-ci joué, un peu assombrie.
+    fn territory_color(&self, territory: usize) -> Color {
+        let owner = self.world.territories[territory].owner;
+        match owner.and_then(|o| self.quiz.mark(o)) {
+            Some(mark @ (Mark::Found { .. } | Mark::Missed)) => {
+                style::mix(style::TERRITORY, mark_color(Some(mark)), 0.75)
+            }
+            _ => style::TERRITORY,
+        }
+    }
+
+    fn place_rings(&self, place: Place, t: &Transform) -> &Vec<Vec<Point>> {
+        let shape = match place {
+            Place::Country(c) => &self.projection.countries[c],
+            Place::Territory(i) => &self.projection.territories[i],
+        };
+        if t.scale >= DETAIL_SCALE {
+            &shape.hi
+        } else {
+            &shape.lo
+        }
+    }
+
+    /// Nom affiché au survol, s'il peut être révélé.
+    fn place_name(&self, place: Place) -> Option<String> {
+        match place {
+            Place::Country(c) => self
+                .reveals(c)
+                .then(|| self.world.countries[c].name.clone()),
+            Place::Territory(i) => {
+                let territory = &self.world.territories[i];
+                Some(match territory.owner {
+                    Some(owner) if self.reveals(owner) => {
+                        format!("{} · {}", territory.name, self.world.countries[owner].name)
+                    }
+                    _ => territory.name.clone(),
+                })
+            }
+        }
     }
 
     fn add_rings(builder: &mut Builder, rings: &[Vec<Point>], t: &Transform) {
@@ -402,24 +468,33 @@ impl MapView<'_> {
         let detailed = t.scale >= DETAIL_SCALE;
         let mut coast = Builder::new();
 
-        let mut land = Builder::new();
-        for shape in &self.projection.territories {
-            if shape.bbox.intersects(&visible) {
-                Self::add_rings(&mut land, if detailed { &shape.hi } else { &shape.lo }, t);
+        // Territoires, regroupés par couleur.
+        let mut groups: Vec<(Color, Builder)> = Vec::new();
+        for (i, shape) in self.projection.territories.iter().enumerate() {
+            if !shape.bbox.intersects(&visible) {
+                continue;
             }
+            let color = self.territory_color(i);
+            let index = match groups.iter().position(|(c, _)| *c == color) {
+                Some(index) => index,
+                None => {
+                    groups.push((color, Builder::new()));
+                    groups.len() - 1
+                }
+            };
+            let rings = if detailed { &shape.hi } else { &shape.lo };
+            Self::add_rings(&mut groups[index].1, rings, t);
+            Self::add_rings(&mut coast, rings, t);
         }
-        let land = land.build();
-        frame.fill(
-            &land,
-            Fill {
-                style: style::TERRITORY.into(),
-                rule: Rule::EvenOdd,
-            },
-        );
-        frame.stroke(
-            &land,
-            Stroke::default().with_color(style::COAST).with_width(0.7),
-        );
+        for (color, builder) in groups {
+            frame.fill(
+                &builder.build(),
+                Fill {
+                    style: color.into(),
+                    rule: Rule::EvenOdd,
+                },
+            );
+        }
 
         let mut buckets: Vec<(Tint, Builder)> =
             Tint::ALL.iter().map(|&k| (k, Builder::new())).collect();
@@ -561,27 +636,28 @@ impl MapView<'_> {
             );
         }
 
-        if let Some(hover) = self.hover {
+        if let Some(place) = self.hover {
             let mut b = Builder::new();
-            Self::add_rings(&mut b, self.rings(hover, t), t);
+            Self::add_rings(&mut b, self.place_rings(place, t), t);
             frame.stroke(
                 &b.build(),
                 Stroke::default()
                     .with_color(style::with_alpha(Color::WHITE, 0.85))
                     .with_width(1.6),
             );
-            if self.is_tiny(hover, t) {
+            if let Place::Country(hover) = place
+                && self.is_tiny(hover, t)
+            {
                 let center = t.to_screen(self.projection.label(hover));
                 frame.stroke(
                     &Path::circle(center, MARKER_RADIUS + 2.5),
                     Stroke::default().with_color(Color::WHITE).with_width(1.5),
                 );
             }
-            if let (Some(cursor), true) = (cursor, self.reveals(hover)) {
-                let name = &self.world.countries[hover].name;
+            if let (Some(cursor), Some(name)) = (cursor, self.place_name(place)) {
                 tag(
                     frame,
-                    name,
+                    &name,
                     Point::new(cursor.x, cursor.y - 24.0),
                     style::SURFACE_3,
                     1.0,
@@ -711,7 +787,8 @@ impl canvas::Program<MapEvent> for MapView<'_> {
                 if drag.moved {
                     return Some(Action::capture());
                 }
-                Some(Action::publish(MapEvent::Click(self.hit(&t, drag.start))).and_capture())
+                let country = self.hit(&t, drag.start).and_then(Place::country);
+                Some(Action::publish(MapEvent::Click(country)).and_capture())
             }
             mouse::Event::CursorLeft => self.hover.map(|_| Action::publish(MapEvent::Hover(None))),
             _ => None,
@@ -743,7 +820,10 @@ impl canvas::Program<MapEvent> for MapView<'_> {
     ) -> mouse::Interaction {
         match &state.drag {
             Some(drag) if drag.moved => mouse::Interaction::Grabbing,
-            _ if self.clickable && self.hover.is_some() && cursor.is_over(bounds) => {
+            _ if self.clickable
+                && self.hover.and_then(Place::country).is_some()
+                && cursor.is_over(bounds) =>
+            {
                 mouse::Interaction::Pointer
             }
             _ => mouse::Interaction::default(),

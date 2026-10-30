@@ -38,9 +38,9 @@ suivant ou la fin de la phrase. Tout est fait localement :
 
 | Moteur | Modèle | Taille | Principe |
 |---|---|---|---|
-| Whisper small | `ggml-small-q5_1` (whisper.cpp) | 190 Mo | Transcription libre, le plus robuste en général |
+| **Vosk** (recommandé) | `vosk-model-small-fr-0.22` (via `utter`) | 42 Mo | Grammaire limitée aux noms de pays, instantané |
+| Whisper small | `ggml-small-q5_1` (whisper.cpp) | 190 Mo | Transcription libre, plus lente ; peine sur les noms isolés (« Uruguay ») |
 | Whisper base | `ggml-base-q5_1` (whisper.cpp) | 60 Mo | Idem, plus rapide et moins précis |
-| Vosk | `vosk-model-small-fr-0.22` (via `utter`) | 42 Mo | Grammaire limitée aux noms de pays, instantané |
 
 Les modèles se téléchargent depuis l'écran d'accueil, avec le `curl` du système. Leur empreinte
 SHA-256 est vérifiée avant installation : un fichier corrompu ou modifié est rejeté.

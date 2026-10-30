@@ -17,7 +17,7 @@ pub enum Engine {
 }
 
 impl Engine {
-    pub const ALL: [Engine; 3] = [Engine::WhisperSmall, Engine::WhisperBase, Engine::Vosk];
+    pub const ALL: [Engine; 3] = [Engine::Vosk, Engine::WhisperSmall, Engine::WhisperBase];
 
     pub fn label(self) -> &'static str {
         match self {
@@ -29,9 +29,9 @@ impl Engine {
 
     pub fn description(self) -> &'static str {
         match self {
-            Engine::WhisperSmall => "Le plus précis en général",
+            Engine::WhisperSmall => "Transcription libre, plus lente",
             Engine::WhisperBase => "Plus léger et plus rapide",
-            Engine::Vosk => "Instantané, limité aux noms de pays",
+            Engine::Vosk => "Recommandé : instantané, limité aux noms de pays",
         }
     }
 
@@ -104,14 +104,14 @@ fn settings_path() -> PathBuf {
     data_dir().join("settings.json")
 }
 
-/// Moteur choisi : celui enregistré, sinon le premier installé, sinon Whisper small.
+/// Moteur choisi : celui enregistré, sinon le premier installé, sinon Vosk.
 pub fn saved_engine() -> Engine {
     std::fs::read(settings_path())
         .ok()
         .and_then(|b| serde_json::from_slice::<Settings>(&b).ok())
         .and_then(|s| s.voice_engine)
         .or_else(|| Engine::ALL.into_iter().find(|e| e.installed()))
-        .unwrap_or(Engine::WhisperSmall)
+        .unwrap_or(Engine::Vosk)
 }
 
 pub fn save_engine(engine: Engine) {

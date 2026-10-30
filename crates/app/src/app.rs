@@ -101,7 +101,7 @@ struct Game {
     camera: Camera,
     animation: Option<Animation>,
     map_size: Size,
-    hover: Option<usize>,
+    hover: Option<map::Place>,
     cache: Cache,
     input: String,
     /// Réponse ambiguë en attente de validation.
@@ -438,10 +438,22 @@ impl App {
             return;
         }
         let Some(country) = self.matcher.lookup(&game.input) else {
-            game.say(
-                format!("« {} » : pays inconnu", game.input.trim()),
-                style::MUTED,
-            );
+            let typed = geo_core::normalize(&game.input);
+            let message = match WORLD
+                .territories
+                .iter()
+                .find(|t| t.answers.contains(&typed))
+            {
+                Some(territory) => match territory.owner {
+                    Some(owner) => format!(
+                        "{} n'est pas un pays du quiz (rattachement : {})",
+                        territory.name, WORLD.countries[owner].name
+                    ),
+                    None => format!("{} n'est pas un pays du quiz", territory.name),
+                },
+                None => format!("« {} » : pays inconnu", game.input.trim()),
+            };
+            game.say(message, style::MUTED);
             return;
         };
         let name = &WORLD.countries[country].name;
