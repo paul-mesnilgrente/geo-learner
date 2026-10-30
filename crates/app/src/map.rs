@@ -81,22 +81,21 @@ impl ProjShape {
         let bbox = bounds(hi.iter().flatten());
         let [x, y] = project(lon, lat, center);
         let label = Point::new(x, y);
-        // Partie principale : l'anneau qui contient le point d'étiquette, sinon le plus proche.
+        // Partie principale : l'anneau qui contient le point d'étiquette, sinon le plus proche
+        // relativement à sa taille (la Nouvelle-Zélande a son point entre ses deux îles, Kiribati
+        // sur Tarawa, bien plus petite que l'île Christmas).
         let core = hi
             .iter()
             .map(|r| bounds(r.iter()))
             .min_by(|a, b| {
-                let da = if a.contains(label) {
-                    0.0
-                } else {
-                    a.center().distance(label)
+                let score = |r: &Rectangle| {
+                    if r.contains(label) {
+                        0.0
+                    } else {
+                        r.center().distance(label) / r.area().sqrt().max(1e-9)
+                    }
                 };
-                let db = if b.contains(label) {
-                    0.0
-                } else {
-                    b.center().distance(label)
-                };
-                da.total_cmp(&db).then(b.area().total_cmp(&a.area()))
+                score(a).total_cmp(&score(b))
             })
             .unwrap_or(bbox);
         Self {
@@ -942,5 +941,33 @@ mod tests {
         assert!(contains(&rings, Point::new(0.5, 0.5)));
         assert!(!contains(&rings, Point::new(2.0, 2.0)));
         assert!(!contains(&rings, Point::new(5.0, 2.0)));
+    }
+}
+
+#[cfg(test)]
+mod sizes {
+    use super::*;
+    use crate::WORLD;
+
+    /// Taille à l'écran (plus grande dimension, en pixels) de quelques pays sur la vue Monde.
+    #[test]
+    #[ignore]
+    fn world_sizes() {
+        let world = &WORLD.regions[0];
+        let projection = Projection::new(&WORLD, world.center);
+        let view = view_rect(world.view, world.center);
+        for size in [Size::new(1070.0, 800.0), Size::new(1630.0, 1020.0)] {
+            let t = Transform::new(Camera::fit(view), view, size);
+            let mut line = format!("{}x{} :", size.width, size.height);
+            for code in [
+                "SVN", "GNB", "BEL", "NLD", "CHE", "PRT", "HUN", "GHA", "FRA", "DEU", "ESP", "ITA",
+                "UKR", "SEN", "KOR", "IRQ", "NZL", "JPN",
+            ] {
+                let c = WORLD.countries.iter().position(|x| x.code == code).unwrap();
+                let core = projection.core(c);
+                line += &format!(" {code}={:.0}", core.width.max(core.height) * t.scale);
+            }
+            println!("{line}");
+        }
     }
 }

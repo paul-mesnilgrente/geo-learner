@@ -22,8 +22,9 @@ const ANSWER_INPUT: &str = "answer";
 /// Délai avant de valider un nom qui est aussi le début d'un autre (« Niger » / « Nigeria »).
 const AMBIGUOUS_DELAY: Duration = Duration::from_millis(900);
 const FEEDBACK_DURATION: Duration = Duration::from_millis(2600);
-/// Taille minimale (en pixels) d'un pays à deviner pour qu'on le voie sans zoomer davantage.
-const TARGET_MIN_PX: f32 = 14.0;
+/// Taille minimale d'un pays à deviner, en part de la hauteur de la carte, pour qu'on le
+/// reconnaisse sans zoomer (Slovénie, Belgique, Guinée-Bissau… sont en dessous sur le monde).
+const TARGET_MIN_SHARE: f32 = 0.04;
 /// Marges de la carte occupées par l'interface : invite (haut), boutons (droite),
 /// barre de saisie (bas).
 const SAFE_AREA: map::Insets = map::Insets {
@@ -1568,7 +1569,7 @@ impl Game {
         let current = transform(self.camera);
         if self.manual_camera
             && current.nudge(core, SAFE_AREA) == Vector::ZERO
-            && core.width.max(core.height) * current.scale >= TARGET_MIN_PX
+            && core.width.max(core.height) * current.scale >= self.target_min_px()
         {
             self.manual_camera = false;
             return;
@@ -1583,14 +1584,18 @@ impl Game {
         }
     }
 
-    /// Cadrage qui situe le pays dans son contexte : la vue d'ensemble s'il y mesure au moins
-    /// `TARGET_MIN_PX`, sinon son continent, où un pays minuscule (île, micro-État) est
+    fn target_min_px(&self) -> f32 {
+        TARGET_MIN_SHARE * self.map_size.width.min(self.map_size.height)
+    }
+
+    /// Cadrage qui situe le pays dans son contexte : la vue d'ensemble s'il y est assez grand
+    /// (`TARGET_MIN_SHARE`), sinon son continent, où un pays minuscule (île, micro-État) est
     /// repéré par le cercle pulsant.
     fn context_camera(&self, target: usize) -> Camera {
         let overview = Camera::fit(self.view);
         let core = self.projection.core(target);
         let scale = Transform::new(overview, self.view, self.map_size).scale;
-        if core.width.max(core.height) * scale >= TARGET_MIN_PX {
+        if core.width.max(core.height) * scale >= self.target_min_px() {
             return overview;
         }
         let Some(continent) = WORLD.continent_of(target) else {
