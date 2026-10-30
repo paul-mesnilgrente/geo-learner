@@ -21,6 +21,8 @@ pub struct Demo {
     pub listening: bool,
     pub give_up: bool,
     pub summary: bool,
+    /// Textes saisis l'un après l'autre dans le champ de réponse.
+    pub typed: Vec<String>,
 }
 
 pub fn demo() -> Option<Demo> {
@@ -51,6 +53,7 @@ pub fn demo() -> Option<Demo> {
             "voice" => demo.listening = value == "listening",
             "giveup" => demo.give_up = true,
             "summary" => demo.summary = true,
+            "type" => demo.typed = value.split('|').map(str::to_owned).collect(),
             _ => {}
         }
     }

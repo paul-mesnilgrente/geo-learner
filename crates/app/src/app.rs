@@ -146,7 +146,18 @@ impl App {
         let mut app = app;
         app.voice.refresh_installed();
         #[cfg(debug_assertions)]
-        let app = app.with_demo();
+        {
+            // Saisie simulée (`type=…` dans GEO_DEMO), par le même chemin que le clavier.
+            let typed = crate::dev::demo().map(|d| d.typed).unwrap_or_default();
+            let app = app.with_demo();
+            let task = typed
+                .into_iter()
+                .fold(operation::focus(ANSWER_INPUT), |task, t| {
+                    task.chain(Task::done(Message::Input(t)))
+                });
+            (app, task)
+        }
+        #[cfg(not(debug_assertions))]
         (app, Task::none())
     }
 
@@ -1243,13 +1254,19 @@ impl App {
             .padding(12)
             .max_width(640)
             .style(style::floating);
-        match &game.feedback {
-            Some(feedback) => column![feedback_chip(feedback), card]
-                .spacing(10)
-                .align_x(Center)
-                .into(),
-            None => card.into(),
-        }
+        // La structure ne doit pas changer quand un message apparaît : iced perdrait
+        // l'état du champ (et donc le focus) s'il changeait de place dans l'arbre.
+        let feedback: Element<'a, Message> = match &game.feedback {
+            Some(feedback) => feedback_chip(feedback),
+            None => space().into(),
+        };
+        column![
+            container(feedback).height(34).align_y(Vertical::Bottom),
+            card
+        ]
+        .spacing(8)
+        .align_x(Center)
+        .into()
     }
 
     fn sidebar<'a>(&'a self, game: &'a Game) -> Element<'a, Message> {
