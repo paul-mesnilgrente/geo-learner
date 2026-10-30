@@ -1,5 +1,5 @@
 //! Saisie vocale hors ligne : micro (cpal) → 16 kHz → découpage en phrases → transcription
-//! (Whisper ou Vosk) → noms de pays.
+//! (Vosk, grammaire limitée aux pays) → noms de pays.
 //!
 //! Diagnostic : avec `GEO_VOICE_DUMP=<dossier>`, chaque phrase captée est enregistrée en WAV
 //! avec sa transcription.
@@ -17,12 +17,12 @@ use iced::Subscription;
 use iced::futures::channel::mpsc::{self, Sender};
 use iced::futures::{SinkExt, Stream, StreamExt};
 
-pub use models::{Engine, save_engine, saved_engine};
+pub use models::{MODEL_SIZE_MB, installed};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum State {
     Idle,
-    Downloading(Engine, f32),
+    Downloading(f32),
     Loading,
     Listening,
     Error(String),
@@ -49,9 +49,9 @@ pub enum Event {
 
 #[derive(Debug, Clone, Copy)]
 pub enum Command {
-    Start(Engine),
+    Start,
     Stop,
-    Download(Engine),
+    Download,
 }
 
 pub fn subscription() -> Subscription<Event> {
@@ -69,7 +69,7 @@ fn worker() -> impl Stream<Item = Event> {
 
         while let Some(command) = inbox.next().await {
             match command {
-                Command::Start(engine) => {
+                Command::Start => {
                     if session
                         .as_ref()
                         .is_some_and(|stop| !stop.load(Ordering::Relaxed))
@@ -80,7 +80,7 @@ fn worker() -> impl Stream<Item = Event> {
                     session = Some(stop.clone());
                     let mut tx = output.clone();
                     std::thread::spawn(move || {
-                        let state = match listen(engine, &mut tx, &stop) {
+                        let state = match listen(&mut tx, &stop) {
                             Ok(()) => State::Idle,
                             Err(e) => State::Error(e),
                         };
@@ -95,16 +95,16 @@ fn worker() -> impl Stream<Item = Event> {
                         stop.store(true, Ordering::Relaxed);
                     }
                 }
-                Command::Download(engine) => {
-                    if engine.installed() || downloading.swap(true, Ordering::Relaxed) {
+                Command::Download => {
+                    if models::installed() || downloading.swap(true, Ordering::Relaxed) {
                         continue;
                     }
                     let mut tx = output.clone();
                     let downloading = downloading.clone();
                     std::thread::spawn(move || {
                         let mut progress = tx.clone();
-                        let result = models::download(engine, |p| {
-                            let _ = progress.try_send(Event::State(State::Downloading(engine, p)));
+                        let result = models::download(|p| {
+                            let _ = progress.try_send(Event::State(State::Downloading(p)));
                         });
                         downloading.store(false, Ordering::Relaxed);
                         let state = match result {
@@ -119,9 +119,9 @@ fn worker() -> impl Stream<Item = Event> {
     })
 }
 
-fn listen(engine: Engine, tx: &mut Sender<Event>, stop: &AtomicBool) -> Result<(), String> {
+fn listen(tx: &mut Sender<Event>, stop: &AtomicBool) -> Result<(), String> {
     let _ = tx.try_send(Event::State(State::Loading));
-    let mut transcriber = engine::load(engine)?;
+    let mut transcriber = engine::Vosk::load()?;
 
     // La transcription tourne à part pour ne jamais bloquer la capture.
     let (jobs, inbox) = std_mpsc::channel::<Job>();
@@ -129,7 +129,7 @@ fn listen(engine: Engine, tx: &mut Sender<Event>, stop: &AtomicBool) -> Result<(
     let transcription = {
         let mut out = tx.clone();
         let busy = busy.clone();
-        std::thread::spawn(move || transcribe_jobs(transcriber.as_mut(), inbox, &busy, &mut out))
+        std::thread::spawn(move || transcribe_jobs(&mut transcriber, inbox, &busy, &mut out))
     };
 
     let device = cpal::default_host()
@@ -280,7 +280,7 @@ enum Job {
 }
 
 fn transcribe_jobs(
-    transcriber: &mut dyn engine::Transcriber,
+    transcriber: &mut engine::Vosk,
     inbox: std_mpsc::Receiver<Job>,
     busy: &AtomicBool,
     out: &mut Sender<Event>,
@@ -378,7 +378,7 @@ impl Agreement {
 mod tests {
     use super::*;
 
-    /// Ouvre le micro par défaut pendant 3 s avec le vrai pipeline (moteur choisi installé requis) :
+    /// Ouvre le micro par défaut pendant 3 s avec le vrai pipeline (modèle installé requis) :
     /// `cargo test -p geo-learner -- --ignored listens --nocapture`.
     #[test]
     #[ignore]
@@ -386,8 +386,7 @@ mod tests {
         let (mut tx, mut rx) = mpsc::channel(4096);
         let stop = Arc::new(AtomicBool::new(false));
         let flag = stop.clone();
-        let engine = saved_engine();
-        let worker = std::thread::spawn(move || listen(engine, &mut tx, &flag));
+        let worker = std::thread::spawn(move || listen(&mut tx, &flag));
         std::thread::sleep(Duration::from_secs(3));
         stop.store(true, Ordering::Relaxed);
         worker.join().unwrap().unwrap();
@@ -395,7 +394,7 @@ mod tests {
         while let Ok(e) = rx.try_recv() {
             events.push(e);
         }
-        println!("{} évènements avec {}", events.len(), engine.label());
+        println!("{} évènements", events.len());
         assert!(
             events
                 .iter()
@@ -444,57 +443,45 @@ mod tests {
             .chunks(2)
             .map(|c| f32::from(i16::from_le_bytes([c[0], c[1]])) / 32768.0)
             .collect();
-        for engine in Engine::ALL.into_iter().filter(|e| e.installed()) {
-            let mut transcriber = engine::load(engine).unwrap();
-            let (jobs, inbox) = std_mpsc::channel();
-            let busy = Arc::new(AtomicBool::new(false));
-            let (mut tx, mut rx) = mpsc::channel(4096);
-            let worker = {
-                let (busy, mut out) = (busy.clone(), tx.clone());
-                std::thread::spawn(move || {
-                    transcribe_jobs(transcriber.as_mut(), inbox, &busy, &mut out)
-                })
-            };
-            let mut pipeline = Pipeline::new(audio::RATE, jobs, busy);
-            let start = Instant::now();
-            // Blocs de 20 ms, au rythme réel, suivis d'une seconde de silence.
-            let silence = vec![0.0; audio::RATE as usize];
-            for chunk in audio.chunks(320).chain(silence.chunks(320)) {
-                pipeline.feed(chunk, &mut tx);
-                std::thread::sleep(Duration::from_millis(20));
-                while let Ok(event) = rx.try_recv() {
-                    if let Event::Heard {
-                        countries, done, ..
-                    } = event
-                    {
-                        let names: Vec<&str> = countries
-                            .iter()
-                            .map(|&c| crate::WORLD.countries[c].name.as_str())
-                            .collect();
-                        println!(
-                            "{:>13} {:5.2} s {names:?}{}",
-                            engine.label(),
-                            start.elapsed().as_secs_f32(),
-                            if done { " (fin de phrase)" } else { "" }
-                        );
-                    }
-                }
+        let mut transcriber = engine::Vosk::load().unwrap();
+        let (jobs, inbox) = std_mpsc::channel();
+        let busy = Arc::new(AtomicBool::new(false));
+        let (mut tx, mut rx) = mpsc::channel(4096);
+        let worker = {
+            let (busy, mut out) = (busy.clone(), tx.clone());
+            std::thread::spawn(move || transcribe_jobs(&mut transcriber, inbox, &busy, &mut out))
+        };
+        let mut pipeline = Pipeline::new(audio::RATE, jobs, busy);
+        let start = Instant::now();
+        let report = |event: Event| {
+            if let Event::Heard {
+                countries, done, ..
+            } = event
+            {
+                let names: Vec<&str> = countries
+                    .iter()
+                    .map(|&c| crate::WORLD.countries[c].name.as_str())
+                    .collect();
+                println!(
+                    "{:5.2} s {names:?}{}",
+                    start.elapsed().as_secs_f32(),
+                    if done { " (fin de phrase)" } else { "" }
+                );
             }
-            drop(pipeline);
-            worker.join().unwrap();
+        };
+        // Blocs de 20 ms, au rythme réel, suivis d'une seconde de silence.
+        let silence = vec![0.0; audio::RATE as usize];
+        for chunk in audio.chunks(320).chain(silence.chunks(320)) {
+            pipeline.feed(chunk, &mut tx);
+            std::thread::sleep(Duration::from_millis(20));
             while let Ok(event) = rx.try_recv() {
-                if let Event::Heard { countries, .. } = event {
-                    let names: Vec<&str> = countries
-                        .iter()
-                        .map(|&c| crate::WORLD.countries[c].name.as_str())
-                        .collect();
-                    println!(
-                        "{:>13} {:5.2} s {names:?} (fin de phrase)",
-                        engine.label(),
-                        start.elapsed().as_secs_f32()
-                    );
-                }
+                report(event);
             }
+        }
+        drop(pipeline);
+        worker.join().unwrap();
+        while let Ok(event) = rx.try_recv() {
+            report(event);
         }
     }
 }

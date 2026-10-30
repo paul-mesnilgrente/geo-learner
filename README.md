@@ -33,25 +33,23 @@ suivant ou la fin de la phrase. Tout est fait localement :
 1. **Capture** : le micro est lu avec `cpal`, ramené en mono et ré-échantillonné à 16 kHz.
 2. **Découpage** : la détection de parole repose sur l'énergie du signal, avec un seuil qui
    s'adapte au bruit de fond.
-3. **Transcription** de la phrase en cours par le moteur choisi, toutes les 0,3 s environ.
+3. **Transcription** de la phrase en cours, toutes les 0,3 s environ.
 4. **Recherche des noms de pays**, qui tolère de petites fautes (« État-Unis » → États-Unis).
 
-| Moteur | Modèle | Taille | Principe |
-|---|---|---|---|
-| **Vosk** (recommandé) | `vosk-model-small-fr-0.22` (via `utter`) | 42 Mo | Grammaire limitée aux noms de pays, instantané |
-| Whisper small | `ggml-small-q5_1` (whisper.cpp) | 190 Mo | Transcription libre, plus lente ; peine sur les noms isolés (« Uruguay ») |
-| Whisper base | `ggml-base-q5_1` (whisper.cpp) | 60 Mo | Idem, plus rapide et moins précis |
+La reconnaissance utilise [Vosk](https://alphacephei.com/vosk/) via `utter`, un décodeur en pur
+Rust, avec le modèle `vosk-model-small-fr-0.22` (42 Mo) et une grammaire limitée aux noms de pays.
+Whisper a été essayé puis retiré : en transcription libre, il comprend mal les noms isolés
+(« Uruguay » devient « Le rodoin »), et il alourdissait l'application.
 
-Les modèles se téléchargent depuis l'écran d'accueil, avec le `curl` du système. Leur empreinte
+Le modèle se télécharge depuis l'écran d'accueil, avec le `curl` du système. Son empreinte
 SHA-256 est vérifiée avant installation : un fichier corrompu ou modifié est rejeté.
 
 Pour le diagnostic :
 - `GEO_VOICE_DUMP=<dossier>` enregistre chaque phrase captée (fichier WAV et sa transcription) ;
 - `GEO_VOICE_SAMPLES=<dossier> cargo test -p geo-learner --release -- --ignored samples --nocapture`
-  repasse ces fichiers dans chaque moteur installé ;
+  repasse ces fichiers dans le moteur ;
 - `GEO_VOICE_WAV=<fichier> cargo test -p geo-learner --release -- --ignored streams --nocapture`
-  rejoue un enregistrement en temps réel et montre quand chaque pays est validé ;
-- `GEO_WHISPER_PROMPT` remplace l'amorce donnée à Whisper.
+  rejoue un enregistrement en temps réel et montre quand chaque pays est validé.
 
 ## Données locales
 
@@ -62,27 +60,22 @@ Pour le diagnostic :
 
 Contenu :
 - `progress.json` : historique des parties ;
-- `models/` : modèles vocaux ;
-- `settings.json` : moteur vocal choisi.
+- `models/` : modèle vocal.
 
 ## Compiler et lancer
 
 Prérequis :
 
 - [Rust](https://rustup.rs) (édition 2024, Rust ≥ 1.93) ;
-- CMake et un compilateur C++, pour whisper.cpp. Sous Windows, les « Build Tools » de
-  Visual Studio fournissent les deux.
-- sous Linux, les en-têtes ALSA pour le micro : `sudo apt install libasound2-dev pkg-config cmake`.
-
-`.cargo/config.toml` force une compilation portable de whisper.cpp (`GGML_NATIVE=OFF`, AVX2) :
-l'exécutable fonctionne ainsi sur d'autres processeurs que celui de la machine de build.
+- sous Linux, les en-têtes ALSA pour le micro : `sudo apt install libasound2-dev pkg-config`.
+  Sous Windows, il faut les « Build Tools » de Visual Studio (compilateur MSVC).
 
 ```sh
 cargo run --release -p geo-learner     # lancer l'application
 cargo test --workspace                 # tests
 ```
 
-Le binaire release fait environ 12 Mo. La carte et les polices sont intégrées, pas les modèles vocaux.
+Le binaire release fait environ 11 Mo. La carte et les polices sont intégrées, pas les modèles vocaux.
 
 ## Organisation
 

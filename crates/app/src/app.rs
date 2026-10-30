@@ -42,8 +42,7 @@ pub enum Message {
     Tick(Instant),
     Voice(voice::Event),
     ToggleMic,
-    DownloadModel(voice::Engine),
-    SelectEngine(voice::Engine),
+    DownloadModel,
     Key(keyboard::Event),
     #[cfg(debug_assertions)]
     DevTick,
@@ -64,9 +63,8 @@ pub struct App {
 
 struct Voice {
     commands: Option<iced::futures::channel::mpsc::Sender<voice::Command>>,
-    engine: voice::Engine,
-    /// Moteurs dont le modèle est installé (mis à jour après chaque téléchargement).
-    installed: Vec<voice::Engine>,
+    /// Le modèle vocal est installé (mis à jour après chaque téléchargement).
+    installed: bool,
     state: voice::State,
     speaking: bool,
     /// Transcription provisoire de la phrase en cours.
@@ -78,14 +76,7 @@ struct Voice {
 
 impl Voice {
     fn refresh_installed(&mut self) {
-        self.installed = voice::Engine::ALL
-            .into_iter()
-            .filter(|e| e.installed())
-            .collect();
-    }
-
-    fn ready(&self) -> bool {
-        self.installed.contains(&self.engine)
+        self.installed = voice::installed();
     }
 
     fn active(&self) -> bool {
@@ -140,8 +131,7 @@ impl App {
             game: None,
             voice: Voice {
                 commands: None,
-                engine: voice::saved_engine(),
-                installed: Vec::new(),
+                installed: false,
                 state: voice::State::Idle,
                 speaking: false,
                 partial: String::new(),
@@ -311,16 +301,7 @@ impl App {
             Message::Tick(now) => self.on_tick(now),
             Message::Voice(event) => self.on_voice(event),
             Message::ToggleMic => self.toggle_mic(),
-            Message::DownloadModel(engine) => self.send_voice(voice::Command::Download(engine)),
-            Message::SelectEngine(engine) => {
-                if engine != self.voice.engine {
-                    if self.voice.active() {
-                        self.send_voice(voice::Command::Stop);
-                    }
-                    self.voice.engine = engine;
-                    voice::save_engine(engine);
-                }
-            }
+            Message::DownloadModel => self.send_voice(voice::Command::Download),
             Message::Key(keyboard::Event::KeyPressed { key, modifiers, .. }) => {
                 use keyboard::key::Named;
                 match key.as_ref() {
@@ -444,13 +425,8 @@ impl App {
                 .iter()
                 .find(|t| t.answers.contains(&typed))
             {
-                Some(territory) => match territory.owner {
-                    Some(owner) => format!(
-                        "{} n'est pas un pays du quiz (rattachement : {})",
-                        territory.name, WORLD.countries[owner].name
-                    ),
-                    None => format!("{} n'est pas un pays du quiz", territory.name),
-                },
+                // Sans dire à quel pays il appartient : ce serait un indice.
+                Some(territory) => format!("{} n'est pas un pays", territory.name),
                 None => format!("« {} » : pays inconnu", game.input.trim()),
             };
             game.say(message, style::MUTED);
@@ -591,10 +567,10 @@ impl App {
         if self.voice.active() {
             self.send_voice(voice::Command::Stop);
         } else if matches!(self.voice.state, voice::State::Downloading(..)) {
-        } else if !self.voice.ready() {
-            self.send_voice(voice::Command::Download(self.voice.engine));
+        } else if !self.voice.installed {
+            self.send_voice(voice::Command::Download);
         } else if self.game.is_some() {
-            self.send_voice(voice::Command::Start(self.voice.engine));
+            self.send_voice(voice::Command::Start);
         }
     }
 
@@ -796,6 +772,25 @@ impl App {
     }
 
     fn voice_card(&self) -> Element<'_, Message> {
+        let (status, color) = match &self.voice.state {
+            voice::State::Downloading(p) => {
+                (format!("Téléchargement… {}", percent(*p)), style::MUTED)
+            }
+            voice::State::Error(e) => (e.clone(), style::DANGER),
+            voice::State::Listening => ("Écoute en cours.".into(), style::SUCCESS),
+            _ if !self.voice.installed => (
+                format!(
+                    "Le modèle de reconnaissance française ({} Mo) doit être téléchargé une fois. Tout se passe ensuite hors ligne.",
+                    voice::MODEL_SIZE_MB
+                ),
+                style::MUTED,
+            ),
+            _ => (
+                "Prête. En partie, cliquez sur le micro (ou Ctrl+M) et citez les pays à la suite."
+                    .into(),
+                style::MUTED,
+            ),
+        };
         let mut body = column![
             row![
                 icon(Icon::Mic, 18.0, style::TEXT),
@@ -803,63 +798,37 @@ impl App {
             ]
             .spacing(8)
             .align_y(Center),
-            text("Le modèle choisi est téléchargé une fois ; la reconnaissance se fait ensuite hors ligne. En partie : micro ou Ctrl+M.")
-                .size(13)
-                .color(style::MUTED),
+            text(status).size(13).color(color),
         ]
         .spacing(10);
-
-        for engine in voice::Engine::ALL {
-            let status: Element<'_, Message> = match &self.voice.state {
-                voice::State::Downloading(e, p) if *e == engine => {
-                    text(percent(*p)).size(13).color(style::ACCENT).into()
-                }
-                _ if self.voice.installed.contains(&engine) => container(text("Installé").size(12))
-                    .padding([3, 10])
-                    .style(style::chip(style::SUCCESS))
-                    .into(),
-                _ => button(
-                    row![
-                        icon(Icon::Download, 13.0, style::TEXT),
-                        text(format!("{} Mo", engine.size_mb())).size(12)
-                    ]
-                    .spacing(6)
-                    .align_y(Center),
-                )
-                .padding([5, 10])
-                .style(style::secondary)
-                .on_press(Message::DownloadModel(engine))
-                .into(),
-            };
-            body = body.push(
-                button(
-                    row![
-                        column![
-                            text(engine.label()).size(14).font(style::FONT_SEMIBOLD),
-                            text(engine.description()).size(12).color(style::MUTED),
+        match &self.voice.state {
+            voice::State::Downloading(p) => {
+                body = body.push(
+                    progress_bar(0.0..=1.0, *p)
+                        .girth(6)
+                        .style(style::progress(style::ACCENT)),
+                );
+            }
+            _ if !self.voice.installed => {
+                body = body.push(
+                    button(
+                        row![
+                            icon(Icon::Download, 15.0, style::TEXT),
+                            text(format!(
+                                "Télécharger le modèle ({} Mo)",
+                                voice::MODEL_SIZE_MB
+                            ))
+                            .size(14)
                         ]
-                        .spacing(2)
-                        .width(Fill),
-                        status,
-                    ]
-                    .spacing(10)
-                    .align_y(Center),
-                )
-                .padding([10, 12])
-                .width(Fill)
-                .style(style::option_card(self.voice.engine == engine))
-                .on_press(Message::SelectEngine(engine)),
-            );
-        }
-        if let voice::State::Downloading(_, p) = &self.voice.state {
-            body = body.push(
-                progress_bar(0.0..=1.0, *p)
-                    .girth(5)
-                    .style(style::progress(style::ACCENT)),
-            );
-        }
-        if let voice::State::Error(e) = &self.voice.state {
-            body = body.push(text(e.clone()).size(13).color(style::DANGER));
+                        .spacing(8)
+                        .align_y(Center),
+                    )
+                    .padding([9, 14])
+                    .style(style::secondary)
+                    .on_press(Message::DownloadModel),
+                );
+            }
+            _ => {}
         }
         container(body)
             .padding(18)
@@ -1245,7 +1214,7 @@ impl App {
                     .into(),
                 )
             }
-            voice::State::Downloading(_, p) => Some(
+            voice::State::Downloading(p) => Some(
                 row![
                     progress_bar(0.0..=1.0, *p)
                         .length(120)
