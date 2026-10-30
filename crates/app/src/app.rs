@@ -9,7 +9,7 @@ use iced::widget::{
     Column, Row, button, canvas, column, container, opaque, operation, progress_bar, row, rule,
     scrollable, sensor, space, stack, text, text_input,
 };
-use iced::{Center, Color, Element, Fill, Size, Subscription, Task, Theme, keyboard, time};
+use iced::{Center, Color, Element, Fill, Size, Subscription, Task, Theme, Vector, keyboard, time};
 
 use crate::WORLD;
 use crate::icons::{Icon, icon};
@@ -22,6 +22,16 @@ const ANSWER_INPUT: &str = "answer";
 /// Délai avant de valider un nom qui est aussi le début d'un autre (« Niger » / « Nigeria »).
 const AMBIGUOUS_DELAY: Duration = Duration::from_millis(900);
 const FEEDBACK_DURATION: Duration = Duration::from_millis(2600);
+/// Taille minimale (en pixels) d'un pays à deviner pour qu'on le voie sans zoomer davantage.
+const TARGET_MIN_PX: f32 = 14.0;
+/// Marges de la carte occupées par l'interface : invite (haut), boutons (droite),
+/// barre de saisie (bas).
+const SAFE_AREA: map::Insets = map::Insets {
+    top: 90.0,
+    right: 80.0,
+    bottom: 150.0,
+    left: 40.0,
+};
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -178,6 +188,16 @@ impl App {
             return self;
         }
         let mut game = Game::new(self.region, self.mode);
+        if let Some(first) = demo
+            .target
+            .as_deref()
+            .and_then(|code| WORLD.countries.iter().position(|c| c.code == code))
+        {
+            let members = WORLD.regions[self.region].members.clone();
+            let mut order: Vec<usize> = members.iter().copied().filter(|&c| c != first).collect();
+            order.insert(0, first);
+            game.quiz = Quiz::new(self.mode, WORLD.countries.len(), members, order);
+        }
         for code in &demo.answers {
             if let Some(c) = WORLD.countries.iter().position(|c| &c.code == code) {
                 let outcome = game.quiz.submit(c);
@@ -1543,31 +1563,48 @@ impl Game {
             return;
         }
         let core = self.projection.core(target);
-        let visible = |camera: Camera| {
-            let t = Transform::new(camera, self.view, self.map_size);
-            t.shows(core, 60.0) && core.width.max(core.height) * t.scale >= 10.0
-        };
-        let to = if self.manual_camera {
-            // L'utilisateur a pris la main : on ne bouge que si le pays est caché ou trop petit.
-            if visible(self.camera) {
-                self.manual_camera = false;
-                return;
-            }
-            self.camera
-                .focus(core, self.view, self.map_size, 30.0, 10.0)
-        } else {
-            // Cadrage automatique : la vue d'ensemble dès qu'elle suffit, sinon le zoom minimal.
-            let overview = Camera::fit(self.view);
-            if visible(overview) {
-                overview
-            } else {
-                overview.focus(core, self.view, self.map_size, 30.0, 10.0)
-            }
-        };
+        let transform = |camera: Camera| Transform::new(camera, self.view, self.map_size);
+        // L'utilisateur a pris la main : on ne bouge que si le pays est caché ou trop petit.
+        let current = transform(self.camera);
+        if self.manual_camera
+            && current.nudge(core, SAFE_AREA) == Vector::ZERO
+            && core.width.max(core.height) * current.scale >= TARGET_MIN_PX
+        {
+            self.manual_camera = false;
+            return;
+        }
         self.manual_camera = false;
+        let mut to = self.context_camera(target);
+        // Décale juste assez pour que le pays ne soit pas sous l'invite, la barre de saisie
+        // ou les boutons.
+        to.center += transform(to).nudge(core, SAFE_AREA);
         if to != self.camera {
             self.animate_to(to);
         }
+    }
+
+    /// Cadrage qui situe le pays dans son contexte : la vue d'ensemble s'il y mesure au moins
+    /// `TARGET_MIN_PX`, sinon son continent, où un pays minuscule (île, micro-État) est
+    /// repéré par le cercle pulsant.
+    fn context_camera(&self, target: usize) -> Camera {
+        let overview = Camera::fit(self.view);
+        let core = self.projection.core(target);
+        let scale = Transform::new(overview, self.view, self.map_size).scale;
+        if core.width.max(core.height) * scale >= TARGET_MIN_PX {
+            return overview;
+        }
+        let Some(continent) = WORLD.continent_of(target) else {
+            return overview;
+        };
+        let area = map::view_rect(
+            WORLD.regions[continent].view,
+            WORLD.regions[self.region].center,
+        );
+        // Inutile si la partie se joue déjà sur ce continent (ou une zone plus petite).
+        if area.width >= self.view.width * 0.9 && area.height >= self.view.height * 0.9 {
+            return overview;
+        }
+        Camera::frame(area, self.view, self.map_size)
     }
 
     fn after_answer(&mut self) {

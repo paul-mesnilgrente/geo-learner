@@ -23,6 +23,8 @@ pub struct Demo {
     pub summary: bool,
     /// Textes saisis l'un après l'autre dans le champ de réponse.
     pub typed: Vec<String>,
+    /// Code du premier pays à deviner (modes Nommer et Localiser).
+    pub target: Option<String>,
 }
 
 pub fn demo() -> Option<Demo> {
@@ -53,6 +55,7 @@ pub fn demo() -> Option<Demo> {
             "voice" => demo.listening = value == "listening",
             "giveup" => demo.give_up = true,
             "summary" => demo.summary = true,
+            "target" => demo.target = Some(value.to_owned()),
             "type" => demo.typed = value.split('|').map(str::to_owned).collect(),
             _ => {}
         }

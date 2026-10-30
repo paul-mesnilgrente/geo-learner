@@ -144,6 +144,15 @@ impl Camera {
         }
     }
 
+    /// Caméra qui montre `area` en entier, `view` étant le cadrage de référence (zoom 1).
+    pub fn frame(area: Rectangle, view: Rectangle, size: Size) -> Self {
+        Camera {
+            center: area.center(),
+            zoom: fit_scale(area, size) / fit_scale(view, size),
+        }
+        .clamped()
+    }
+
     pub fn lerp(self, to: Camera, t: f32) -> Camera {
         Camera {
             center: Point::new(
@@ -177,28 +186,6 @@ impl Camera {
         .clamped()
     }
 
-    /// Caméra centrée sur une boîte. Le zoom actuel est conservé s'il convient ; sinon il est
-    /// ajusté pour que la boîte mesure au moins `min_px` pixels (sans dépasser `max_zoom`)
-    /// et tienne dans l'écran.
-    pub fn focus(
-        self,
-        target: Rectangle,
-        view: Rectangle,
-        size: Size,
-        min_px: f32,
-        max_zoom: f32,
-    ) -> Camera {
-        let base = Transform::new(Camera { zoom: 1.0, ..self }, view, size).scale;
-        let extent = target.width.max(target.height).max(1e-6) * base;
-        let smallest = (min_px / extent).min(max_zoom);
-        let largest = (0.6 * size.width.min(size.height) / extent).max(smallest);
-        Camera {
-            center: target.center(),
-            zoom: self.zoom.clamp(smallest, largest),
-        }
-        .clamped()
-    }
-
     fn clamped(self) -> Camera {
         Camera {
             center: Point::new(
@@ -208,6 +195,20 @@ impl Camera {
             zoom: self.zoom.clamp(MIN_ZOOM, MAX_ZOOM),
         }
     }
+}
+
+/// Échelle (pixels par unité projetée) qui fait tenir `area` dans `size`, avec une marge.
+fn fit_scale(area: Rectangle, size: Size) -> f32 {
+    (size.width / area.width.max(1e-6)).min(size.height / area.height.max(1e-6)) * 0.94
+}
+
+/// Marges en pixels.
+#[derive(Debug, Clone, Copy)]
+pub struct Insets {
+    pub top: f32,
+    pub right: f32,
+    pub bottom: f32,
+    pub left: f32,
 }
 
 /// Passage des coordonnées projetées aux pixels du canvas.
@@ -220,11 +221,9 @@ pub struct Transform {
 
 impl Transform {
     pub fn new(camera: Camera, view: Rectangle, size: Size) -> Self {
-        let fit =
-            (size.width / view.width.max(1e-6)).min(size.height / view.height.max(1e-6)) * 0.94;
         Self {
             center: camera.center,
-            scale: fit * camera.zoom,
+            scale: fit_scale(view, size) * camera.zoom,
             half: Vector::new(size.width / 2.0, size.height / 2.0),
         }
     }
@@ -253,14 +252,31 @@ impl Transform {
         )
     }
 
-    /// La boîte (projetée) est-elle entièrement visible, avec une marge en pixels ?
-    pub fn shows(&self, r: Rectangle, margin: f32) -> bool {
+    /// Déplacement (en coordonnées projetées) à ajouter au centre de la caméra pour que
+    /// la boîte `r` tienne dans l'écran privé des marges `insets` ; nul si c'est déjà le cas.
+    pub fn nudge(&self, r: Rectangle, insets: Insets) -> Vector {
         let a = self.to_screen(Point::new(r.x, r.y + r.height));
         let b = self.to_screen(Point::new(r.x + r.width, r.y));
-        a.x >= margin
-            && a.y >= margin
-            && b.x <= self.half.x * 2.0 - margin
-            && b.y <= self.half.y * 2.0 - margin
+        let (left, top) = (insets.left, insets.top);
+        let (right, bottom) = (
+            self.half.x * 2.0 - insets.right,
+            self.half.y * 2.0 - insets.bottom,
+        );
+        let shift = |low: f32, high: f32, min: f32, max: f32| {
+            if high - low > max - min {
+                (low + high) / 2.0 - (min + max) / 2.0
+            } else if low < min {
+                low - min
+            } else if high > max {
+                high - max
+            } else {
+                0.0
+            }
+        };
+        let dx = shift(a.x, b.x, left, right);
+        let dy = shift(a.y, b.y, top, bottom);
+        // L'axe y de l'écran pointe vers le bas, celui de la carte vers le haut.
+        Vector::new(dx / self.scale, -dy / self.scale)
     }
 }
 
@@ -865,22 +881,47 @@ mod tests {
     }
 
     #[test]
-    fn focus_zooms_in_on_tiny_targets_and_out_on_large_ones() {
+    fn frame_shows_the_whole_area() {
         let view = rect(-2.0, -1.0, 4.0, 2.0);
         let size = Size::new(800.0, 600.0);
-        let tiny = rect(0.5, 0.5, 0.001, 0.001);
-        let zoomed = Camera::fit(view).focus(tiny, view, size, 30.0, 10.0);
-        assert_eq!(zoomed.zoom, 10.0);
-        assert_eq!(zoomed.center, tiny.center());
+        let area = rect(0.5, 0.2, 0.8, 0.4);
+        let camera = Camera::frame(area, view, size);
+        let t = Transform::new(camera, view, size);
+        let zero = Insets {
+            top: 0.0,
+            right: 0.0,
+            bottom: 0.0,
+            left: 0.0,
+        };
+        assert_eq!(t.nudge(area, zero), Vector::ZERO);
+        // Et pas beaucoup plus : la zone occupe presque toute la largeur.
+        assert!(area.width * t.scale > 0.9 * 800.0);
+    }
 
-        let large = rect(-1.0, -0.5, 1.5, 0.8);
-        let back = zoomed.focus(large, view, size, 30.0, 10.0);
-        let t = Transform::new(back, view, size);
-        assert!(
-            t.shows(large, 0.0),
-            "le grand pays doit tenir à l'écran (zoom {})",
-            back.zoom
-        );
+    #[test]
+    fn nudge_moves_boxes_out_of_the_margins() {
+        let view = rect(-2.0, -1.0, 4.0, 2.0);
+        let size = Size::new(800.0, 600.0);
+        let insets = Insets {
+            top: 50.0,
+            right: 50.0,
+            bottom: 150.0,
+            left: 50.0,
+        };
+        let camera = Camera::fit(view);
+        let t = Transform::new(camera, view, size);
+        // Une boîte au centre ne bouge pas.
+        assert_eq!(t.nudge(rect(-0.1, -0.1, 0.2, 0.2), insets), Vector::ZERO);
+        // Une boîte tout en bas remonte au-dessus de la marge du bas.
+        let low = rect(-0.1, -0.98, 0.1, 0.05);
+        let moved = Camera {
+            center: camera.center + t.nudge(low, insets),
+            ..camera
+        };
+        let t = Transform::new(moved, view, size);
+        assert_eq!(t.nudge(low, insets), Vector::ZERO);
+        let bottom = t.to_screen(Point::new(low.x, low.y)).y;
+        assert!(bottom <= 600.0 - 150.0 + 0.5, "{bottom}");
     }
 
     #[test]
