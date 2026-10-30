@@ -25,13 +25,15 @@ et Taïwan. Elle se modifie dans `data/countries.toml`.
 
 ## Saisie vocale
 
-Clic sur le micro (ou Ctrl+M) pendant une partie, puis on énumère les pays à voix haute en
-marquant une courte pause entre deux noms. Tout est fait localement :
+Clic sur le micro (ou Ctrl+M) pendant une partie, puis on énumère les pays à voix haute, à la
+suite. Chaque pays est validé dès que deux transcriptions successives de la phrase en cours
+s'accordent sur lui. Un nom qui peut encore s'allonger (« Niger » → « Nigeria ») attend le mot
+suivant ou la fin de la phrase. Tout est fait localement :
 
 1. **Capture** : le micro est lu avec `cpal`, ramené en mono et ré-échantillonné à 16 kHz.
 2. **Découpage** : la détection de parole repose sur l'énergie du signal, avec un seuil qui
    s'adapte au bruit de fond.
-3. **Transcription** de chaque phrase par le moteur choisi.
+3. **Transcription** de la phrase en cours par le moteur choisi, toutes les 0,3 s environ.
 4. **Recherche des noms de pays**, qui tolère de petites fautes (« État-Unis » → États-Unis).
 
 | Moteur | Modèle | Taille | Principe |
@@ -47,6 +49,8 @@ Pour le diagnostic :
 - `GEO_VOICE_DUMP=<dossier>` enregistre chaque phrase captée (fichier WAV et sa transcription) ;
 - `GEO_VOICE_SAMPLES=<dossier> cargo test -p geo-learner --release -- --ignored samples --nocapture`
   repasse ces fichiers dans chaque moteur installé ;
+- `GEO_VOICE_WAV=<fichier> cargo test -p geo-learner --release -- --ignored streams --nocapture`
+  rejoue un enregistrement en temps réel et montre quand chaque pays est validé ;
 - `GEO_WHISPER_PROMPT` remplace l'amorce donnée à Whisper.
 
 ## Données locales

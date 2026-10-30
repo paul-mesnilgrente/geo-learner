@@ -81,10 +81,10 @@ impl Resampler {
 
 const FRAME: usize = (RATE / 1000 * 30) as usize; // 30 ms
 const START_FRAMES: usize = 3; // 90 ms de parole pour démarrer
-const END_FRAMES: usize = 20; // 600 ms de silence pour terminer
+const END_FRAMES: usize = 16; // 480 ms de silence pour terminer
 const PREROLL_FRAMES: usize = 10; // 300 ms conservés avant le début
 const MIN_SPEECH_FRAMES: usize = 6; // phrases plus courtes ignorées (bruits)
-const MAX_FRAMES: usize = 400; // 12 s au plus par phrase
+const MAX_FRAMES: usize = 330; // 10 s au plus par phrase
 
 /// Détection de parole par énergie, avec un plancher de bruit adaptatif.
 pub struct Vad {
@@ -133,6 +133,11 @@ impl Vad {
                 self.frame_done(frame, events);
             }
         }
+    }
+
+    /// Audio de la phrase en cours, s'il y en a une.
+    pub fn current(&self) -> Option<&[f32]> {
+        self.active.then_some(self.segment.as_slice())
     }
 
     fn threshold(&self) -> f32 {
@@ -276,9 +281,9 @@ mod tests {
             })
             .collect();
         assert_eq!(segments.len(), 1);
-        // Parole (0,8 s) + amorce (0,3 s) + fin de silence (0,6 s).
+        // Parole (0,8 s) + amorce (0,3 s) + fin de silence (0,48 s).
         let seconds = segments[0] as f32 / RATE as f32;
-        assert!((1.5..1.9).contains(&seconds), "{seconds} s");
+        assert!((1.4..1.8).contains(&seconds), "{seconds} s");
     }
 
     #[test]

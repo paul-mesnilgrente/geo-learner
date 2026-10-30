@@ -9,6 +9,8 @@ pub struct Matcher {
     answers: HashMap<String, usize>,
     /// Réponses sans espaces, pour la recherche approchée.
     compact: Vec<(String, usize)>,
+    /// Pays dont un nom est le début du nom d'un autre (« niger » / « nigeria »).
+    extendable: Vec<bool>,
     max_words: usize,
 }
 
@@ -26,11 +28,23 @@ impl Matcher {
             .iter()
             .map(|(a, &c)| (a.replace(' ', ""), c))
             .collect();
+        let mut extendable = vec![false; world.countries.len()];
+        for (short, &c) in &answers {
+            extendable[c] |= answers.iter().any(|(long, &d)| {
+                d != c && long.len() > short.len() && long.starts_with(short.as_str())
+            });
+        }
         Self {
             answers,
             compact,
+            extendable,
             max_words,
         }
+    }
+
+    /// Un nom de ce pays peut-il encore s'allonger en celui d'un autre pays ?
+    pub fn can_extend(&self, country: usize) -> bool {
+        self.extendable[country]
     }
 
     /// Le pays dont le nom correspond exactement au texte (après normalisation).
@@ -171,5 +185,13 @@ mod tests {
         assert_eq!(levenshtein("chat", "chats"), 1);
         assert_eq!(levenshtein("", "abc"), 3);
         assert_eq!(levenshtein("kitten", "sitting"), 3);
+    }
+
+    #[test]
+    fn detects_names_that_can_grow() {
+        let m = matcher();
+        assert!(m.can_extend(0)); // guinée → guinée équatoriale
+        assert!(!m.can_extend(1));
+        assert!(!m.can_extend(2));
     }
 }

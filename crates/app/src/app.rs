@@ -69,7 +69,10 @@ struct Voice {
     installed: Vec<voice::Engine>,
     state: voice::State,
     speaking: bool,
-    transcribing: bool,
+    /// Transcription provisoire de la phrase en cours.
+    partial: String,
+    /// Pays déjà entendus dans la phrase en cours.
+    sentence: Vec<usize>,
     level: f32,
 }
 
@@ -141,7 +144,8 @@ impl App {
                 installed: Vec::new(),
                 state: voice::State::Idle,
                 speaking: false,
-                transcribing: false,
+                partial: String::new(),
+                sentence: Vec::new(),
                 level: 0.0,
             },
             #[cfg(debug_assertions)]
@@ -519,19 +523,21 @@ impl App {
                 self.voice.state = state;
             }
             voice::Event::Speaking(speaking) => self.voice.speaking = speaking,
-            voice::Event::Transcribing(busy) => self.voice.transcribing = busy,
+            voice::Event::Partial(text) => self.voice.partial = text,
             voice::Event::Level(level) => self.voice.level = level,
-            voice::Event::Heard(sentence) => self.on_heard(&sentence),
+            voice::Event::Heard {
+                countries,
+                text,
+                done,
+            } => self.on_heard(countries, &text, done),
         }
     }
 
-    fn on_heard(&mut self, sentence: &str) {
+    /// Pays reconnus à la voix, au fil de la phrase (`done` : phrase terminée).
+    fn on_heard(&mut self, countries: Vec<usize>, text: &str, done: bool) {
         let Some(game) = &mut self.game else { return };
-        let countries = self.matcher.scan_fuzzy(sentence);
-        if countries.is_empty() {
-            game.say(format!("Entendu : « {sentence} »"), style::MUTED);
-            return;
-        }
+        let earlier = self.voice.sentence.len();
+        self.voice.sentence.extend(&countries);
         match game.quiz.mode() {
             Mode::Free => {
                 for country in countries {
@@ -539,15 +545,32 @@ impl App {
                     game.apply(outcome);
                 }
             }
-            Mode::Identify => {
-                let guess = match game.quiz.target() {
-                    Some(target) if countries.contains(&target) => target,
-                    _ => countries[0],
-                };
-                let outcome = game.quiz.submit(guess);
-                game.apply(outcome);
+            // Une mauvaise réponse n'est comptée qu'en fin de phrase : la transcription
+            // provisoire peut encore se corriger.
+            Mode::Identify => match game.quiz.target() {
+                Some(target) if countries.contains(&target) => {
+                    let outcome = game.quiz.submit(target);
+                    game.apply(outcome);
+                    self.voice.sentence.clear();
+                }
+                _ if done => {
+                    if let Some(&guess) = self.voice.sentence.first() {
+                        let outcome = game.quiz.submit(guess);
+                        game.apply(outcome);
+                    }
+                }
+                _ => {}
+            },
+            Mode::Locate if !countries.is_empty() => {
+                game.say("Dans ce mode, il faut cliquer sur la carte", style::MUTED)
             }
-            Mode::Locate => game.say("Dans ce mode, il faut cliquer sur la carte", style::MUTED),
+            Mode::Locate => {}
+        }
+        if done {
+            if earlier == 0 && self.voice.sentence.is_empty() && !text.trim().is_empty() {
+                game.say(format!("Entendu : « {} »", text.trim()), style::MUTED);
+            }
+            self.voice.sentence.clear();
         }
         self.check_finished();
     }
@@ -1190,12 +1213,12 @@ impl App {
                     .into(),
             ),
             voice::State::Listening => {
-                let heard = if self.voice.transcribing {
-                    "Transcription…"
+                let heard = if !self.voice.partial.is_empty() {
+                    format!("« {} »", self.voice.partial)
                 } else if self.voice.speaking {
-                    "Parole détectée…"
+                    "Parole détectée…".to_owned()
                 } else {
-                    "Je vous écoute — marquez une courte pause entre les pays"
+                    "Je vous écoute — citez les pays à la suite".to_owned()
                 };
                 Some(
                     row![
