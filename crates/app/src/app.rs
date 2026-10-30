@@ -42,7 +42,8 @@ pub enum Message {
     Tick(Instant),
     Voice(voice::Event),
     ToggleMic,
-    DownloadModel,
+    DownloadModel(voice::Engine),
+    SelectEngine(voice::Engine),
     Key(keyboard::Event),
     #[cfg(debug_assertions)]
     DevTick,
@@ -63,9 +64,30 @@ pub struct App {
 
 struct Voice {
     commands: Option<iced::futures::channel::mpsc::Sender<voice::Command>>,
+    engine: voice::Engine,
+    /// Moteurs dont le modèle est installé (mis à jour après chaque téléchargement).
+    installed: Vec<voice::Engine>,
     state: voice::State,
-    partial: String,
+    speaking: bool,
+    transcribing: bool,
     level: f32,
+}
+
+impl Voice {
+    fn refresh_installed(&mut self) {
+        self.installed = voice::Engine::ALL
+            .into_iter()
+            .filter(|e| e.installed())
+            .collect();
+    }
+
+    fn ready(&self) -> bool {
+        self.installed.contains(&self.engine)
+    }
+
+    fn active(&self) -> bool {
+        matches!(self.state, voice::State::Listening | voice::State::Loading)
+    }
 }
 
 struct Game {
@@ -115,13 +137,18 @@ impl App {
             game: None,
             voice: Voice {
                 commands: None,
+                engine: voice::saved_engine(),
+                installed: Vec::new(),
                 state: voice::State::Idle,
-                partial: String::new(),
+                speaking: false,
+                transcribing: false,
                 level: 0.0,
             },
             #[cfg(debug_assertions)]
             dev_ticks: 0,
         };
+        let mut app = app;
+        app.voice.refresh_installed();
         #[cfg(debug_assertions)]
         let app = app.with_demo();
         (app, Task::none())
@@ -162,7 +189,7 @@ impl App {
         }
         if demo.listening {
             self.voice.state = voice::State::Listening;
-            self.voice.partial = "france allemagne".into();
+            self.voice.speaking = true;
             self.voice.level = 0.4;
         }
         if demo.give_up {
@@ -280,7 +307,16 @@ impl App {
             Message::Tick(now) => self.on_tick(now),
             Message::Voice(event) => self.on_voice(event),
             Message::ToggleMic => self.toggle_mic(),
-            Message::DownloadModel => self.send_voice(voice::Command::Download),
+            Message::DownloadModel(engine) => self.send_voice(voice::Command::Download(engine)),
+            Message::SelectEngine(engine) => {
+                if engine != self.voice.engine {
+                    if self.voice.active() {
+                        self.send_voice(voice::Command::Stop);
+                    }
+                    self.voice.engine = engine;
+                    voice::save_engine(engine);
+                }
+            }
             Message::Key(keyboard::Event::KeyPressed { key, modifiers, .. }) => {
                 use keyboard::key::Named;
                 match key.as_ref() {
@@ -477,9 +513,13 @@ impl App {
                 if let voice::State::Error(e) = &state {
                     eprintln!("{e}");
                 }
+                if state == voice::State::Idle {
+                    self.voice.refresh_installed();
+                }
                 self.voice.state = state;
             }
-            voice::Event::Partial(partial) => self.voice.partial = partial,
+            voice::Event::Speaking(speaking) => self.voice.speaking = speaking,
+            voice::Event::Transcribing(busy) => self.voice.transcribing = busy,
             voice::Event::Level(level) => self.voice.level = level,
             voice::Event::Heard(sentence) => self.on_heard(&sentence),
         }
@@ -487,7 +527,7 @@ impl App {
 
     fn on_heard(&mut self, sentence: &str) {
         let Some(game) = &mut self.game else { return };
-        let countries = self.matcher.scan(sentence);
+        let countries = self.matcher.scan_fuzzy(sentence);
         if countries.is_empty() {
             game.say(format!("Entendu : « {sentence} »"), style::MUTED);
             return;
@@ -513,21 +553,13 @@ impl App {
     }
 
     fn toggle_mic(&mut self) {
-        match self.voice.state {
-            voice::State::Missing | voice::State::Error(_)
-                if !voice_installed(&self.voice.state) =>
-            {
-                self.send_voice(voice::Command::Download)
-            }
-            voice::State::Listening | voice::State::Loading => {
-                self.send_voice(voice::Command::Stop)
-            }
-            voice::State::Downloading(_) => {}
-            _ => {
-                if self.game.is_some() {
-                    self.send_voice(voice::Command::Start)
-                }
-            }
+        if self.voice.active() {
+            self.send_voice(voice::Command::Stop);
+        } else if matches!(self.voice.state, voice::State::Downloading(..)) {
+        } else if !self.voice.ready() {
+            self.send_voice(voice::Command::Download(self.voice.engine));
+        } else if self.game.is_some() {
+            self.send_voice(voice::Command::Start(self.voice.engine));
         }
     }
 
@@ -729,16 +761,6 @@ impl App {
     }
 
     fn voice_card(&self) -> Element<'_, Message> {
-        let (status, color) = match &self.voice.state {
-            voice::State::Missing => (
-                format!("Le modèle de reconnaissance française ({} Mo) doit être téléchargé une fois. Tout se passe ensuite hors ligne.", voice::MODEL_SIZE_MB),
-                style::MUTED,
-            ),
-            voice::State::Downloading(p) => (format!("Téléchargement… {}", percent(*p)), style::MUTED),
-            voice::State::Error(e) => (e.clone(), style::DANGER),
-            voice::State::Listening => ("Écoute en cours.".into(), style::SUCCESS),
-            _ => ("Prête. En partie, cliquez sur le micro (ou Ctrl+M) et énumérez les pays à voix haute.".into(), style::MUTED),
-        };
         let mut body = column![
             row![
                 icon(Icon::Mic, 18.0, style::TEXT),
@@ -746,35 +768,63 @@ impl App {
             ]
             .spacing(8)
             .align_y(Center),
-            text(status).size(13).color(color),
+            text("Le modèle choisi est téléchargé une fois ; la reconnaissance se fait ensuite hors ligne. En partie : micro ou Ctrl+M.")
+                .size(13)
+                .color(style::MUTED),
         ]
         .spacing(10);
-        match &self.voice.state {
-            voice::State::Missing | voice::State::Error(_)
-                if !voice_installed(&self.voice.state) =>
-            {
-                body = body.push(
-                    button(
-                        row![
-                            icon(Icon::Download, 15.0, style::TEXT),
-                            text("Télécharger le modèle").size(14)
+
+        for engine in voice::Engine::ALL {
+            let status: Element<'_, Message> = match &self.voice.state {
+                voice::State::Downloading(e, p) if *e == engine => {
+                    text(percent(*p)).size(13).color(style::ACCENT).into()
+                }
+                _ if self.voice.installed.contains(&engine) => container(text("Installé").size(12))
+                    .padding([3, 10])
+                    .style(style::chip(style::SUCCESS))
+                    .into(),
+                _ => button(
+                    row![
+                        icon(Icon::Download, 13.0, style::TEXT),
+                        text(format!("{} Mo", engine.size_mb())).size(12)
+                    ]
+                    .spacing(6)
+                    .align_y(Center),
+                )
+                .padding([5, 10])
+                .style(style::secondary)
+                .on_press(Message::DownloadModel(engine))
+                .into(),
+            };
+            body = body.push(
+                button(
+                    row![
+                        column![
+                            text(engine.label()).size(14).font(style::FONT_SEMIBOLD),
+                            text(engine.description()).size(12).color(style::MUTED),
                         ]
-                        .spacing(8)
-                        .align_y(Center),
-                    )
-                    .padding([9, 14])
-                    .style(style::secondary)
-                    .on_press(Message::DownloadModel),
-                );
-            }
-            voice::State::Downloading(p) => {
-                body = body.push(
-                    progress_bar(0.0..=1.0, *p)
-                        .girth(6)
-                        .style(style::progress(style::ACCENT)),
-                );
-            }
-            _ => {}
+                        .spacing(2)
+                        .width(Fill),
+                        status,
+                    ]
+                    .spacing(10)
+                    .align_y(Center),
+                )
+                .padding([10, 12])
+                .width(Fill)
+                .style(style::option_card(self.voice.engine == engine))
+                .on_press(Message::SelectEngine(engine)),
+            );
+        }
+        if let voice::State::Downloading(_, p) = &self.voice.state {
+            body = body.push(
+                progress_bar(0.0..=1.0, *p)
+                    .girth(5)
+                    .style(style::progress(style::ACCENT)),
+            );
+        }
+        if let voice::State::Error(e) = &self.voice.state {
+            body = body.push(text(e.clone()).size(13).color(style::DANGER));
         }
         container(body)
             .padding(18)
@@ -1105,10 +1155,7 @@ impl App {
     }
 
     fn answer_bar<'a>(&'a self, game: &'a Game) -> Element<'a, Message> {
-        let listening = matches!(
-            self.voice.state,
-            voice::State::Listening | voice::State::Loading
-        );
+        let listening = self.voice.active();
         let mic_color = if listening { Color::WHITE } else { style::TEXT };
         let mic = button(container(icon(Icon::Mic, 20.0, mic_color)).center(Fill))
             .width(46)
@@ -1143,10 +1190,12 @@ impl App {
                     .into(),
             ),
             voice::State::Listening => {
-                let heard = if self.voice.partial.is_empty() {
-                    "Je vous écoute…".to_owned()
+                let heard = if self.voice.transcribing {
+                    "Transcription…"
+                } else if self.voice.speaking {
+                    "Parole détectée…"
                 } else {
-                    format!("« {} »", self.voice.partial)
+                    "Je vous écoute — marquez une courte pause entre les pays"
                 };
                 Some(
                     row![
@@ -1161,7 +1210,7 @@ impl App {
                     .into(),
                 )
             }
-            voice::State::Downloading(p) => Some(
+            voice::State::Downloading(_, p) => Some(
                 row![
                     progress_bar(0.0..=1.0, *p)
                         .length(120)
@@ -1541,11 +1590,6 @@ fn is_prefix_of_other(input: &str, country: usize, quiz: &Quiz) -> bool {
                 .iter()
                 .any(|a| a.len() > typed.len() && a.starts_with(&typed))
     })
-}
-
-fn voice_installed(state: &voice::State) -> bool {
-    !matches!(state, voice::State::Missing)
-        && !matches!(state, voice::State::Error(e) if e.starts_with("Téléchargement") || e.contains("pas installé"))
 }
 
 fn feedback_chip<'a>(feedback: &Feedback) -> Element<'a, Message> {

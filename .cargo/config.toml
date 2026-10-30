@@ -1,0 +1,4 @@
+[env]
+# whisper.cpp : compilation portable (AVX2) plutôt qu'optimisée pour la machine de build,
+# sinon l'exécutable distribué planterait sur d'autres processeurs.
+GGML_NATIVE = "OFF"

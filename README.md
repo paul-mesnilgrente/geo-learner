@@ -25,13 +25,28 @@ et Taïwan. Elle se modifie dans `data/countries.toml`.
 
 ## Saisie vocale
 
-Clic sur le micro (ou Ctrl+M) pendant une partie, puis énumérer les pays à voix haute.
-La reconnaissance est faite localement par [`utter`](https://crates.io/crates/utter), un
-décodeur en pur Rust pour les modèles Vosk. Il utilise le modèle `vosk-model-small-fr-0.22`
-et une grammaire restreinte aux noms de pays, ce qui le rend rapide et précis.
+Clic sur le micro (ou Ctrl+M) pendant une partie, puis on énumère les pays à voix haute en
+marquant une courte pause entre deux noms. Tout est fait localement :
 
-Le modèle (41 Mo) est téléchargé une seule fois, depuis l'application, avec le `curl` du système.
-Il est stocké dans le dossier de données de l'application.
+1. **Capture** : le micro est lu avec `cpal`, ramené en mono et ré-échantillonné à 16 kHz.
+2. **Découpage** : la détection de parole repose sur l'énergie du signal, avec un seuil qui
+   s'adapte au bruit de fond.
+3. **Transcription** de chaque phrase par le moteur choisi.
+4. **Recherche des noms de pays**, qui tolère de petites fautes (« État-Unis » → États-Unis).
+
+| Moteur | Modèle | Taille | Principe |
+|---|---|---|---|
+| Whisper small | `ggml-small-q5_1` (whisper.cpp) | 190 Mo | Transcription libre, le plus robuste en général |
+| Whisper base | `ggml-base-q5_1` (whisper.cpp) | 60 Mo | Idem, plus rapide et moins précis |
+| Vosk | `vosk-model-small-fr-0.22` (via `utter`) | 42 Mo | Grammaire limitée aux noms de pays, instantané |
+
+Les modèles se téléchargent depuis l'écran d'accueil, avec le `curl` du système.
+
+Pour le diagnostic :
+- `GEO_VOICE_DUMP=<dossier>` enregistre chaque phrase captée (fichier WAV et sa transcription) ;
+- `GEO_VOICE_SAMPLES=<dossier> cargo test -p geo-learner --release -- --ignored samples --nocapture`
+  repasse ces fichiers dans chaque moteur installé ;
+- `GEO_WHISPER_PROMPT` remplace l'amorce donnée à Whisper.
 
 ## Données locales
 
@@ -42,22 +57,27 @@ Il est stocké dans le dossier de données de l'application.
 
 Contenu :
 - `progress.json` : historique des parties ;
-- `models/` : modèle vocal.
+- `models/` : modèles vocaux ;
+- `settings.json` : moteur vocal choisi.
 
 ## Compiler et lancer
 
 Prérequis :
 
 - [Rust](https://rustup.rs) (édition 2024, Rust ≥ 1.93) ;
-- sous Linux, les en-têtes ALSA pour le micro : `sudo apt install libasound2-dev pkg-config`.
-  Windows n'a besoin de rien de plus.
+- CMake et un compilateur C++, pour whisper.cpp. Sous Windows, les « Build Tools » de
+  Visual Studio fournissent les deux.
+- sous Linux, les en-têtes ALSA pour le micro : `sudo apt install libasound2-dev pkg-config cmake`.
+
+`.cargo/config.toml` force une compilation portable de whisper.cpp (`GGML_NATIVE=OFF`, AVX2) :
+l'exécutable fonctionne ainsi sur d'autres processeurs que celui de la machine de build.
 
 ```sh
 cargo run --release -p geo-learner     # lancer l'application
 cargo test --workspace                 # tests
 ```
 
-Le binaire release fait environ 8 Mo. La carte et les polices sont intégrées.
+Le binaire release fait environ 12 Mo. La carte et les polices sont intégrées, pas les modèles vocaux.
 
 ## Organisation
 
@@ -82,8 +102,9 @@ GEO_DEMO="mode=free;region=europe;answers=FRA,DEU" GEO_SHOT=/tmp/shot.png cargo 
 
 ## Choix techniques
 
-- **Interface** : [Iced](https://iced.rs) 0.14, avec un rendu logiciel `tiny-skia` (sans GPU),
-  ce qui garantit un rendu identique partout et un binaire plus petit.
+- **Interface** : [Iced](https://iced.rs) 0.14, rendu GPU (wgpu), avec repli sur le rendu
+  logiciel `tiny-skia`. Le rendu logiciel seul était plus léger d'environ 3 Mo, mais il laissait
+  des zones mal redessinées au survol des boutons.
 - **Carte** : Natural Earth 1:50m (domaine public), en projection Natural Earth. Elle existe en
   deux niveaux de détail selon le zoom. Les micro-États sont signalés par des pastilles cliquables.
 - **Audio** : `cpal` (ALSA ou PipeWire sous Linux, WASAPI sous Windows).

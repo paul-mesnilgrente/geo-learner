@@ -6,13 +6,17 @@ Tout a été installé dans le dossier utilisateur : rien n'a été installé av
 |---|---|---|---|
 | Toolchain Rust via **rustup** (rustc 1.99, cargo, clippy, rustfmt) | `~/.rustup`, `~/.cargo/bin` | ~310 Mo | `rustup self uninstall` |
 | Cache des crates téléchargées (iced, cpal, utter…) | `~/.cargo/registry` | ~350 Mo | supprimé avec rustup, ou `rm -rf ~/.cargo/registry` |
-| Modèle vocal Vosk français (téléchargé par l'application) | `~/.local/share/geo-learner/models/` | ~65 Mo | `rm -rf ~/.local/share/geo-learner` |
+| Modèle vocal Vosk français (téléchargé par l'application) | `~/.local/share/geo-learner/models/vosk-model-small-fr-0.22` | ~65 Mo | `rm -rf ~/.local/share/geo-learner/models` |
+| Modèle Whisper small (copié depuis mes essais) | `~/.local/share/geo-learner/models/ggml-small-q5_1.bin` | 181 Mo | idem |
+| **CMake 4.4.5** (binaire officiel Kitware, nécessaire pour compiler whisper.cpp) | `~/.local/opt/cmake-4.4.5-linux-x86_64/` | ~135 Mo | `rm -rf ~/.local/opt/cmake-4.4.5-linux-x86_64` |
 
-rustup a été installé **sans modifier le PATH**. Pour utiliser `cargo`, ajoute ceci à `~/.zshrc` :
+rustup et CMake ont été installés **sans modifier le PATH**. Pour compiler, ajoute ceci à `~/.zshrc` :
 
 ```sh
-export PATH="$HOME/.cargo/bin:$PATH"
+export PATH="$HOME/.cargo/bin:$HOME/.local/opt/cmake-4.4.5-linux-x86_64/bin:$PATH"
 ```
+
+(ou `sudo apt install cmake` et supprimer la copie locale).
 
 Le `rustc` 1.93 déjà présent dans `/usr/bin` (paquet Ubuntu) n'a pas été touché.
 

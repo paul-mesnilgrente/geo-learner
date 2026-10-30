@@ -30,6 +30,9 @@ opt-level = 3
 [profile.release.package.tiny-skia-path]
 opt-level = 3
 
+[profile.release.package.lyon_tessellation]
+opt-level = 3
+
 # Le décodeur vocal est très lent sans optimisations, même en debug.
 [profile.dev.package.utter]
 opt-level = 3
