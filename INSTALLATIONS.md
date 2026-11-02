@@ -10,7 +10,8 @@ Tout a été installé dans le dossier utilisateur : rien n'a été installé av
 | Modèle vocal Vosk français (téléchargé par l'application) | `~/.local/share/geo-learner/models/vosk-model-small-fr-0.22` | ~65 Mo | `rm -rf ~/.local/share/geo-learner/models` |
 | **CMake 4.4.5** (binaire officiel Kitware), installé pour whisper.cpp, **plus nécessaire** depuis le retrait de Whisper | `~/.local/opt/cmake-4.4.5-linux-x86_64/` | ~135 Mo | `rm -rf ~/.local/opt/cmake-4.4.5-linux-x86_64` |
 
-rustup a été installé **sans modifier le PATH**. Pour compiler, ajoute ceci à `~/.zshrc` :
+rustup a été installé sans modifier le PATH ; cette ligne a ensuite été ajoutée à la fin de
+`~/.zshrc` (à retirer en cas de désinstallation) :
 
 ```sh
 export PATH="$HOME/.cargo/bin:$PATH"
