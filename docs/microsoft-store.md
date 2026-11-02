@@ -44,7 +44,10 @@ Le Store exige une **adresse publique** (le micro et l'accès Internet sont déc
 - rendre le dépôt public et pointer vers `PRIVACY.md` ;
 - tout autre hébergement de page web.
 
-Penser à compléter l'adresse de contact dans `PRIVACY.md`.
+Publiée dans un [gist public](https://gist.github.com/paul-mesnilgrente/5884474ce8f49255bbf82e746cb33adc)
+(fichier `GeoLearner_PRIVACY.md`). Toute modification de `PRIVACY.md` doit y être reportée.
+
+Adresse de contact : big.learner.app@gmail.com.
 
 ## 5. Construire le paquet
 
@@ -68,7 +71,7 @@ Certification Kit* (fourni avec le SDK Windows) permet aussi de lancer les tests
 | Section | Contenu |
 |---|---|
 | Tarification | Gratuit ; marchés au choix (francophones au minimum, l'interface étant en français) |
-| Propriétés | Catégorie **Éducation** ; politique de confidentialité : l'adresse de l'étape 4 |
+| Propriétés | Catégorie **Éducation** ; politique de confidentialité : <https://gist.github.com/paul-mesnilgrente/5884474ce8f49255bbf82e746cb33adc> |
 | Classification par âge | Questionnaire IARC : aucun contenu sensible → PEGI 3 attendu |
 | Paquets | Le `.msix` |
 | Fiche (français) | Textes ci-dessous, captures `docs/store/1-…4-*.png`, logo `docs/store/logo-300.png` |

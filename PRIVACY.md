@@ -1,6 +1,6 @@
 # Politique de confidentialité de GeoLearner
 
-*Dernière mise à jour : 30 octobre 2026*
+*Dernière mise à jour : 2 novembre 2026*
 
 GeoLearner est une application d'apprentissage de la géographie. Elle ne collecte, ne transmet
 et ne vend **aucune donnée personnelle**. Il n'y a ni compte, ni publicité, ni statistiques
@@ -12,6 +12,7 @@ L'application enregistre uniquement, dans son dossier de données local :
 
 - l'historique de vos parties (date, zone, mode, score, durée, pays manqués), pour afficher vos
   records et les pays à revoir ;
+- vos réglages (minuteur et durées choisies, affichage de l'avancement) ;
 - le modèle de reconnaissance vocale, si vous activez la saisie vocale.
 
 Ces fichiers ne quittent jamais votre appareil. Désinstaller l'application les supprime.
@@ -30,14 +31,14 @@ téléchargement, ce serveur voit l'adresse IP de l'appareil. Aucune autre donn�
 
 ## Contact
 
-Pour toute question : [ADRESSE DE CONTACT À COMPLÉTER]
+Pour toute question : big.learner.app@gmail.com
 
 ---
 
 # GeoLearner privacy policy (English)
 
 GeoLearner does not collect, transmit or sell any personal data. There is no account, no
-advertising, no analytics and no online service. Game history and the speech model are stored
+advertising, no analytics and no online service. Game history, settings and the speech model are stored
 locally on your device only. Microphone audio is processed locally to recognise country names and
 is never recorded or sent anywhere. The only network access is the user-requested, one-time
-download of the French speech model from alphacephei.com. Contact: [CONTACT ADDRESS TO FILL IN]
+download of the French speech model from alphacephei.com. Contact: big.learner.app@gmail.com

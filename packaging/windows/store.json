@@ -1,7 +1,7 @@
 {
-  "_comment": "Identité du paquet : à remplacer par les valeurs de Partner Center (Gestion des produits > Identité du produit) une fois le nom réservé.",
-  "identityName": "A-REMPLACER.GeoLearner",
-  "publisher": "CN=00000000-0000-0000-0000-000000000000",
-  "publisherDisplayName": "Paul Mesnilgrente",
+  "_comment": "Identité du paquet, recopiée de Partner Center (Gestion des produits > Identité du produit).",
+  "identityName": "BigLearner.GeoLearner",
+  "publisher": "CN=18C36C21-EBC3-4640-8EBF-B673C0C708B4",
+  "publisherDisplayName": "BigLearner",
   "displayName": "GeoLearner"
 }
