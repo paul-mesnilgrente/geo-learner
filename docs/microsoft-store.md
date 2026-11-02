@@ -74,43 +74,66 @@ Certification Kit* (fourni avec le SDK Windows) permet aussi de lancer les tests
 | Propriétés | Catégorie **Éducation** ; politique de confidentialité : <https://gist.github.com/paul-mesnilgrente/5884474ce8f49255bbf82e746cb33adc> |
 | Classification par âge | Questionnaire IARC : aucun contenu sensible → PEGI 3 attendu |
 | Paquets | Le `.msix` |
-| Fiche (français) | Textes ci-dessous, captures `docs/store/1-…4-*.png`, logo `docs/store/logo-300.png` |
+| Fiche (français) | Textes ci-dessous, captures `docs/store/1-…7-*.png` (dans l'ordre), logo `docs/store/logo-300.png` |
 | Remarques pour la certification | Texte ci-dessous (la capacité `runFullTrust` doit être justifiée) |
 
 ### Description courte
 
-> Apprenez les pays du monde sur une carte interactive, au clavier ou à la voix.
+> Apprenez les pays du monde, les départements français et les États américains sur une carte
+> interactive, au clavier ou à la voix.
 
 ### Description
 
-> GeoLearner vous aide à retenir les 197 pays du monde, carte à l'appui.
+> GeoLearner vous aide à retenir la carte du monde, et bien plus : les 197 pays, les
+> départements et les régions de France, les 50 États des États-Unis.
 >
 > Trois façons de jouer :
-> • Tous les pays : citez tous les pays d'une zone, dans l'ordre que vous voulez. Chaque pays
-> trouvé se colore sur la carte.
-> • Nommer le pays : un pays s'allume, à vous de trouver son nom.
-> • Trouver sur la carte : un nom s'affiche, cliquez sur le bon pays.
+> • Tout citer : nommez tous les lieux d'une zone, dans l'ordre que vous voulez. Chaque réponse
+> juste se colore sur la carte.
+> • Nommer : un pays ou un département s'allume, à vous de trouver son nom.
+> • Trouver sur la carte : un nom s'affiche, cliquez au bon endroit.
 >
 > Jouez sur le monde entier, un continent, une région (Balkans, Caraïbes, Asie centrale,
-> Polynésie…) ou un regroupement comme les Petites Antilles ou l'Union européenne.
+> Polynésie…) ou un regroupement comme les Petites Antilles ou l'Union européenne. Côté France,
+> révisez la métropole, l'outre-mer ou une seule région ; côté États-Unis, une région ou une
+> division du recensement. Les numéros de département sont acceptés (« 75 », « 2A »).
 >
-> Saisie vocale : énumérez les pays à voix haute, ils sont validés au fil de la parole. La
+> Saisie vocale : énumérez les noms à voix haute, ils sont validés au fil de la parole. La
 > reconnaissance se fait entièrement sur votre ordinateur, sans envoyer votre voix sur Internet.
 >
-> Vos records et les pays à revoir sont enregistrés localement. Aucun compte, aucune publicité.
+> Minuteur facultatif, réglable pour chaque mode et chaque zone. L'onglet Progression trace
+> l'évolution de votre score et de votre temps, partie après partie, et liste les lieux que vous
+> ratez le plus souvent.
+>
+> Tout reste sur votre ordinateur. Aucun compte, aucune publicité.
 
 ### Fonctionnalités (liste du Store)
 
 - 197 pays : les 193 membres de l'ONU, plus le Vatican, la Palestine, le Kosovo et Taïwan
-- Trois modes de jeu
+- Départements français (101), régions françaises (18) et États des États-Unis (50)
+- Trois modes de jeu : tout citer, nommer, trouver sur la carte
 - Monde, continents, sous-régions et regroupements d'îles
 - Saisie vocale hors ligne, validée au fil de la parole
-- Carte interactive : zoom, déplacement, micro-États repérables
-- Records et pays à revoir, enregistrés localement
+- Minuteur facultatif, réglable pour chaque mode et chaque zone
+- Courbes de progression : score, temps et lieux à revoir
+- Carte interactive : zoom, déplacement, archipels et micro-États repérables
 
 ### Mots-clés
 
-géographie, pays, carte, quiz, monde, capitales, éducation, apprendre
+Le Store en accepte 7 au plus : géographie, pays, carte du monde, quiz, départements,
+États-Unis, éducation.
+
+### Captures
+
+Dans l'ordre (1600×900, générées par le mode démo, voir le README) :
+
+1. Accueil : catalogue des quiz, modes et zones
+2. Pays du monde, « Tous les pays » en cours
+3. Pays du monde, « Nommer le pays »
+4. Départements français, avec les encarts de l'outre-mer
+5. États des États-Unis, « Trouver sur la carte »
+6. Onglet Progression
+7. Bilan d'une partie
 
 ### Remarques pour la certification
 
