@@ -10,7 +10,7 @@ pub mod world;
 pub use matcher::Matcher;
 pub use normalize::normalize;
 pub use quiz::{Mark, Mode, Outcome, Quiz};
-pub use world::{Country, Region, RegionKind, Shape, Territory, World};
+pub use world::{Country, Info, Region, RegionKind, Shape, Territory, World};
 
 #[cfg(test)]
 mod testing {
@@ -18,6 +18,7 @@ mod testing {
 
     pub fn world_with(countries: &[(&str, &[&str])]) -> World {
         World {
+            info: Default::default(),
             countries: countries
                 .iter()
                 .map(|(code, answers)| Country {

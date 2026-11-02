@@ -10,15 +10,23 @@ mod progress;
 mod settings;
 mod style;
 mod voice;
+mod words;
 
 use std::sync::LazyLock;
 
 use geo_core::World;
 
-/// Carte et données des pays, intégrées à l'exécutable.
-pub static WORLD: LazyLock<World> = LazyLock::new(|| {
-    World::from_bytes(include_bytes!("../../../assets/world.bin"))
-        .expect("données de carte invalides")
+/// Atlas intégrés à l'exécutable, un par quiz, dans l'ordre du catalogue.
+pub static ATLASES: LazyLock<Vec<World>> = LazyLock::new(|| {
+    [
+        include_bytes!("../../../assets/world.bin").as_slice(),
+        include_bytes!("../../../assets/fr-departements.bin"),
+        include_bytes!("../../../assets/fr-regions.bin"),
+        include_bytes!("../../../assets/us-etats.bin"),
+    ]
+    .iter()
+    .map(|bytes| World::from_bytes(bytes).expect("atlas invalide"))
+    .collect()
 });
 
 fn main() -> iced::Result {
@@ -50,15 +58,16 @@ fn main() -> iced::Result {
 
 #[cfg(test)]
 mod tests {
-    use super::WORLD;
+    use super::ATLASES;
 
     fn owner(territory: &str) -> Option<&'static str> {
-        let t = WORLD
+        let world = &ATLASES[0];
+        let t = world
             .territories
             .iter()
             .find(|t| t.name == territory)
             .expect(territory);
-        t.owner.map(|o| WORLD.countries[o].name.as_str())
+        t.owner.map(|o| world.countries[o].name.as_str())
     }
 
     #[test]
@@ -68,5 +77,22 @@ mod tests {
         assert_eq!(owner("Nouvelle-Calédonie"), Some("France"));
         assert_eq!(owner("Sint Maarten"), Some("Pays-Bas"));
         assert_eq!(owner("Sahara occidental"), None);
+    }
+
+    #[test]
+    fn atlases_are_complete() {
+        let counts: Vec<(String, usize)> = ATLASES
+            .iter()
+            .map(|a| (a.info.id.clone(), a.countries.len()))
+            .collect();
+        assert_eq!(
+            counts,
+            [
+                ("monde".to_owned(), 197),
+                ("fr-departements".to_owned(), 101),
+                ("fr-regions".to_owned(), 18),
+                ("us-etats".to_owned(), 50),
+            ]
+        );
     }
 }

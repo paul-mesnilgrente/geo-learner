@@ -3,6 +3,38 @@
 Application de bureau pour apprendre les pays du monde sur une carte, au clavier ou à la voix.
 Écrite entièrement en Rust, avec un seul code pour Linux et Windows, et tout se passe hors ligne.
 
+## Quiz
+
+| Catégorie | Quiz | Lieux | Zones |
+|---|---|---|---|
+| Monde | Pays du monde | 197 pays | continents, sous-régions, regroupements |
+| France | Départements français | 101 départements | métropole, outre-mer, régions |
+| France | Régions françaises | 18 régions | métropole, outre-mer |
+| États-Unis | États des États-Unis | 50 États | régions et divisions du recensement |
+
+L'écran d'accueil présente le catalogue dans une colonne à gauche, groupé par catégorie : la
+liste peut s'allonger sans changer l'interface. Les textes s'accordent au quiz (« Nommer la
+région », « 13 régions trouvées », « Quel est cet État ? »).
+
+Les départements et régions d'outre-mer, l'Alaska et Hawaï sont déplacés en **encarts** près de
+la carte principale, dans un cadre. Les numéros de département sont acceptés au clavier
+(« 75 », « 2A », « 971 »), et les noms anglais des États (« California »).
+
+### Ajouter un quiz
+
+Un quiz de subdivisions (provinces, Länder…) se décrit dans un fichier `data/atlases/<id>.toml`
+(voir ceux existants) :
+- `[atlas]` : titre, catégorie, noms au singulier et au pluriel, genre, pays Natural Earth,
+  cadre des terres voisines ;
+- `[[inset]]` : encarts ;
+- `[world]`, `[[continent]]`, `[[sub]]` : zones ;
+- `items` : les lieux, avec leurs codes ISO 3166-2. `parts` réunit plusieurs entités en une
+  seule, comme une région faite de ses départements.
+
+Ensuite :
+1. lancer `scripts/build-map.sh` ;
+2. ajouter le fichier `.bin` produit à `ATLASES`, dans `crates/app/src/main.rs`.
+
 ## Modes de jeu
 
 | Mode | Principe |
@@ -122,12 +154,12 @@ cargo clippy --workspace --all-targets --target x86_64-pc-windows-msvc
 ```
 crates/geo-core   données, normalisation des réponses, logique de quiz, projection (sans interface)
 crates/app        application Iced : carte (canvas), écrans, saisie vocale, sauvegarde
-crates/mapgen     outil de génération de assets/world.bin depuis Natural Earth
-data/             liste des pays (noms, alias, formes orales) et définition des zones
+crates/mapgen     génération des atlas (assets/*.bin) depuis Natural Earth (admin-0 et admin-1)
+data/             pays du monde et zones ; data/atlases/ : départements, régions, États
 assets/           carte générée et police Inter (sous-ensemble latin)
 ```
 
-Pour régénérer la carte après une modification de `data/` : `scripts/build-map.sh`.
+Pour régénérer les cartes après une modification de `data/` : `scripts/build-map.sh`.
 
 ### Captures en développement
 
@@ -142,6 +174,7 @@ Paramètres de `GEO_DEMO`, séparés par `;` :
 - `mode` et `region` : la partie à lancer ;
 - `answers` : codes des pays déjà joués ;
 - `target` : premier pays à deviner ;
+- `atlas` : quiz à ouvrir (`fr-departements`, `fr-regions`, `us-etats`) ;
 - `type=a|b` : saisie simulée au clavier ;
 - `zoom=lon,lat,z` : position de la caméra ;
 - `elapsed` : temps déjà écoulé, en secondes ;

@@ -49,7 +49,8 @@ pub enum Event {
 
 #[derive(Debug, Clone, Copy)]
 pub enum Command {
-    Start,
+    /// Écoute, pour l'atlas (index dans `ATLASES`) de la partie en cours.
+    Start(usize),
     Stop,
     Download,
 }
@@ -69,7 +70,7 @@ fn worker() -> impl Stream<Item = Event> {
 
         while let Some(command) = inbox.next().await {
             match command {
-                Command::Start => {
+                Command::Start(atlas) => {
                     if session
                         .as_ref()
                         .is_some_and(|stop| !stop.load(Ordering::Relaxed))
@@ -80,7 +81,7 @@ fn worker() -> impl Stream<Item = Event> {
                     session = Some(stop.clone());
                     let mut tx = output.clone();
                     std::thread::spawn(move || {
-                        let state = match listen(&mut tx, &stop) {
+                        let state = match listen(atlas, &mut tx, &stop) {
                             Ok(()) => State::Idle,
                             Err(e) => State::Error(e),
                         };
@@ -119,9 +120,10 @@ fn worker() -> impl Stream<Item = Event> {
     })
 }
 
-fn listen(tx: &mut Sender<Event>, stop: &AtomicBool) -> Result<(), String> {
+fn listen(atlas: usize, tx: &mut Sender<Event>, stop: &AtomicBool) -> Result<(), String> {
+    let world = &crate::ATLASES[atlas];
     let _ = tx.try_send(Event::State(State::Loading));
-    let mut transcriber = engine::Vosk::load()?;
+    let mut transcriber = engine::Vosk::load(world)?;
 
     // La transcription tourne à part pour ne jamais bloquer la capture.
     let (jobs, inbox) = std_mpsc::channel::<Job>();
@@ -129,7 +131,7 @@ fn listen(tx: &mut Sender<Event>, stop: &AtomicBool) -> Result<(), String> {
     let transcription = {
         let mut out = tx.clone();
         let busy = busy.clone();
-        std::thread::spawn(move || transcribe_jobs(&mut transcriber, inbox, &busy, &mut out))
+        std::thread::spawn(move || transcribe_jobs(world, &mut transcriber, inbox, &busy, &mut out))
     };
 
     let device = cpal::default_host()
@@ -280,12 +282,13 @@ enum Job {
 }
 
 fn transcribe_jobs(
+    world: &'static geo_core::World,
     transcriber: &mut engine::Vosk,
     inbox: std_mpsc::Receiver<Job>,
     busy: &AtomicBool,
     out: &mut Sender<Event>,
 ) {
-    let matcher = geo_core::Matcher::new(&crate::WORLD);
+    let matcher = geo_core::Matcher::new(world);
     let dump = std::env::var_os("GEO_VOICE_DUMP").map(std::path::PathBuf::from);
     let mut agreement = Agreement::default();
     let mut finals = 0;
@@ -386,7 +389,7 @@ mod tests {
         let (mut tx, mut rx) = mpsc::channel(4096);
         let stop = Arc::new(AtomicBool::new(false));
         let flag = stop.clone();
-        let worker = std::thread::spawn(move || listen(&mut tx, &flag));
+        let worker = std::thread::spawn(move || listen(0, &mut tx, &flag));
         std::thread::sleep(Duration::from_secs(3));
         stop.store(true, Ordering::Relaxed);
         worker.join().unwrap().unwrap();
@@ -443,13 +446,16 @@ mod tests {
             .chunks(2)
             .map(|c| f32::from(i16::from_le_bytes([c[0], c[1]])) / 32768.0)
             .collect();
-        let mut transcriber = engine::Vosk::load().unwrap();
+        let world = &crate::ATLASES[0];
+        let mut transcriber = engine::Vosk::load(world).unwrap();
         let (jobs, inbox) = std_mpsc::channel();
         let busy = Arc::new(AtomicBool::new(false));
         let (mut tx, mut rx) = mpsc::channel(4096);
         let worker = {
             let (busy, mut out) = (busy.clone(), tx.clone());
-            std::thread::spawn(move || transcribe_jobs(&mut transcriber, inbox, &busy, &mut out))
+            std::thread::spawn(move || {
+                transcribe_jobs(world, &mut transcriber, inbox, &busy, &mut out)
+            })
         };
         let mut pipeline = Pipeline::new(audio::RATE, jobs, busy);
         let start = Instant::now();
@@ -460,7 +466,7 @@ mod tests {
             {
                 let names: Vec<&str> = countries
                     .iter()
-                    .map(|&c| crate::WORLD.countries[c].name.as_str())
+                    .map(|&c| crate::ATLASES[0].countries[c].name.as_str())
                     .collect();
                 println!(
                     "{:5.2} s {names:?}{}",

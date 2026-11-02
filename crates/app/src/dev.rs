@@ -31,6 +31,8 @@ pub struct Demo {
     pub timer: Option<u64>,
     /// Avancement affiché par continent.
     pub by_continent: bool,
+    /// Quiz à ouvrir (identifiant d'atlas : « fr-departements »…).
+    pub atlas: Option<String>,
 }
 
 pub fn demo() -> Option<Demo> {
@@ -65,6 +67,7 @@ pub fn demo() -> Option<Demo> {
             "elapsed" => demo.elapsed = value.parse().ok(),
             "timer" => demo.timer = value.parse().ok(),
             "continents" => demo.by_continent = true,
+            "atlas" => demo.atlas = Some(value.to_owned()),
             "type" => demo.typed = value.split('|').map(str::to_owned).collect(),
             _ => {}
         }

@@ -1,12 +1,18 @@
 #!/usr/bin/env sh
-# Régénère assets/world.bin à partir des contours Natural Earth (1:50m) et des fichiers de data/.
+# Régénère les atlas (assets/*.bin) à partir de Natural Earth et des fichiers de data/ :
+# pays du monde (admin-0, 1:50m) et subdivisions de data/atlases/ (admin-1, 1:10m).
 set -eu
 cd "$(dirname "$0")/.."
 
-SRC=.cache/ne_50m_admin_0_countries.geojson
-if [ ! -f "$SRC" ]; then
-    mkdir -p .cache
-    curl -fL -o "$SRC" \
-        https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson
-fi
-cargo run --release -p mapgen -- "$SRC" assets/world.bin
+NE=https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson
+ADMIN0=.cache/ne_50m_admin_0_countries.geojson
+ADMIN1=.cache/ne_10m_admin_1.geojson
+mkdir -p .cache
+[ -f "$ADMIN0" ] || curl -fL -o "$ADMIN0" "$NE/ne_50m_admin_0_countries.geojson"
+[ -f "$ADMIN1" ] || curl -fL -o "$ADMIN1" "$NE/ne_10m_admin_1_states_provinces.geojson"
+
+cargo run --release -p mapgen -- world "$ADMIN0" assets/world.bin
+for atlas in data/atlases/*.toml; do
+    name=$(basename "$atlas" .toml)
+    cargo run --release -p mapgen -- atlas "$atlas" "$ADMIN0" "$ADMIN1" "assets/$name.bin"
+done

@@ -1,0 +1,146 @@
+# États des États-Unis (Natural Earth admin-1), groupés selon les régions et divisions du
+# Bureau du recensement. Les noms anglais sont aussi acceptés (Californie / California).
+
+# Lieux à trouver (avant toute section : en TOML, une clé suit sinon la dernière section).
+items = [
+  { code = "US-AL", name = "Alabama", sub = "centre-sud-est" },
+  { code = "US-AK", name = "Alaska", sub = "pacifique" },
+  { code = "US-AZ", name = "Arizona", sub = "montagnes" },
+  { code = "US-AR", name = "Arkansas", sub = "centre-sud-ouest" },
+  { code = "US-CA", name = "Californie", sub = "pacifique" },
+  { code = "US-NC", name = "Caroline du Nord", sub = "atlantique-sud" },
+  { code = "US-SC", name = "Caroline du Sud", sub = "atlantique-sud" },
+  { code = "US-CO", name = "Colorado", sub = "montagnes" },
+  { code = "US-CT", name = "Connecticut", sub = "nouvelle-angleterre" },
+  { code = "US-ND", name = "Dakota du Nord", sub = "centre-nord-ouest" },
+  { code = "US-SD", name = "Dakota du Sud", sub = "centre-nord-ouest" },
+  { code = "US-DE", name = "Delaware", sub = "atlantique-sud" },
+  { code = "US-FL", name = "Floride", sub = "atlantique-sud" },
+  { code = "US-GA", name = "Géorgie", sub = "atlantique-sud" },
+  { code = "US-HI", name = "Hawaï", sub = "pacifique" },
+  { code = "US-ID", name = "Idaho", sub = "montagnes" },
+  { code = "US-IL", name = "Illinois", sub = "centre-nord-est" },
+  { code = "US-IN", name = "Indiana", sub = "centre-nord-est" },
+  { code = "US-IA", name = "Iowa", sub = "centre-nord-ouest" },
+  { code = "US-KS", name = "Kansas", sub = "centre-nord-ouest" },
+  { code = "US-KY", name = "Kentucky", sub = "centre-sud-est" },
+  { code = "US-LA", name = "Louisiane", sub = "centre-sud-ouest" },
+  { code = "US-ME", name = "Maine", sub = "nouvelle-angleterre" },
+  { code = "US-MD", name = "Maryland", sub = "atlantique-sud" },
+  { code = "US-MA", name = "Massachusetts", sub = "nouvelle-angleterre" },
+  { code = "US-MI", name = "Michigan", sub = "centre-nord-est" },
+  { code = "US-MN", name = "Minnesota", sub = "centre-nord-ouest" },
+  { code = "US-MS", name = "Mississippi", sub = "centre-sud-est" },
+  { code = "US-MO", name = "Missouri", sub = "centre-nord-ouest" },
+  { code = "US-MT", name = "Montana", sub = "montagnes" },
+  { code = "US-NE", name = "Nebraska", sub = "centre-nord-ouest" },
+  { code = "US-NV", name = "Nevada", sub = "montagnes" },
+  { code = "US-NH", name = "New Hampshire", sub = "nouvelle-angleterre" },
+  { code = "US-NJ", name = "New Jersey", sub = "centre-atlantique" },
+  { code = "US-NM", name = "Nouveau-Mexique", sub = "montagnes" },
+  { code = "US-NY", name = "New York", sub = "centre-atlantique" },
+  { code = "US-OH", name = "Ohio", sub = "centre-nord-est" },
+  { code = "US-OK", name = "Oklahoma", sub = "centre-sud-ouest" },
+  { code = "US-OR", name = "Oregon", sub = "pacifique" },
+  { code = "US-PA", name = "Pennsylvanie", sub = "centre-atlantique" },
+  { code = "US-RI", name = "Rhode Island", sub = "nouvelle-angleterre" },
+  { code = "US-TN", name = "Tennessee", sub = "centre-sud-est" },
+  { code = "US-TX", name = "Texas", sub = "centre-sud-ouest" },
+  { code = "US-UT", name = "Utah", sub = "montagnes" },
+  { code = "US-VT", name = "Vermont", sub = "nouvelle-angleterre" },
+  { code = "US-VA", name = "Virginie", sub = "atlantique-sud" },
+  { code = "US-WV", name = "Virginie-Occidentale", sub = "atlantique-sud" },
+  { code = "US-WA", name = "Washington", sub = "pacifique" },
+  { code = "US-WI", name = "Wisconsin", sub = "centre-nord-est" },
+  { code = "US-WY", name = "Wyoming", sub = "montagnes" },
+]
+
+[atlas]
+id = "us-etats"
+title = "États des États-Unis"
+category = "États-Unis"
+levels = ["Régions", "Divisions"]
+one = "État"
+many = "États"
+country = "USA"
+context = [-140.0, 12.0, -50.0, 60.0]
+
+# Alaska et Hawaï en encarts, dans le Pacifique au large de la Californie.
+[[inset]]
+codes = ["US-AK"]
+to = [-129.0, 29.5]
+scale = 0.3
+
+[[inset]]
+codes = ["US-HI"]
+to = [-122.0, 24.0]
+scale = 0.9
+# Seulement les îles principales : Natural Earth inclut des atolls jusqu'à 178° O.
+crop = [-161.0, 18.5, -154.5, 22.5]
+
+[world]
+name = "États-Unis"
+view = [-135.0, 21.5, -66.0, 50.0]
+center = -98
+
+[[continent]]
+id = "nord-est"
+name = "Nord-Est"
+
+[[continent]]
+id = "midwest"
+name = "Midwest"
+
+[[continent]]
+id = "sud"
+name = "Sud"
+
+[[continent]]
+id = "ouest"
+name = "Ouest"
+view = [-135.0, 21.5, -101.0, 50.0]
+
+[[sub]]
+id = "nouvelle-angleterre"
+name = "Nouvelle-Angleterre"
+continent = "nord-est"
+
+[[sub]]
+id = "centre-atlantique"
+name = "Centre-Atlantique"
+continent = "nord-est"
+
+[[sub]]
+id = "centre-nord-est"
+name = "Centre-Nord-Est"
+continent = "midwest"
+
+[[sub]]
+id = "centre-nord-ouest"
+name = "Centre-Nord-Ouest"
+continent = "midwest"
+
+[[sub]]
+id = "atlantique-sud"
+name = "Atlantique Sud"
+continent = "sud"
+
+[[sub]]
+id = "centre-sud-est"
+name = "Centre-Sud-Est"
+continent = "sud"
+
+[[sub]]
+id = "centre-sud-ouest"
+name = "Centre-Sud-Ouest"
+continent = "sud"
+
+[[sub]]
+id = "montagnes"
+name = "Montagnes"
+continent = "ouest"
+
+[[sub]]
+id = "pacifique"
+name = "Pacifique"
+continent = "ouest"

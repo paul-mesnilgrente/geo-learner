@@ -20,7 +20,8 @@ pub struct Settings {
     /// Avancement de la partie affiché par continent plutôt que par sous-région.
     #[serde(default)]
     pub by_continent: bool,
-    /// Durées choisies par l'utilisateur (secondes), par mode et zone (`"Free/europe"`).
+    /// Durées choisies par l'utilisateur (secondes), par atlas, mode et zone
+    /// (`"monde/Free/europe"`).
     #[serde(default)]
     durations: BTreeMap<String, u32>,
     #[serde(skip)]
@@ -48,8 +49,8 @@ fn step(seconds: u32, up: bool) -> u32 {
     }
 }
 
-fn key(mode: Mode, region: &str) -> String {
-    format!("{mode:?}/{region}")
+fn key(atlas: &str, mode: Mode, region: &str) -> String {
+    format!("{atlas}/{mode:?}/{region}")
 }
 
 impl Settings {
@@ -74,15 +75,15 @@ impl Settings {
     }
 
     /// Durée du minuteur (secondes) pour ce mode et cette zone.
-    pub fn duration(&self, mode: Mode, region: &str, countries: usize) -> u32 {
+    pub fn duration(&self, atlas: &str, mode: Mode, region: &str, countries: usize) -> u32 {
         self.durations
-            .get(&key(mode, region))
+            .get(&key(atlas, mode, region))
             .copied()
             .unwrap_or_else(|| default_duration(mode, countries))
     }
 
-    pub fn is_custom(&self, mode: Mode, region: &str) -> bool {
-        self.durations.contains_key(&key(mode, region))
+    pub fn is_custom(&self, atlas: &str, mode: Mode, region: &str) -> bool {
+        self.durations.contains_key(&key(atlas, mode, region))
     }
 
     pub fn set_by_continent(&mut self, by_continent: bool) {
@@ -96,8 +97,15 @@ impl Settings {
     }
 
     /// Allonge (`up`) ou raccourcit la durée d'un pas.
-    pub fn step_duration(&mut self, mode: Mode, region: &str, countries: usize, up: bool) {
-        let current = self.duration(mode, region, countries);
+    pub fn step_duration(
+        &mut self,
+        atlas: &str,
+        mode: Mode,
+        region: &str,
+        countries: usize,
+        up: bool,
+    ) {
+        let current = self.duration(atlas, mode, region, countries);
         let next = if up {
             current + step(current, true)
         } else {
@@ -105,15 +113,15 @@ impl Settings {
         };
         let next = next.clamp(MIN_DURATION, MAX_DURATION);
         if next == default_duration(mode, countries) {
-            self.durations.remove(&key(mode, region));
+            self.durations.remove(&key(atlas, mode, region));
         } else {
-            self.durations.insert(key(mode, region), next);
+            self.durations.insert(key(atlas, mode, region), next);
         }
         self.save();
     }
 
-    pub fn reset_duration(&mut self, mode: Mode, region: &str) {
-        self.durations.remove(&key(mode, region));
+    pub fn reset_duration(&mut self, atlas: &str, mode: Mode, region: &str) {
+        self.durations.remove(&key(atlas, mode, region));
         self.save();
     }
 }
@@ -134,18 +142,18 @@ mod tests {
     #[test]
     fn steps_and_custom_durations() {
         let mut s = Settings::default();
-        assert_eq!(s.duration(Mode::Free, "europe", 46), 240);
-        s.step_duration(Mode::Free, "europe", 46, true);
-        assert_eq!(s.duration(Mode::Free, "europe", 46), 270);
-        assert!(s.is_custom(Mode::Free, "europe"));
+        assert_eq!(s.duration("monde", Mode::Free, "europe", 46), 240);
+        s.step_duration("monde", Mode::Free, "europe", 46, true);
+        assert_eq!(s.duration("monde", Mode::Free, "europe", 46), 270);
+        assert!(s.is_custom("monde", Mode::Free, "europe"));
         // Revenir à la valeur par défaut efface le réglage personnalisé.
-        s.step_duration(Mode::Free, "europe", 46, false);
-        assert!(!s.is_custom(Mode::Free, "europe"));
+        s.step_duration("monde", Mode::Free, "europe", 46, false);
+        assert!(!s.is_custom("monde", Mode::Free, "europe"));
         // Au-delà de 5 min, le pas est d'une minute.
-        assert_eq!(s.duration(Mode::Free, "monde", 197), 900);
-        s.step_duration(Mode::Free, "monde", 197, true);
-        assert_eq!(s.duration(Mode::Free, "monde", 197), 960);
-        s.reset_duration(Mode::Free, "monde");
-        assert_eq!(s.duration(Mode::Free, "monde", 197), 900);
+        assert_eq!(s.duration("monde", Mode::Free, "monde", 197), 900);
+        s.step_duration("monde", Mode::Free, "monde", 197, true);
+        assert_eq!(s.duration("monde", Mode::Free, "monde", 197), 960);
+        s.reset_duration("monde", Mode::Free, "monde");
+        assert_eq!(s.duration("monde", Mode::Free, "monde", 197), 900);
     }
 }

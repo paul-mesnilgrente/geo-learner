@@ -2,7 +2,7 @@
 
 use std::time::{Duration, Instant};
 
-use geo_core::{Mark, Matcher, Mode, Outcome, Quiz, RegionKind};
+use geo_core::{Mark, Matcher, Mode, Outcome, Quiz, RegionKind, World};
 use iced::alignment::{Horizontal, Vertical};
 use iced::widget::canvas::Cache;
 use iced::widget::{
@@ -11,13 +11,14 @@ use iced::widget::{
 };
 use iced::{Center, Color, Element, Fill, Size, Subscription, Task, Theme, Vector, keyboard, time};
 
-use crate::WORLD;
+use crate::ATLASES;
 use crate::icons::{Icon, icon};
 use crate::map::{self, Camera, Flash, MapEvent, MapView, Projection, Transform};
 use crate::progress::{self, Progress, Session};
 use crate::settings::Settings;
 use crate::style;
 use crate::voice;
+use crate::words::{Words, capitalize};
 
 const ANSWER_INPUT: &str = "answer";
 /// Délai avant de valider un nom qui est aussi le début d'un autre (« Niger » / « Nigeria »).
@@ -38,6 +39,8 @@ const SAFE_AREA: map::Insets = map::Insets {
 #[derive(Debug, Clone)]
 pub enum Message {
     SelectMode(Mode),
+    /// Choix du quiz (index dans `ATLASES`).
+    SelectAtlas(usize),
     SelectRegion(usize),
     ToggleTimer,
     /// Avancement affiché par continent (`true`) ou par sous-région.
@@ -69,7 +72,10 @@ pub enum Message {
 }
 
 pub struct App {
-    matcher: Matcher,
+    /// Reconnaissance des noms, une par atlas.
+    matchers: Vec<Matcher>,
+    /// Atlas choisi (index dans `ATLASES`).
+    atlas: usize,
     progress: Progress,
     settings: Settings,
     mode: Mode,
@@ -106,6 +112,9 @@ impl Voice {
 }
 
 struct Game {
+    /// Atlas joué (index dans `ATLASES`) et ses données.
+    atlas: usize,
+    world: &'static World,
     region: usize,
     quiz: Quiz,
     projection: Projection,
@@ -138,6 +147,8 @@ struct Game {
 
 /// Carte de l'écran d'accueil : la zone choisie, ses pays mis en évidence.
 struct Preview {
+    atlas: usize,
+    world: &'static World,
     region: usize,
     projection: Projection,
     view: iced::Rectangle,
@@ -147,21 +158,24 @@ struct Preview {
 }
 
 impl Preview {
-    fn new(region: usize) -> Self {
-        let zone = &WORLD.regions[region];
+    fn new(atlas: usize, region: usize) -> Self {
+        let world = &ATLASES[atlas];
+        let zone = &world.regions[region];
         let members = zone.members.clone();
         Self {
+            atlas,
+            world,
             region,
-            projection: Projection::new(&WORLD, zone.center),
+            projection: Projection::new(world, zone.center),
             view: map::view_rect(zone.view, zone.center),
-            quiz: Quiz::new(Mode::Free, WORLD.countries.len(), members, Vec::new()),
+            quiz: Quiz::new(Mode::Free, world.countries.len(), members, Vec::new()),
             cache: Cache::new(),
         }
     }
 
     fn view(&self) -> Element<'_, Message> {
         let map_view = MapView {
-            world: &WORLD,
+            world: self.world,
             projection: &self.projection,
             view: self.view,
             camera: Camera::fit(self.view),
@@ -209,13 +223,14 @@ struct Feedback {
 impl App {
     pub fn new() -> (Self, Task<Message>) {
         let app = Self {
-            matcher: Matcher::new(&WORLD),
+            matchers: ATLASES.iter().map(Matcher::new).collect(),
             progress: Progress::load(),
             settings: Settings::load(),
             mode: Mode::Free,
+            atlas: 0,
             region: 0,
             game: None,
-            preview: Preview::new(0),
+            preview: Preview::new(0, 0),
             voice: Voice {
                 commands: None,
                 installed: false,
@@ -251,14 +266,22 @@ impl App {
         let Some(demo) = crate::dev::demo() else {
             return self;
         };
+        if let Some(atlas) = demo
+            .atlas
+            .as_deref()
+            .and_then(|id| ATLASES.iter().position(|a| a.info.id == id))
+        {
+            self.atlas = atlas;
+            self.preview = Preview::new(atlas, 0);
+        }
         // Les parties de démonstration ne sont pas enregistrées.
         self.progress = Progress::default();
         if let Some(mode) = demo.mode {
             self.mode = mode;
         }
-        if let Some(region) = demo.region.as_deref().and_then(|r| WORLD.region(r)) {
+        if let Some(region) = demo.region.as_deref().and_then(|r| self.world().region(r)) {
             self.region = region;
-            self.preview = Preview::new(region);
+            self.preview = Preview::new(self.atlas, region);
         }
         // En mémoire seulement, comme le minuteur ci-dessous.
         self.settings.by_continent = demo.by_continent;
@@ -269,25 +292,26 @@ impl App {
         if demo.mode.is_none() {
             return self;
         }
-        let mut game = Game::new(self.region, self.mode, self.time_limit());
+        let mut game = Game::new(self.atlas, self.region, self.mode, self.time_limit());
         if let Some(first) = demo
             .target
             .as_deref()
-            .and_then(|code| WORLD.countries.iter().position(|c| c.code == code))
+            .and_then(|code| self.world().countries.iter().position(|c| c.code == code))
         {
-            let members = WORLD.regions[self.region].members.clone();
+            let members = self.world().regions[self.region].members.clone();
             let mut order: Vec<usize> = members.iter().copied().filter(|&c| c != first).collect();
             order.insert(0, first);
-            game.quiz = Quiz::new(self.mode, WORLD.countries.len(), members, order);
+            game.quiz = Quiz::new(self.mode, self.world().countries.len(), members, order);
         }
         for code in &demo.answers {
-            if let Some(c) = WORLD.countries.iter().position(|c| &c.code == code) {
+            if let Some(c) = self.world().countries.iter().position(|c| &c.code == code) {
                 let outcome = game.quiz.submit(c);
                 game.apply(outcome);
             }
         }
         if let Some((lon, lat, zoom)) = demo.zoom {
-            let [x, y] = geo_core::projection::project(lon, lat, WORLD.regions[self.region].center);
+            let [x, y] =
+                geo_core::projection::project(lon, lat, self.world().regions[self.region].center);
             game.camera = Camera {
                 center: iced::Point::new(x, y),
                 zoom,
@@ -319,12 +343,24 @@ impl App {
         self
     }
 
+    /// Atlas choisi sur l'écran d'accueil.
+    fn world(&self) -> &'static World {
+        &ATLASES[self.atlas]
+    }
+
+    /// Reconstruit l'aperçu si l'atlas ou la zone ont changé.
+    fn refresh_preview(&mut self) {
+        if self.preview.atlas != self.atlas || self.preview.region != self.region {
+            self.preview = Preview::new(self.atlas, self.region);
+        }
+    }
+
     pub fn title(&self) -> String {
         match &self.game {
             Some(game) => format!(
                 "{} · {} — GeoLearner",
-                WORLD.regions[game.region].name,
-                mode_title(game.quiz.mode())
+                game.world.regions[game.region].name,
+                mode_title(game.quiz.mode(), &Words::of(&game.world.info))
             ),
             None => "GeoLearner".into(),
         }
@@ -365,29 +401,46 @@ impl App {
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::SelectMode(mode) => self.mode = mode,
+            Message::SelectAtlas(atlas) => {
+                if atlas != self.atlas {
+                    self.atlas = atlas;
+                    self.region = 0;
+                    self.refresh_preview();
+                }
+            }
             Message::SelectRegion(region) => {
                 self.region = region;
-                if self.preview.region != region {
-                    self.preview = Preview::new(region);
-                }
+                self.refresh_preview();
             }
             Message::ToggleTimer => self.settings.toggle_timer(),
             Message::ByContinent(by_continent) => self.settings.set_by_continent(by_continent),
             Message::StepTimer(up) => {
-                let zone = &WORLD.regions[self.region];
-                self.settings
-                    .step_duration(self.mode, &zone.id, zone.members.len(), up);
+                let zone = &self.world().regions[self.region];
+                self.settings.step_duration(
+                    &self.world().info.id,
+                    self.mode,
+                    &zone.id,
+                    zone.members.len(),
+                    up,
+                );
             }
             Message::ResetTimer => {
-                let zone = &WORLD.regions[self.region];
-                self.settings.reset_duration(self.mode, &zone.id);
+                let zone = &self.world().regions[self.region];
+                self.settings
+                    .reset_duration(&self.world().info.id, self.mode, &zone.id);
             }
             Message::Start | Message::Restart => {
                 if let Some(game) = &self.game {
+                    self.atlas = game.atlas;
                     self.region = game.region;
                     self.mode = game.quiz.mode();
                 }
-                self.game = Some(Game::new(self.region, self.mode, self.time_limit()));
+                self.game = Some(Game::new(
+                    self.atlas,
+                    self.region,
+                    self.mode,
+                    self.time_limit(),
+                ));
                 return operation::focus(ANSWER_INPUT);
             }
             Message::BackToMenu => {
@@ -401,7 +454,7 @@ impl App {
                 if let Some(game) = &mut self.game
                     && let Some(country) = game.quiz.skip()
                 {
-                    let name = &WORLD.countries[country].name;
+                    let name = &game.world.countries[country].name;
                     game.say(format!("C'était : {name}"), style::DANGER);
                     game.flash(country, style::DANGER, 1800);
                     game.history.push(country);
@@ -508,7 +561,7 @@ impl App {
 
     fn on_click(&mut self, country: usize) {
         let Some(game) = &mut self.game else { return };
-        let name = &WORLD.countries[country].name;
+        let name = &game.world.countries[country].name;
         match game.quiz.mark(country) {
             None => {
                 game.say(
@@ -532,12 +585,12 @@ impl App {
         let Some(game) = &mut self.game else { return };
         game.input = value;
         game.pending = None;
-        let Some(country) = self.matcher.lookup(&game.input) else {
+        let Some(country) = self.matchers[game.atlas].lookup(&game.input) else {
             return;
         };
         match game.quiz.mode() {
             Mode::Free if game.quiz.mark(country) == Some(Mark::Pending) => {
-                if is_prefix_of_other(&game.input, country, &game.quiz) {
+                if is_prefix_of_other(game.world, &game.input, country, &game.quiz) {
                     game.pending = Some((country, game.now));
                 } else {
                     let outcome = game.quiz.submit(country);
@@ -558,21 +611,29 @@ impl App {
         if game.input.trim().is_empty() {
             return;
         }
-        let Some(country) = self.matcher.lookup(&game.input) else {
+        let Some(country) = self.matchers[game.atlas].lookup(&game.input) else {
+            let info = &game.world.info;
+            let words = Words::of(info);
             let typed = geo_core::normalize(&game.input);
-            let message = match WORLD
+            let message = match game
+                .world
                 .territories
                 .iter()
                 .find(|t| t.answers.contains(&typed))
             {
                 // Sans dire à quel pays il appartient : ce serait un indice.
-                Some(territory) => format!("{} n'est pas un pays", territory.name),
-                None => format!("« {} » : pays inconnu", game.input.trim()),
+                Some(territory) => format!("{} n'est pas {}", territory.name, words.a()),
+                None => format!(
+                    "« {} » : {} {}",
+                    game.input.trim(),
+                    info.one,
+                    words.agree("inconnu")
+                ),
             };
             game.say(message, style::MUTED);
             return;
         };
-        let name = &WORLD.countries[country].name;
+        let name = &game.world.countries[country].name;
         match game.quiz.mode() {
             Mode::Free => match game.quiz.mark(country) {
                 Some(Mark::Pending) => {
@@ -721,7 +782,9 @@ impl App {
         } else if !self.voice.installed {
             self.send_voice(voice::Command::Download);
         } else if self.game.is_some() {
-            self.send_voice(voice::Command::Start);
+            self.send_voice(voice::Command::Start(
+                self.game.as_ref().map_or(self.atlas, |g| g.atlas),
+            ));
         }
     }
 
@@ -742,8 +805,9 @@ impl App {
         game.feedback = None;
         game.cache.clear();
         let quiz = &game.quiz;
-        let region = &WORLD.regions[game.region];
+        let region = &game.world.regions[game.region];
         let session = Session {
+            atlas: game.world.info.id.clone(),
             when: progress::now(),
             mode: quiz.mode(),
             region: region.id.clone(),
@@ -756,10 +820,13 @@ impl App {
                 .members()
                 .iter()
                 .filter(|&&c| quiz.mark(c) == Some(Mark::Missed))
-                .map(|&c| WORLD.countries[c].code.clone())
+                .map(|&c| game.world.countries[c].code.clone())
                 .collect(),
         };
-        game.new_record = match self.progress.best(session.mode, &session.region) {
+        game.new_record = match self
+            .progress
+            .best(&session.atlas, session.mode, &session.region)
+        {
             Some(best) => {
                 session.score > best.score
                     || (session.score == best.score && session.seconds < best.seconds)
@@ -780,32 +847,38 @@ impl App {
     }
 
     fn home_view(&self) -> Element<'_, Message> {
+        let info = &self.world().info;
+        let words = Words::of(info);
         let header = column![
-            text("GeoLearner").size(34).font(style::FONT_BOLD),
-            text("Apprendre les pays du monde, carte en main.")
-                .size(15)
+            text(info.title.clone()).size(26).font(style::FONT_BOLD),
+            text(format!("{} {}", self.world().countries.len(), info.many))
+                .size(14)
                 .color(style::MUTED),
         ]
-        .spacing(4);
+        .spacing(2);
 
         let modes = Row::with_children(Mode::ALL.iter().map(|&mode| {
             button(
                 column![
-                    text(mode_title(mode)).size(16).font(style::FONT_SEMIBOLD),
-                    text(mode_description(mode)).size(13).color(style::MUTED),
+                    text(mode_title(mode, &words))
+                        .size(16)
+                        .font(style::FONT_SEMIBOLD),
+                    text(mode_description(mode, &words))
+                        .size(13)
+                        .color(style::MUTED),
                 ]
                 .spacing(6),
             )
-            .padding(18)
+            .padding(16)
             .width(Fill)
-            .height(108)
+            .height(124)
             .style(style::option_card(self.mode == mode))
             .on_press(Message::SelectMode(mode))
             .into()
         }))
         .spacing(12);
 
-        let selected = &WORLD.regions[self.region];
+        let selected = &self.world().regions[self.region];
         let open_continent = match selected.kind {
             RegionKind::Continent => Some(self.region),
             RegionKind::Sub | RegionKind::Group => selected.parent,
@@ -819,7 +892,7 @@ impl App {
                 .into()
         };
         let top = Row::with_children(
-            WORLD
+            self.world()
                 .regions
                 .iter()
                 .enumerate()
@@ -830,13 +903,14 @@ impl App {
         .wrap();
         let mut zones = column![section_title("Zone"), top].spacing(12);
         if let Some(continent) = open_continent {
-            let subs = WORLD
+            let subs = self
+                .world()
                 .regions
                 .iter()
                 .enumerate()
                 .filter(|(_, r)| r.parent == Some(continent) && !r.hidden)
                 .map(|(i, r)| pill(i, &r.name));
-            let all = pill(continent, "Tout le continent");
+            let all = pill(continent, "Toute la zone");
             if subs.clone().count() > 0 {
                 zones = zones.push(
                     container(
@@ -857,21 +931,25 @@ impl App {
             }
         }
 
-        let best = self.progress.best(self.mode, &selected.id).map(|s| {
-            format!(
-                "Record : {} en {}",
-                percent(s.score),
-                clock(Duration::from_secs(u64::from(s.seconds)))
-            )
-        });
+        let best = self
+            .progress
+            .best(&self.world().info.id, self.mode, &selected.id)
+            .map(|s| {
+                format!(
+                    "Record : {} en {}",
+                    percent(s.score),
+                    clock(Duration::from_secs(u64::from(s.seconds)))
+                )
+            });
         let launch = container(
             row![
                 column![
                     text(selected.name.clone()).size(22).font(style::FONT_BOLD),
                     text(format!(
-                        "{} · {} pays",
-                        mode_title(self.mode),
-                        selected.members.len()
+                        "{} · {} {}",
+                        mode_title(self.mode, &words),
+                        selected.members.len(),
+                        words.many()
                     ))
                     .size(14)
                     .color(style::MUTED),
@@ -901,21 +979,21 @@ impl App {
         .style(style::card);
 
         let main = column![
+            header,
             column![section_title("Mode de jeu"), modes].spacing(12),
             zones,
             launch,
         ]
-        .spacing(28)
+        .spacing(24)
         .width(Fill);
 
         let side = column![self.preview_card(), self.voice_card(), self.history_card()]
             .spacing(16)
-            .width(340);
+            .width(320);
 
-        let content = column![header, row![main, side].spacing(28)]
-            .spacing(28)
-            .padding(36)
-            .max_width(1240);
+        let content = container(row![self.catalog(), main, side].spacing(28))
+            .padding(32)
+            .max_width(1440);
         container(scrollable(container(content).center_x(Fill)).height(Fill))
             .style(style::page)
             .width(Fill)
@@ -925,7 +1003,7 @@ impl App {
 
     /// Réglage du minuteur pour le mode et la zone choisis.
     fn timer_setting(&self) -> Element<'_, Message> {
-        let zone = &WORLD.regions[self.region];
+        let zone = &self.world().regions[self.region];
         let on = self.settings.timer;
         let fg = if on { Color::WHITE } else { style::TEXT };
         let mut setting = row![
@@ -941,9 +1019,12 @@ impl App {
         .spacing(8)
         .align_y(Center);
         if on {
-            let seconds = self
-                .settings
-                .duration(self.mode, &zone.id, zone.members.len());
+            let seconds = self.settings.duration(
+                &self.world().info.id,
+                self.mode,
+                &zone.id,
+                zone.members.len(),
+            );
             let step = |i: Icon, message: Message| {
                 button(container(icon(i, 12.0, style::TEXT)).center(Fill))
                     .width(26)
@@ -960,7 +1041,10 @@ impl App {
                         .font(style::FONT_SEMIBOLD),
                 )
                 .push(step(Icon::Plus, Message::StepTimer(true)));
-            if self.settings.is_custom(self.mode, &zone.id) {
+            if self
+                .settings
+                .is_custom(&self.world().info.id, self.mode, &zone.id)
+            {
                 setting = setting.push(
                     button(text("Par défaut").size(12))
                         .padding([4, 8])
@@ -976,9 +1060,54 @@ impl App {
             .into()
     }
 
+    /// Catalogue des quiz, groupés par catégorie (dans l'ordre de `ATLASES`).
+    fn catalog(&self) -> Element<'_, Message> {
+        let mut list = column![
+            text("GeoLearner").size(26).font(style::FONT_BOLD),
+            text("La géographie, carte en main.")
+                .size(13)
+                .color(style::MUTED),
+        ]
+        .spacing(4);
+        let mut categories: Vec<&str> = Vec::new();
+        for atlas in ATLASES.iter() {
+            if !categories.contains(&atlas.info.category.as_str()) {
+                categories.push(&atlas.info.category);
+            }
+        }
+        for category in categories {
+            let mut group = column![section_title(category)].spacing(6);
+            for (i, atlas) in ATLASES
+                .iter()
+                .enumerate()
+                .filter(|(_, a)| a.info.category == category)
+            {
+                group = group.push(
+                    button(
+                        column![
+                            text(atlas.info.title.clone())
+                                .size(14)
+                                .font(style::FONT_SEMIBOLD),
+                            text(format!("{} {}", atlas.countries.len(), atlas.info.many))
+                                .size(12)
+                                .color(style::MUTED),
+                        ]
+                        .spacing(2),
+                    )
+                    .padding([9, 12])
+                    .width(Fill)
+                    .style(style::option_card(self.atlas == i))
+                    .on_press(Message::SelectAtlas(i)),
+                );
+            }
+            list = list.push(container(group).padding(iced::Padding::ZERO.top(14)));
+        }
+        container(list).width(230).into()
+    }
+
     /// Aperçu de la zone choisie : ses pays en bleu sur la carte.
     fn preview_card(&self) -> Element<'_, Message> {
-        let zone = &WORLD.regions[self.region];
+        let zone = &self.world().regions[self.region];
         container(
             column![
                 row![
@@ -986,7 +1115,7 @@ impl App {
                         .size(16)
                         .font(style::FONT_SEMIBOLD)
                         .width(Fill),
-                    text(format!("{} pays", zone.members.len()))
+                    text(format!("{} {}", zone.members.len(), self.world().info.many))
                         .size(13)
                         .color(style::MUTED),
                 ]
@@ -1016,7 +1145,7 @@ impl App {
                 style::MUTED,
             ),
             _ => (
-                "Prête. En partie, cliquez sur le micro (ou Ctrl+M) et citez les pays à la suite."
+                "Prête. En partie, cliquez sur le micro (ou Ctrl+M) et citez les noms à la suite."
                     .into(),
                 style::MUTED,
             ),
@@ -1072,9 +1201,13 @@ impl App {
         let mut empty = true;
         for session in self.progress.recent(6) {
             empty = false;
-            let region = WORLD
+            let atlas = ATLASES
+                .iter()
+                .find(|a| a.info.id == session.atlas)
+                .unwrap_or(&ATLASES[0]);
+            let region = atlas
                 .region(&session.region)
-                .map(|i| WORLD.regions[i].name.clone())
+                .map(|i| atlas.regions[i].name.clone())
                 .unwrap_or_else(|| session.region.clone());
             list = list.push(
                 row![
@@ -1084,7 +1217,17 @@ impl App {
                         .style(style::dot(score_color(session.score))),
                     column![
                         text(region).size(14),
-                        text(mode_title(session.mode)).size(12).color(style::MUTED),
+                        text(if atlas.info.id == "monde" {
+                            mode_title(session.mode, &Words::of(&atlas.info))
+                        } else {
+                            format!(
+                                "{} · {}",
+                                atlas.info.title,
+                                mode_title(session.mode, &Words::of(&atlas.info))
+                            )
+                        })
+                        .size(12)
+                        .color(style::MUTED),
                     ]
                     .width(Fill),
                     column![
@@ -1116,11 +1259,11 @@ impl App {
             list
         ]
         .spacing(14);
-        let missed = self.progress.most_missed(10);
+        let missed = self.progress.most_missed(&self.world().info.id, 10);
         if !missed.is_empty() {
             let names = missed
                 .iter()
-                .filter_map(|(code, _)| WORLD.countries.iter().find(|c| &c.code == code))
+                .filter_map(|(code, _)| self.world().countries.iter().find(|c| &c.code == code))
                 .map(|c| {
                     container(text(c.name.clone()).size(12))
                         .padding([4, 10])
@@ -1162,9 +1305,10 @@ impl App {
 
     /// Durée du minuteur pour le mode et la zone choisis, s'il est activé.
     fn time_limit(&self) -> Option<Duration> {
-        let zone = &WORLD.regions[self.region];
+        let zone = &self.world().regions[self.region];
         self.settings.timer.then(|| {
             Duration::from_secs(u64::from(self.settings.duration(
+                &self.world().info.id,
                 self.mode,
                 &zone.id,
                 zone.members.len(),
@@ -1201,7 +1345,7 @@ impl App {
 
     fn top_bar<'a>(&'a self, game: &'a Game) -> Element<'a, Message> {
         let quiz = &game.quiz;
-        let region = &WORLD.regions[game.region];
+        let region = &game.world.regions[game.region];
         let counted = if quiz.mode() == Mode::Free {
             quiz.found()
         } else {
@@ -1264,7 +1408,9 @@ impl App {
                 text(region.name.clone())
                     .size(16)
                     .font(style::FONT_SEMIBOLD),
-                text(mode_title(quiz.mode())).size(12).color(style::MUTED),
+                text(mode_title(quiz.mode(), &Words::of(&game.world.info)))
+                    .size(12)
+                    .color(style::MUTED),
             ]
             .spacing(2),
             space::horizontal(),
@@ -1300,7 +1446,7 @@ impl App {
             }
         });
         let map_view = MapView {
-            world: &WORLD,
+            world: game.world,
             projection: &game.projection,
             view: game.view,
             camera: game.camera,
@@ -1392,14 +1538,22 @@ impl App {
         let mut content = match quiz.mode() {
             Mode::Locate => column![
                 text("Où se trouve…").size(13).color(style::MUTED),
-                text(WORLD.countries[target].name.clone())
+                text(game.world.countries[target].name.clone())
                     .size(26)
                     .font(style::FONT_BOLD),
             ],
             Mode::Identify => column![
-                text("Quel est ce pays ?")
-                    .size(18)
-                    .font(style::FONT_SEMIBOLD)
+                text({
+                    let words = Words::of(&game.world.info);
+                    let feminine = game.world.info.feminine;
+                    format!(
+                        "Quel{} est {} ?",
+                        if feminine { "le" } else { "" },
+                        words.this()
+                    )
+                })
+                .size(18)
+                .font(style::FONT_SEMIBOLD)
             ],
             Mode::Free => return None,
         };
@@ -1431,16 +1585,17 @@ impl App {
             .padding(0)
             .style(style::mic(listening))
             .on_press(Message::ToggleMic);
+        let words = Words::of(&game.world.info);
         let placeholder = match game.quiz.mode() {
-            Mode::Identify => "Nom du pays en surbrillance…",
-            _ => "Nom d'un pays…",
+            Mode::Identify => format!("Nom {} en surbrillance…", words.of_the()),
+            _ => format!("Nom {}…", words.of_a()),
         };
         let flash_border = game
             .feedback
             .as_ref()
             .filter(|f| game.now - f.at < Duration::from_millis(500))
             .map(|f| f.color);
-        let input = text_input(placeholder, &game.input)
+        let input = text_input(&placeholder, &game.input)
             .id(ANSWER_INPUT)
             .on_input(Message::Input)
             .on_submit(Message::Submit)
@@ -1463,7 +1618,7 @@ impl App {
                 } else if self.voice.speaking {
                     "Parole détectée…".to_owned()
                 } else {
-                    "Je vous écoute — citez les pays à la suite".to_owned()
+                    "Je vous écoute — citez les noms à la suite".to_owned()
                 };
                 Some(
                     row![
@@ -1527,11 +1682,16 @@ impl App {
                 text(percent(quiz.found() as f32 / quiz.total().max(1) as f32))
                     .size(34)
                     .font(style::FONT_BOLD),
-                text(format!(
-                    "{} pays trouvés sur {}",
-                    quiz.found(),
-                    quiz.total()
-                ))
+                text({
+                    let words = Words::of(&game.world.info);
+                    format!(
+                        "{} {} {} sur {}",
+                        quiz.found(),
+                        words.many(),
+                        words.agree("trouvés"),
+                        quiz.total()
+                    )
+                })
                 .size(13)
                 .color(style::MUTED),
             ]
@@ -1539,11 +1699,12 @@ impl App {
             column![
                 text(percent(quiz.score())).size(34).font(style::FONT_BOLD),
                 text(format!(
-                    "{} du premier coup · {} erreur{} · {} restant{}",
+                    "{} du premier coup · {} erreur{} · {} {}{}",
                     quiz.perfect(),
                     quiz.mistakes(),
                     plural(quiz.mistakes() as usize),
                     quiz.total() - quiz.done(),
+                    Words::of(&game.world.info).agree("restant"),
                     plural(quiz.total() - quiz.done()),
                 ))
                 .size(13)
@@ -1556,14 +1717,19 @@ impl App {
         if quiz.mode() == Mode::Free {
             let in_quiz =
                 |region: &&geo_core::Region| region.members.iter().any(|&c| quiz.mark(c).is_some());
-            let continents = WORLD
-                .regions
-                .iter()
-                .filter(|r| r.kind == RegionKind::Continent)
-                .filter(in_quiz)
-                .count();
-            // Le choix n'a de sens que si la partie couvre plusieurs continents.
-            let by_continent = self.settings.by_continent && continents > 1;
+            let count_of = |kind: RegionKind| {
+                game.world
+                    .regions
+                    .iter()
+                    .filter(|r| r.kind == kind && !r.hidden)
+                    .filter(in_quiz)
+                    .count()
+            };
+            let (continents, subs) = (count_of(RegionKind::Continent), count_of(RegionKind::Sub));
+            // Le choix n'a de sens que si la partie couvre plusieurs continents et que les deux
+            // niveaux diffèrent (pour les régions françaises, il n'y a pas de sous-niveau).
+            let choice_useful = continents > 1 && subs > 1;
+            let by_continent = continents > 1 && (self.settings.by_continent || subs <= 1);
             let kind = if by_continent {
                 RegionKind::Continent
             } else {
@@ -1571,7 +1737,7 @@ impl App {
             };
             let mut rows = Column::new().spacing(12);
             let mut count = 0;
-            for region in WORLD.regions.iter().filter(|r| r.kind == kind) {
+            for region in game.world.regions.iter().filter(|r| r.kind == kind) {
                 let members: Vec<usize> = region
                     .members
                     .iter()
@@ -1610,16 +1776,17 @@ impl App {
                 let mut header = row![section_title("Avancement"), space::horizontal()]
                     .align_y(Center)
                     .spacing(4);
-                if continents > 1 {
-                    let choice = |label: &'static str, value: bool| {
-                        button(text(label).size(11))
+                if choice_useful {
+                    let levels = &game.world.info.levels;
+                    let choice = |label: &str, value: bool| {
+                        button(text(label.to_owned()).size(11))
                             .padding([3, 8])
                             .style(style::pill(by_continent == value))
                             .on_press(Message::ByContinent(value))
                     };
                     header = header
-                        .push(choice("Continents", true))
-                        .push(choice("Régions", false));
+                        .push(choice(&levels[0], true))
+                        .push(choice(&levels[1], false));
                 }
                 body = body.push(column![header, rows].spacing(12));
             }
@@ -1641,7 +1808,7 @@ impl App {
                         .width(8)
                         .height(8)
                         .style(style::dot(map::mark_color(mark))),
-                    text(WORLD.countries[country].name.clone())
+                    text(game.world.countries[country].name.clone())
                         .size(13)
                         .width(Fill),
                     text(note).size(12).color(style::MUTED),
@@ -1663,7 +1830,7 @@ impl App {
 
     fn summary<'a>(&'a self, game: &'a Game) -> Element<'a, Message> {
         let quiz = &game.quiz;
-        let region = &WORLD.regions[game.region];
+        let region = &game.world.regions[game.region];
         let title = if quiz.score() >= 1.0 {
             "Parfait !"
         } else if game.timed_out {
@@ -1671,7 +1838,7 @@ impl App {
         } else {
             "Partie terminée"
         };
-        let stat = |label: &'static str, value: String| {
+        let stat = |label: String, value: String| {
             container(
                 column![
                     text(value).size(22).font(style::FONT_BOLD),
@@ -1693,13 +1860,20 @@ impl App {
         };
         let mut content = column![
             text(title).size(28).font(style::FONT_BOLD),
-            text(format!("{} · {}", region.name, mode_title(quiz.mode())))
-                .size(14)
-                .color(style::MUTED),
+            text(format!(
+                "{} · {}",
+                region.name,
+                mode_title(quiz.mode(), &Words::of(&game.world.info))
+            ))
+            .size(14)
+            .color(style::MUTED),
             row![
-                stat("score", percent(quiz.score())),
-                stat("trouvés", format!("{}/{}", quiz.found(), quiz.total())),
-                stat("temps", clock(game.elapsed())),
+                stat("score".into(), percent(quiz.score())),
+                stat(
+                    Words::of(&game.world.info).agree("trouvés"),
+                    format!("{}/{}", quiz.found(), quiz.total())
+                ),
+                stat("temps".into(), clock(game.elapsed())),
             ]
             .spacing(10),
         ]
@@ -1714,9 +1888,16 @@ impl App {
         }
         if quiz.missed() > 0 {
             content = content.push(
-                text("Les pays ratés sont en rouge sur la carte.")
-                    .size(13)
-                    .color(style::MUTED),
+                text({
+                    let words = Words::of(&game.world.info);
+                    format!(
+                        "Les {} {} sont en rouge sur la carte.",
+                        words.many(),
+                        words.agree("ratés")
+                    )
+                })
+                .size(13)
+                .color(style::MUTED),
             );
         }
         content = content.push(
@@ -1752,17 +1933,20 @@ impl App {
 }
 
 impl Game {
-    fn new(region: usize, mode: Mode, limit: Option<Duration>) -> Self {
-        let zone = &WORLD.regions[region];
+    fn new(atlas: usize, region: usize, mode: Mode, limit: Option<Duration>) -> Self {
+        let world = &ATLASES[atlas];
+        let zone = &world.regions[region];
         let members = zone.members.clone();
         let mut order = members.clone();
         fastrand::shuffle(&mut order);
         let view = map::view_rect(zone.view, zone.center);
         let now = Instant::now();
         Self {
+            atlas,
+            world,
             region,
-            quiz: Quiz::new(mode, WORLD.countries.len(), members, order),
-            projection: Projection::new(&WORLD, zone.center),
+            quiz: Quiz::new(mode, world.countries.len(), members, order),
+            projection: Projection::new(world, zone.center),
             view,
             camera: Camera::fit(view),
             animation: None,
@@ -1866,12 +2050,18 @@ impl Game {
         if core.width.max(core.height) * scale >= self.target_min_px() {
             return overview;
         }
-        let Some(continent) = WORLD.continent_of(target) else {
+        // Zone de contexte : le continent, ou la sous-région (départements : leur région).
+        let continent = if self.world.info.zoom_sub {
+            Some(self.world.countries[target].sub)
+        } else {
+            self.world.continent_of(target)
+        };
+        let Some(continent) = continent else {
             return overview;
         };
         let area = map::view_rect(
-            WORLD.regions[continent].view,
-            WORLD.regions[self.region].center,
+            self.world.regions[continent].view,
+            self.world.regions[self.region].center,
         );
         // Inutile si la partie se joue déjà sur ce continent (ou une zone plus petite).
         if area.width >= self.view.width * 0.9 && area.height >= self.view.height * 0.9 {
@@ -1887,7 +2077,7 @@ impl Game {
 
     /// Réagit au résultat d'une réponse.
     fn apply(&mut self, outcome: Outcome) {
-        let name = |c: usize| WORLD.countries[c].name.clone();
+        let name = |c: usize| self.world.countries[c].name.clone();
         match outcome {
             Outcome::Found(c) => {
                 self.input.clear();
@@ -1933,12 +2123,12 @@ impl Game {
 }
 
 /// Le texte saisi est-il aussi le début du nom d'un autre pays encore à trouver ?
-fn is_prefix_of_other(input: &str, country: usize, quiz: &Quiz) -> bool {
+fn is_prefix_of_other(world: &World, input: &str, country: usize, quiz: &Quiz) -> bool {
     let typed = geo_core::normalize(input);
     quiz.members().iter().any(|&other| {
         other != country
             && quiz.mark(other) == Some(Mark::Pending)
-            && WORLD.countries[other]
+            && world.countries[other]
                 .answers
                 .iter()
                 .any(|a| a.len() > typed.len() && a.starts_with(&typed))
@@ -1964,21 +2154,26 @@ fn section_title<'a>(label: &'a str) -> Element<'a, Message> {
         .into()
 }
 
-pub fn mode_title(mode: Mode) -> &'static str {
+/// « Tous les pays », « Nommer la région »…
+pub fn mode_title(mode: Mode, w: &Words) -> String {
     match mode {
-        Mode::Free => "Tous les pays",
-        Mode::Identify => "Nommer le pays",
-        Mode::Locate => "Trouver sur la carte",
+        Mode::Free => capitalize(&w.all()),
+        Mode::Identify => format!("Nommer {}", w.the()),
+        Mode::Locate => "Trouver sur la carte".into(),
     }
 }
 
-fn mode_description(mode: Mode) -> &'static str {
+fn mode_description(mode: Mode, w: &Words) -> String {
     match mode {
-        Mode::Free => {
-            "Citer tous les pays de la zone, dans n'importe quel ordre. Au clavier ou à la voix."
-        }
-        Mode::Identify => "Un pays s'allume sur la carte : donner son nom.",
-        Mode::Locate => "Un nom de pays s'affiche : cliquer dessus sur la carte.",
+        Mode::Free => format!(
+            "Citer {} de la zone, dans n'importe quel ordre. Au clavier ou à la voix.",
+            w.all()
+        ),
+        Mode::Identify => format!(
+            "{} s'allume sur la carte : donner son nom.",
+            capitalize(&w.a())
+        ),
+        Mode::Locate => "Un nom s'affiche : cliquer dessus sur la carte.".into(),
     }
 }
 
@@ -2018,7 +2213,7 @@ mod tests {
     fn preview_build_time() {
         for region in ["monde", "europe", "oceanie"] {
             let start = Instant::now();
-            let _ = Preview::new(WORLD.region(region).unwrap());
+            let _ = Preview::new(0, ATLASES[0].region(region).unwrap());
             println!("{region} : {:?}", start.elapsed());
         }
     }

@@ -30,6 +30,8 @@ pub const MAX_ZOOM: f32 = 600.0;
 
 /// Contours projetés pour un méridien central donné.
 pub struct Projection {
+    /// Méridien central.
+    center: f32,
     countries: Vec<ProjShape>,
     territories: Vec<ProjShape>,
     /// Bulles des archipels : une ellipse par groupe d'îles (vide pour les autres pays).
@@ -82,6 +84,7 @@ impl Projection {
             })
             .collect();
         Self {
+            center,
             countries,
             territories,
             bubbles,
@@ -864,6 +867,20 @@ impl MapView<'_> {
             Stroke::default().with_color(style::COAST).with_width(0.8),
         );
 
+        // Cadres des encarts (outre-mer, Alaska, Hawaï) : ces terres ont été déplacées.
+        for &frame_view in &self.world.info.frames {
+            let r = view_rect(frame_view, self.projection.center);
+            let a = t.to_screen(Point::new(r.x, r.y + r.height));
+            let b = t.to_screen(Point::new(r.x + r.width, r.y));
+            let path = Path::rounded_rectangle(a, Size::new(b.x - a.x, b.y - a.y), 6.0.into());
+            frame.stroke(
+                &path,
+                Stroke::default()
+                    .with_color(style::with_alpha(style::MUTED, 0.45))
+                    .with_width(1.0),
+            );
+        }
+
         // Pastilles des micro-États (les archipels ont leur bulle).
         for &c in self.quiz.members() {
             if !self.projection.bubbles[c].is_empty()
@@ -1349,14 +1366,15 @@ mod tests {
 #[cfg(test)]
 mod sizes {
     use super::*;
-    use crate::WORLD;
+    use crate::ATLASES;
 
     /// Taille à l'écran (plus grande dimension, en pixels) de quelques pays sur la vue Monde.
     #[test]
     #[ignore]
     fn world_sizes() {
-        let world = &WORLD.regions[0];
-        let projection = Projection::new(&WORLD, world.center);
+        let atlas = &ATLASES[0];
+        let world = &atlas.regions[0];
+        let projection = Projection::new(atlas, world.center);
         let view = view_rect(world.view, world.center);
         for size in [Size::new(1070.0, 800.0), Size::new(1630.0, 1020.0)] {
             let t = Transform::new(Camera::fit(view), view, size);
@@ -1365,7 +1383,7 @@ mod sizes {
                 "SVN", "GNB", "BEL", "NLD", "CHE", "PRT", "HUN", "GHA", "FRA", "DEU", "ESP", "ITA",
                 "UKR", "SEN", "KOR", "IRQ", "NZL", "JPN",
             ] {
-                let c = WORLD.countries.iter().position(|x| x.code == code).unwrap();
+                let c = atlas.countries.iter().position(|x| x.code == code).unwrap();
                 let core = projection.core(c);
                 line += &format!(" {code}={:.0}", core.width.max(core.height) * t.scale);
             }

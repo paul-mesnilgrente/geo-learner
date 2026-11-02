@@ -4,7 +4,7 @@ use std::sync::OnceLock;
 
 use super::audio::RATE;
 use super::models;
-use crate::WORLD;
+use geo_core::World;
 
 /// Coût du chemin « mot inconnu » : plus il est bas, plus les paroles hors liste sont rejetées
 /// (au risque de manquer de vrais noms de pays). -3 a donné le meilleur compromis aux essais.
@@ -18,7 +18,8 @@ pub struct Vosk {
 }
 
 impl Vosk {
-    pub fn load() -> Result<Self, String> {
+    /// Modèle chargé, avec une grammaire limitée aux noms des lieux de l'atlas.
+    pub fn load(world: &World) -> Result<Self, String> {
         if !models::installed() {
             return Err("Le modèle vocal n'est pas installé.".into());
         }
@@ -31,7 +32,7 @@ impl Vosk {
             .map_err(Clone::clone)?;
         // Formes orales des pays dont tous les mots sont connus du modèle.
         let mut grammar: Vec<String> = Vec::new();
-        for country in &WORLD.countries {
+        for country in &world.countries {
             for form in &country.spoken {
                 if form.split(' ').all(|w| model.word_ids.contains_key(w))
                     && !grammar.contains(form)
@@ -88,14 +89,15 @@ mod tests {
     #[ignore]
     fn samples() {
         let dir = std::env::var("GEO_VOICE_SAMPLES").expect("GEO_VOICE_SAMPLES");
-        let matcher = geo_core::Matcher::new(&WORLD);
+        let world = &crate::ATLASES[0];
+        let matcher = geo_core::Matcher::new(world);
         let mut files: Vec<_> = std::fs::read_dir(&dir)
             .unwrap()
             .filter_map(|e| e.ok().map(|e| e.path()))
             .filter(|p| p.extension().is_some_and(|x| x == "wav"))
             .collect();
         files.sort();
-        let mut vosk = Vosk::load().unwrap();
+        let mut vosk = Vosk::load(world).unwrap();
         for file in &files {
             let bytes = std::fs::read(file).unwrap();
             let audio: Vec<f32> = bytes[44..]
@@ -107,7 +109,7 @@ mod tests {
             let names: Vec<&str> = matcher
                 .scan_fuzzy(&text)
                 .iter()
-                .map(|&c| WORLD.countries[c].name.as_str())
+                .map(|&c| world.countries[c].name.as_str())
                 .collect();
             println!(
                 "{:>24} {:>5} ms  {text:?} → {names:?}",

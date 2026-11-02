@@ -1,0 +1,256 @@
+# Départements français (Natural Earth admin-1). Codes ISO 3166-2 ; les numéros de
+# département sont acceptés comme réponses (« 75 », « 2A », « 971 »).
+
+# Lieux à trouver (avant toute section : en TOML, une clé suit sinon la dernière section).
+items = [
+  { code = "FR-01", name = "Ain", sub = "ara", aka = ["01", "1"] },
+  { code = "FR-02", name = "Aisne", sub = "hdf", aka = ["02", "2"] },
+  { code = "FR-03", name = "Allier", sub = "ara", aka = ["03", "3"] },
+  { code = "FR-04", name = "Alpes-de-Haute-Provence", sub = "pac", aka = ["04", "4"] },
+  { code = "FR-05", name = "Hautes-Alpes", sub = "pac", aka = ["05", "5"] },
+  { code = "FR-06", name = "Alpes-Maritimes", sub = "pac", aka = ["06", "6"] },
+  { code = "FR-07", name = "Ardèche", sub = "ara", aka = ["07", "7"] },
+  { code = "FR-08", name = "Ardennes", sub = "ges", aka = ["08", "8"] },
+  { code = "FR-09", name = "Ariège", sub = "occ", aka = ["09", "9"] },
+  { code = "FR-10", name = "Aube", sub = "ges", aka = ["10"] },
+  { code = "FR-11", name = "Aude", sub = "occ", aka = ["11"] },
+  { code = "FR-12", name = "Aveyron", sub = "occ", aka = ["12"] },
+  { code = "FR-13", name = "Bouches-du-Rhône", sub = "pac", aka = ["13"] },
+  { code = "FR-14", name = "Calvados", sub = "nor", aka = ["14"] },
+  { code = "FR-15", name = "Cantal", sub = "ara", aka = ["15"] },
+  { code = "FR-16", name = "Charente", sub = "naq", aka = ["16"] },
+  { code = "FR-17", name = "Charente-Maritime", sub = "naq", aka = ["17"] },
+  { code = "FR-18", name = "Cher", sub = "cvl", aka = ["18"] },
+  { code = "FR-19", name = "Corrèze", sub = "naq", aka = ["19"] },
+  { code = "FR-21", name = "Côte-d'Or", sub = "bfc", aka = ["21"] },
+  { code = "FR-22", name = "Côtes-d'Armor", sub = "bre", aka = ["22"] },
+  { code = "FR-23", name = "Creuse", sub = "naq", aka = ["23"] },
+  { code = "FR-24", name = "Dordogne", sub = "naq", aka = ["24"] },
+  { code = "FR-25", name = "Doubs", sub = "bfc", aka = ["25"] },
+  { code = "FR-26", name = "Drôme", sub = "ara", aka = ["26"] },
+  { code = "FR-27", name = "Eure", sub = "nor", aka = ["27"] },
+  { code = "FR-28", name = "Eure-et-Loir", sub = "cvl", aka = ["28"] },
+  { code = "FR-29", name = "Finistère", sub = "bre", aka = ["29"] },
+  { code = "FR-2A", name = "Corse-du-Sud", sub = "cor", aka = ["2A"] },
+  { code = "FR-2B", name = "Haute-Corse", sub = "cor", aka = ["2B"] },
+  { code = "FR-30", name = "Gard", sub = "occ", aka = ["30"] },
+  { code = "FR-31", name = "Haute-Garonne", sub = "occ", aka = ["31"] },
+  { code = "FR-32", name = "Gers", sub = "occ", aka = ["32"] },
+  { code = "FR-33", name = "Gironde", sub = "naq", aka = ["33"] },
+  { code = "FR-34", name = "Hérault", sub = "occ", aka = ["34"] },
+  { code = "FR-35", name = "Ille-et-Vilaine", sub = "bre", aka = ["35"] },
+  { code = "FR-36", name = "Indre", sub = "cvl", aka = ["36"] },
+  { code = "FR-37", name = "Indre-et-Loire", sub = "cvl", aka = ["37"] },
+  { code = "FR-38", name = "Isère", sub = "ara", aka = ["38"] },
+  { code = "FR-39", name = "Jura", sub = "bfc", aka = ["39"] },
+  { code = "FR-40", name = "Landes", sub = "naq", aka = ["40"] },
+  { code = "FR-41", name = "Loir-et-Cher", sub = "cvl", aka = ["41"] },
+  { code = "FR-42", name = "Loire", sub = "ara", aka = ["42"] },
+  { code = "FR-43", name = "Haute-Loire", sub = "ara", aka = ["43"] },
+  { code = "FR-44", name = "Loire-Atlantique", sub = "pdl", aka = ["44"] },
+  { code = "FR-45", name = "Loiret", sub = "cvl", aka = ["45"] },
+  { code = "FR-46", name = "Lot", sub = "occ", aka = ["46"] },
+  { code = "FR-47", name = "Lot-et-Garonne", sub = "naq", aka = ["47"] },
+  { code = "FR-48", name = "Lozère", sub = "occ", aka = ["48"] },
+  { code = "FR-49", name = "Maine-et-Loire", sub = "pdl", aka = ["49"] },
+  { code = "FR-50", name = "Manche", sub = "nor", aka = ["50"] },
+  { code = "FR-51", name = "Marne", sub = "ges", aka = ["51"] },
+  { code = "FR-52", name = "Haute-Marne", sub = "ges", aka = ["52"] },
+  { code = "FR-53", name = "Mayenne", sub = "pdl", aka = ["53"] },
+  { code = "FR-54", name = "Meurthe-et-Moselle", sub = "ges", aka = ["54"] },
+  { code = "FR-55", name = "Meuse", sub = "ges", aka = ["55"] },
+  { code = "FR-56", name = "Morbihan", sub = "bre", aka = ["56"] },
+  { code = "FR-57", name = "Moselle", sub = "ges", aka = ["57"] },
+  { code = "FR-58", name = "Nièvre", sub = "bfc", aka = ["58"] },
+  { code = "FR-59", name = "Nord", sub = "hdf", aka = ["59"] },
+  { code = "FR-60", name = "Oise", sub = "hdf", aka = ["60"] },
+  { code = "FR-61", name = "Orne", sub = "nor", aka = ["61"] },
+  { code = "FR-62", name = "Pas-de-Calais", sub = "hdf", aka = ["62"] },
+  { code = "FR-63", name = "Puy-de-Dôme", sub = "ara", aka = ["63"] },
+  { code = "FR-64", name = "Pyrénées-Atlantiques", sub = "naq", aka = ["64"] },
+  { code = "FR-65", name = "Hautes-Pyrénées", sub = "occ", aka = ["65"] },
+  { code = "FR-66", name = "Pyrénées-Orientales", sub = "occ", aka = ["66"] },
+  { code = "FR-67", name = "Bas-Rhin", sub = "ges", aka = ["67"] },
+  { code = "FR-68", name = "Haut-Rhin", sub = "ges", aka = ["68"] },
+  { code = "FR-69", name = "Rhône", sub = "ara", aka = ["69"] },
+  { code = "FR-70", name = "Haute-Saône", sub = "bfc", aka = ["70"] },
+  { code = "FR-71", name = "Saône-et-Loire", sub = "bfc", aka = ["71"] },
+  { code = "FR-72", name = "Sarthe", sub = "pdl", aka = ["72"] },
+  { code = "FR-73", name = "Savoie", sub = "ara", aka = ["73"] },
+  { code = "FR-74", name = "Haute-Savoie", sub = "ara", aka = ["74"] },
+  { code = "FR-75", name = "Paris", sub = "idf", aka = ["75"] },
+  { code = "FR-76", name = "Seine-Maritime", sub = "nor", aka = ["76"] },
+  { code = "FR-77", name = "Seine-et-Marne", sub = "idf", aka = ["77"] },
+  { code = "FR-78", name = "Yvelines", sub = "idf", aka = ["78"] },
+  { code = "FR-79", name = "Deux-Sèvres", sub = "naq", aka = ["79"] },
+  { code = "FR-80", name = "Somme", sub = "hdf", aka = ["80"] },
+  { code = "FR-81", name = "Tarn", sub = "occ", aka = ["81"] },
+  { code = "FR-82", name = "Tarn-et-Garonne", sub = "occ", aka = ["82"] },
+  { code = "FR-83", name = "Var", sub = "pac", aka = ["83"] },
+  { code = "FR-84", name = "Vaucluse", sub = "pac", aka = ["84"] },
+  { code = "FR-85", name = "Vendée", sub = "pdl", aka = ["85"] },
+  { code = "FR-86", name = "Vienne", sub = "naq", aka = ["86"] },
+  { code = "FR-87", name = "Haute-Vienne", sub = "naq", aka = ["87"] },
+  { code = "FR-88", name = "Vosges", sub = "ges", aka = ["88"] },
+  { code = "FR-89", name = "Yonne", sub = "bfc", aka = ["89"] },
+  { code = "FR-90", name = "Territoire de Belfort", sub = "bfc", aka = ["90"] },
+  { code = "FR-91", name = "Essonne", sub = "idf", aka = ["91"] },
+  { code = "FR-92", name = "Hauts-de-Seine", sub = "idf", aka = ["92"] },
+  { code = "FR-93", name = "Seine-Saint-Denis", sub = "idf", aka = ["93"] },
+  { code = "FR-94", name = "Val-de-Marne", sub = "idf", aka = ["94"] },
+  { code = "FR-95", name = "Val-d'Oise", sub = "idf", aka = ["95"] },
+  { code = "FR-GF", name = "Guyane", sub = "guy", aka = ["973"] },
+  { code = "FR-GP", name = "Guadeloupe", sub = "gua", aka = ["971"] },
+  { code = "FR-MQ", name = "Martinique", sub = "mtq", aka = ["972"] },
+  { code = "FR-RE", name = "La Réunion", sub = "lre", aka = ["974"] },
+  { code = "FR-YT", name = "Mayotte", sub = "may", aka = ["976"] },
+]
+
+[atlas]
+id = "fr-departements"
+title = "Départements français"
+category = "France"
+# Noms des deux niveaux de zones (avancement en partie).
+levels = ["Grandes zones", "Régions"]
+one = "département"
+many = "départements"
+# Mode Nommer : un département trop petit est montré dans sa région.
+zoom_sub = true
+country = "FRA"
+context = [-16.0, 35.0, 20.0, 57.0]
+
+# Départements et régions d'outre-mer en encarts, à l'ouest de la Bretagne.
+[[inset]]
+codes = ["FR-GP"]
+to = [-11.0, 50.1]
+scale = 1.2
+
+[[inset]]
+codes = ["FR-MQ"]
+to = [-11.0, 48.5]
+scale = 1.6
+
+[[inset]]
+codes = ["FR-GF"]
+to = [-11.0, 46.6]
+scale = 0.32
+
+[[inset]]
+codes = ["FR-RE"]
+to = [-11.0, 44.5]
+scale = 1.6
+
+[[inset]]
+codes = ["FR-YT"]
+to = [-11.0, 42.7]
+scale = 2.2
+
+[world]
+name = "France entière"
+view = [-12.6, 41.2, 9.8, 51.3]
+center = 0
+
+[[continent]]
+id = "metropole"
+name = "Métropole"
+view = [-5.2, 41.2, 9.8, 51.3]
+
+[[continent]]
+id = "outre-mer"
+name = "Outre-mer"
+
+
+[[sub]]
+id = "ara"
+name = "Auvergne-Rhône-Alpes"
+continent = "metropole"
+
+[[sub]]
+id = "bfc"
+name = "Bourgogne-Franche-Comté"
+continent = "metropole"
+
+[[sub]]
+id = "bre"
+name = "Bretagne"
+continent = "metropole"
+
+[[sub]]
+id = "cvl"
+name = "Centre-Val de Loire"
+continent = "metropole"
+
+[[sub]]
+id = "cor"
+name = "Corse"
+continent = "metropole"
+
+[[sub]]
+id = "ges"
+name = "Grand Est"
+continent = "metropole"
+
+[[sub]]
+id = "hdf"
+name = "Hauts-de-France"
+continent = "metropole"
+
+[[sub]]
+id = "idf"
+name = "Île-de-France"
+continent = "metropole"
+
+[[sub]]
+id = "nor"
+name = "Normandie"
+continent = "metropole"
+
+[[sub]]
+id = "naq"
+name = "Nouvelle-Aquitaine"
+continent = "metropole"
+
+[[sub]]
+id = "occ"
+name = "Occitanie"
+continent = "metropole"
+
+[[sub]]
+id = "pdl"
+name = "Pays de la Loire"
+continent = "metropole"
+
+[[sub]]
+id = "pac"
+name = "Provence-Alpes-Côte d'Azur"
+continent = "metropole"
+
+[[sub]]
+id = "gua"
+name = "Guadeloupe"
+continent = "outre-mer"
+hidden = true
+
+[[sub]]
+id = "mtq"
+name = "Martinique"
+continent = "outre-mer"
+hidden = true
+
+[[sub]]
+id = "guy"
+name = "Guyane"
+continent = "outre-mer"
+hidden = true
+
+[[sub]]
+id = "lre"
+name = "La Réunion"
+continent = "outre-mer"
+hidden = true
+
+[[sub]]
+id = "may"
+name = "Mayotte"
+continent = "outre-mer"
+hidden = true

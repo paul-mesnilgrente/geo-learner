@@ -1,19 +1,34 @@
-//! Génère `assets/world.bin` à partir des contours Natural Earth et des fichiers de `data/`.
+//! Génère les atlas embarqués dans l'application (`assets/*.bin`) à partir des contours
+//! Natural Earth et des fichiers de `data/`.
 //!
-//! Usage : `cargo run -p mapgen -- <ne_50m_admin_0_countries.geojson> [sortie]`
+//! ```sh
+//! mapgen world <admin0.geojson> <sortie>                          # pays du monde
+//! mapgen atlas <atlas.toml> <admin0.geojson> <admin1.geojson> <sortie>  # subdivisions
+//! ```
 //! (voir `scripts/build-map.sh`).
 
 use std::collections::HashMap;
 use std::error::Error;
 
-use geo_core::world::{Country, Region, RegionKind, Ring, Shape, Territory, World};
+use geo_core::world::{Country, Info, Region, RegionKind, Ring, Shape, Territory, World};
 use geo_core::{Matcher, normalize};
 use serde::Deserialize;
 use serde_json::Value;
 
 /// Tolérances de simplification (en degrés) des deux niveaux de détail.
-const TOLERANCE_HI: f64 = 0.01;
-const TOLERANCE_LO: f64 = 0.08;
+#[derive(Clone, Copy)]
+struct Tolerance {
+    hi: f64,
+    lo: f64,
+}
+
+/// Pays du monde (Natural Earth 1:50m).
+const WORLD_TOLERANCE: Tolerance = Tolerance { hi: 0.01, lo: 0.08 };
+/// Subdivisions (Natural Earth 1:10m) : départements, États…
+const ATLAS_TOLERANCE: Tolerance = Tolerance {
+    hi: 0.004,
+    lo: 0.02,
+};
 /// Entités Natural Earth ignorées.
 const SKIPPED: &[&str] = &["ATA"];
 
@@ -39,6 +54,9 @@ struct CountryDef {
     bubble: bool,
     #[serde(default)]
     one_bubble: bool,
+    /// Atlas : entités Natural Earth réunies en un seul lieu (départements d'une région).
+    #[serde(default)]
+    parts: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -50,8 +68,11 @@ struct MergeDef {
 #[derive(Deserialize)]
 struct RegionsFile {
     world: ZoneDef,
+    #[serde(default)]
     continent: Vec<ZoneDef>,
+    #[serde(default)]
     sub: Vec<ZoneDef>,
+    #[serde(default)]
     group: Vec<ZoneDef>,
 }
 
@@ -69,20 +90,91 @@ struct ZoneDef {
     hidden: bool,
 }
 
+/// Fichier d'un atlas de subdivisions (`data/atlases/*.toml`).
+#[derive(Deserialize)]
+struct AtlasFile {
+    atlas: AtlasDef,
+    #[serde(flatten)]
+    zones: RegionsFile,
+    #[serde(default)]
+    inset: Vec<InsetDef>,
+    items: Vec<CountryDef>,
+}
+
+#[derive(Deserialize)]
+struct AtlasDef {
+    id: String,
+    title: String,
+    category: String,
+    one: String,
+    many: String,
+    #[serde(default)]
+    feminine: bool,
+    #[serde(default)]
+    zoom_sub: bool,
+    #[serde(default = "default_levels")]
+    levels: [String; 2],
+    /// Pays (code ADM0_A3) dont les subdivisions sont lues dans Natural Earth admin-1.
+    country: String,
+    /// Les terres des autres pays dans ce cadre [lon_min, lat_min, lon_max, lat_max] sont
+    /// dessinées en gris, pour situer la carte.
+    context: [f32; 4],
+}
+
+fn default_levels() -> [String; 2] {
+    ["Continents".into(), "Régions".into()]
+}
+
+/// Encart : entités déplacées (et mises à l'échelle) près de la carte principale.
+#[derive(Deserialize)]
+struct InsetDef {
+    codes: Vec<String>,
+    /// Nouveau centre (lon, lat).
+    to: [f64; 2],
+    scale: f64,
+    /// Ne garder que les anneaux dont le centre est dans ce cadre (îles éloignées écartées).
+    crop: Option<[f64; 4]>,
+}
+
+/// Contours et métadonnées lus dans Natural Earth, pour chaque lieu d'un atlas.
+struct Source {
+    rings: Vec<Vec<Ring>>,
+    labels: Vec<Option<[f32; 2]>>,
+    english: Vec<Option<String>>,
+    territories: Vec<Territory>,
+}
+
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
-    let geojson = args.get(1).ok_or("usage : mapgen <geojson> [sortie]")?;
-    let output = args
-        .get(2)
-        .map(String::as_str)
-        .unwrap_or("assets/world.bin");
-
-    let countries: CountriesFile =
-        toml::from_str(&std::fs::read_to_string("data/countries.toml")?)?;
-    let regions: RegionsFile = toml::from_str(&std::fs::read_to_string("data/regions.toml")?)?;
-    let features: Value = serde_json::from_str(&std::fs::read_to_string(geojson)?)?;
-
-    let world = build(&countries, &regions, &features)?;
+    let usage =
+        "usage : mapgen world <admin0> <sortie> | mapgen atlas <toml> <admin0> <admin1> <sortie>";
+    let read_json = |path: &str| -> Result<Value> {
+        Ok(serde_json::from_str(&std::fs::read_to_string(path)?)?)
+    };
+    let (world, output) = match args.get(1).map(String::as_str) {
+        Some("world") => {
+            let countries: CountriesFile =
+                toml::from_str(&std::fs::read_to_string("data/countries.toml")?)?;
+            let regions: RegionsFile =
+                toml::from_str(&std::fs::read_to_string("data/regions.toml")?)?;
+            let admin0 = read_json(args.get(2).ok_or(usage)?)?;
+            (
+                build_world(&countries, &regions, &admin0)?,
+                args.get(3).ok_or(usage)?,
+            )
+        }
+        Some("atlas") => {
+            let atlas: AtlasFile =
+                toml::from_str(&std::fs::read_to_string(args.get(2).ok_or(usage)?)?)?;
+            let admin0 = read_json(args.get(3).ok_or(usage)?)?;
+            let admin1 = read_json(args.get(4).ok_or(usage)?)?;
+            (
+                build_atlas(&atlas, &admin0, &admin1)?,
+                args.get(5).ok_or(usage)?,
+            )
+        }
+        _ => return Err(usage.into()),
+    };
     let bytes = world.to_bytes()?;
     std::fs::write(output, &bytes)?;
 
@@ -97,8 +189,10 @@ fn main() -> Result<()> {
             .sum()
     };
     println!(
-        "{} pays, {} territoires, {} zones, {} points (détaillé) / {} (simplifié) → {} ({} Ko)",
+        "{} : {} {}, {} terres voisines, {} zones, {} points (détaillé) / {} (simplifié) → {} ({} Ko)",
+        world.info.title,
         world.countries.len(),
+        world.info.many,
         world.territories.len(),
         world.regions.len(),
         points(false),
@@ -109,7 +203,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn build(defs: &CountriesFile, zones: &RegionsFile, features: &Value) -> Result<World> {
+fn build_world(defs: &CountriesFile, zones: &RegionsFile, features: &Value) -> Result<World> {
     let index: HashMap<&str, usize> = defs
         .countries
         .iter()
@@ -122,7 +216,373 @@ fn build(defs: &CountriesFile, zones: &RegionsFile, features: &Value) -> Result<
         .map(|m| (m.from.as_str(), m.into.as_str()))
         .collect();
 
-    // Sous-régions : l'ordre des régions est monde, continents, sous-régions, groupes.
+    let n = defs.countries.len();
+    let mut source = Source {
+        rings: vec![Vec::new(); n],
+        labels: vec![None; n],
+        english: vec![None; n],
+        territories: Vec::new(),
+    };
+    // Territoire → partie principale (HOMEPART) de son État souverain.
+    let mut homes: HashMap<&str, &str> = HashMap::new();
+    for feature in features["features"].as_array().ok_or("GeoJSON invalide")? {
+        let props = &feature["properties"];
+        if props["HOMEPART"].as_i64() == Some(1)
+            && let (Some(sov), Some(code)) = (props["SOV_A3"].as_str(), props["ADM0_A3"].as_str())
+        {
+            homes.insert(sov, code);
+        }
+    }
+
+    for feature in features["features"].as_array().ok_or("GeoJSON invalide")? {
+        let props = &feature["properties"];
+        let code = props["ADM0_A3"].as_str().ok_or("ADM0_A3 manquant")?;
+        if SKIPPED.contains(&code) {
+            continue;
+        }
+        let polygons = read_rings(&feature["geometry"])?;
+        let target = index
+            .get(code)
+            .copied()
+            .or_else(|| merges.get(code).and_then(|into| index.get(into).copied()));
+        match target {
+            Some(i) => {
+                source.rings[i].extend(polygons);
+                if defs.countries[i].code == code {
+                    let x = props["LABEL_X"].as_f64().unwrap_or(0.0) as f32;
+                    let y = props["LABEL_Y"].as_f64().unwrap_or(0.0) as f32;
+                    source.labels[i] = Some([x, y]);
+                    source.english[i] = props["NAME_EN"].as_str().map(str::to_owned);
+                }
+            }
+            None => {
+                let owner = props["SOV_A3"]
+                    .as_str()
+                    .and_then(|sov| homes.get(sov))
+                    .and_then(|home| index.get(home).copied());
+                source
+                    .territories
+                    .push(territory(props, code, owner, polygons, WORLD_TOLERANCE));
+            }
+        }
+    }
+
+    let info = Info {
+        id: "monde".into(),
+        title: "Pays du monde".into(),
+        category: "Monde".into(),
+        one: "pays".into(),
+        many: "pays".into(),
+        feminine: false,
+        zoom_sub: false,
+        levels: default_levels(),
+        frames: Vec::new(),
+    };
+    assemble(info, &defs.countries, zones, source, WORLD_TOLERANCE)
+}
+
+/// Terre affichée sans être à trouver (territoire, pays voisin d'un atlas).
+fn territory(
+    props: &Value,
+    code: &str,
+    owner: Option<usize>,
+    polygons: Vec<Ring>,
+    tolerance: Tolerance,
+) -> Territory {
+    let mut name = props["NAME_FR"].as_str().unwrap_or(code).to_owned();
+    if code == "SXM" {
+        // Natural Earth nomme aussi « Saint-Martin » la partie néerlandaise.
+        name = "Sint Maarten".into();
+    }
+    let name = capitalize(&name);
+    let mut answers = vec![normalize(&name)];
+    if let Some(en) = props["NAME_EN"].as_str() {
+        push_unique(&mut answers, normalize(en));
+    }
+    Territory {
+        name,
+        answers,
+        owner,
+        label: [
+            props["LABEL_X"].as_f64().unwrap_or(0.0) as f32,
+            props["LABEL_Y"].as_f64().unwrap_or(0.0) as f32,
+        ],
+        shape: make_shape(polygons, tolerance),
+    }
+}
+
+fn build_atlas(file: &AtlasFile, admin0: &Value, admin1: &Value) -> Result<World> {
+    let def = &file.atlas;
+    // Entités admin-1 du pays, par code ISO 3166-2.
+    let mut features: HashMap<&str, &Value> = HashMap::new();
+    for feature in admin1["features"].as_array().ok_or("GeoJSON invalide")? {
+        let props = &feature["properties"];
+        if props["adm0_a3"].as_str() == Some(def.country.as_str())
+            && let Some(code) = props["iso_3166_2"].as_str()
+        {
+            features.insert(code, feature);
+        }
+    }
+
+    // Encarts : déplacement de chaque entité concernée.
+    let mut moves: HashMap<&str, (Move, Option<[f64; 4]>)> = HashMap::new();
+    let mut frames = Vec::new();
+    for inset in &file.inset {
+        let mut rings = Vec::new();
+        for code in &inset.codes {
+            let feature = features
+                .get(code.as_str())
+                .ok_or_else(|| format!("encart : {code} inconnu"))?;
+            rings.extend(cropped(read_rings_f64(&feature["geometry"])?, inset.crop));
+        }
+        let shift = Move::new(&rings, inset.to, inset.scale);
+        let moved: Vec<Vec<[f64; 2]>> = rings
+            .iter()
+            .map(|r| r.iter().map(|&p| shift.apply(p)).collect())
+            .collect();
+        let b = bounds_f64(moved.iter().flatten());
+        let pad = 0.35;
+        frames.push([
+            (b[0] - pad) as f32,
+            (b[1] - pad) as f32,
+            (b[2] + pad) as f32,
+            (b[3] + pad) as f32,
+        ]);
+        for code in &inset.codes {
+            moves.insert(code.as_str(), (shift, inset.crop));
+        }
+    }
+
+    let n = file.items.len();
+    let mut source = Source {
+        rings: vec![Vec::new(); n],
+        labels: vec![None; n],
+        english: vec![None; n],
+        territories: Vec::new(),
+    };
+    for (i, item) in file.items.iter().enumerate() {
+        let parts: Vec<&str> = if item.parts.is_empty() {
+            vec![item.code.as_str()]
+        } else {
+            item.parts.iter().map(String::as_str).collect()
+        };
+        let mut rings: Vec<Vec<[f64; 2]>> = Vec::new();
+        let mut label = [0.0f64; 2];
+        for &code in &parts {
+            let feature = features
+                .get(code)
+                .ok_or_else(|| format!("{} : entité {code} introuvable", item.name))?;
+            let props = &feature["properties"];
+            let mut part = read_rings_f64(&feature["geometry"])?;
+            let mut point = [
+                props["longitude"].as_f64().unwrap_or(0.0),
+                props["latitude"].as_f64().unwrap_or(0.0),
+            ];
+            if let Some((shift, crop)) = moves.get(code) {
+                part = cropped(part, *crop)
+                    .iter()
+                    .map(|r| r.iter().map(|&p| shift.apply(p)).collect())
+                    .collect();
+                point = shift.apply(point);
+            }
+            label = [
+                label[0] + point[0] / parts.len() as f64,
+                label[1] + point[1] / parts.len() as f64,
+            ];
+            rings.extend(part);
+            if parts.len() == 1 {
+                source.english[i] = props["name_en"].as_str().map(str::to_owned);
+            }
+        }
+        // Plusieurs entités : on ne garde que leur contour commun (région = départements).
+        if parts.len() > 1 {
+            rings = dissolve(&rings);
+        }
+        source.rings[i] = rings
+            .iter()
+            .map(|r| r.iter().map(|&[x, y]| [x as f32, y as f32]).collect())
+            .collect();
+        source.labels[i] = Some([label[0] as f32, label[1] as f32]);
+    }
+
+    // Terres voisines : pays (admin-0) dans le cadre, sauf celui de l'atlas.
+    let [x0, y0, x1, y1] = def.context;
+    for feature in admin0["features"].as_array().ok_or("GeoJSON invalide")? {
+        let props = &feature["properties"];
+        let code = props["ADM0_A3"].as_str().unwrap_or("");
+        if code == def.country || SKIPPED.contains(&code) {
+            continue;
+        }
+        let polygons = read_rings(&feature["geometry"])?;
+        let inside = polygons
+            .iter()
+            .flatten()
+            .any(|&[x, y]| x >= x0 && x <= x1 && y >= y0 && y <= y1);
+        if inside {
+            source
+                .territories
+                .push(territory(props, code, None, polygons, ATLAS_TOLERANCE));
+        }
+    }
+
+    let info = Info {
+        id: def.id.clone(),
+        title: def.title.clone(),
+        category: def.category.clone(),
+        one: def.one.clone(),
+        many: def.many.clone(),
+        feminine: def.feminine,
+        zoom_sub: def.zoom_sub,
+        levels: def.levels.clone(),
+        frames,
+    };
+    assemble(info, &file.items, &file.zones, source, ATLAS_TOLERANCE)
+}
+
+/// Déplacement d'un encart : translation vers `to` et mise à l'échelle, en corrigeant
+/// l'écartement des méridiens pour conserver les formes.
+#[derive(Clone, Copy)]
+struct Move {
+    from: [f64; 2],
+    to: [f64; 2],
+    scale: f64,
+    /// Longitude de référence pour « dérouler » les longitudes (Aléoutiennes au-delà de 180°).
+    reference: f64,
+}
+
+impl Move {
+    fn new(rings: &[Vec<[f64; 2]>], to: [f64; 2], scale: f64) -> Self {
+        let reference = rings.first().and_then(|r| r.first()).map_or(0.0, |p| p[0]);
+        let mut unwrapped = Move {
+            from: [0.0; 2],
+            to,
+            scale,
+            reference,
+        };
+        let points: Vec<[f64; 2]> = rings
+            .iter()
+            .flatten()
+            .map(|&p| unwrapped.unwrap(p))
+            .collect();
+        let b = bounds_f64(points.iter());
+        unwrapped.from = [(b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0];
+        unwrapped
+    }
+
+    fn unwrap(&self, [lon, lat]: [f64; 2]) -> [f64; 2] {
+        let mut lon = lon;
+        while lon - self.reference > 180.0 {
+            lon -= 360.0;
+        }
+        while self.reference - lon > 180.0 {
+            lon += 360.0;
+        }
+        [lon, lat]
+    }
+
+    fn apply(&self, p: [f64; 2]) -> [f64; 2] {
+        let [lon, lat] = self.unwrap(p);
+        let stretch = self.from[1].to_radians().cos() / self.to[1].to_radians().cos();
+        [
+            self.to[0] + (lon - self.from[0]) * self.scale * stretch,
+            self.to[1] + (lat - self.from[1]) * self.scale,
+        ]
+    }
+}
+
+/// Anneaux dont le centre est dans le cadre (tous sans cadre).
+fn cropped(rings: Vec<Vec<[f64; 2]>>, crop: Option<[f64; 4]>) -> Vec<Vec<[f64; 2]>> {
+    let Some([x0, y0, x1, y1]) = crop else {
+        return rings;
+    };
+    rings
+        .into_iter()
+        .filter(|r| {
+            let b = bounds_f64(r.iter());
+            let (x, y) = ((b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0);
+            x >= x0 && x <= x1 && y >= y0 && y <= y1
+        })
+        .collect()
+}
+
+fn bounds_f64<'a>(points: impl Iterator<Item = &'a [f64; 2]>) -> [f64; 4] {
+    let mut b = [f64::MAX, f64::MAX, f64::MIN, f64::MIN];
+    for &[x, y] in points {
+        b = [b[0].min(x), b[1].min(y), b[2].max(x), b[3].max(y)];
+    }
+    b
+}
+
+/// Fusionne des polygones voisins : les arêtes communes (parcourues dans les deux sens par deux
+/// entités voisines) s'annulent, le reste est rechaîné en anneaux. Natural Earth partage
+/// exactement les sommets le long des frontières, ce qui rend la comparaison exacte possible.
+/// Point arrondi au dix-millionième de degré, comparable exactement.
+type Key = (i64, i64);
+
+fn dissolve(rings: &[Vec<[f64; 2]>]) -> Vec<Vec<[f64; 2]>> {
+    let key = |p: [f64; 2]| ((p[0] * 1e7).round() as i64, (p[1] * 1e7).round() as i64);
+    let mut count: HashMap<(Key, Key), i32> = HashMap::new();
+    let mut edges = Vec::new();
+    for ring in rings {
+        for w in ring.windows(2) {
+            let (a, b) = (key(w[0]), key(w[1]));
+            if a == b {
+                continue;
+            }
+            let undirected = if a < b { (a, b) } else { (b, a) };
+            *count.entry(undirected).or_default() += 1;
+            edges.push((w[0], w[1], a, b));
+        }
+    }
+    // Arêtes de contour, indexées par leur point de départ.
+    let mut outgoing: HashMap<Key, Vec<usize>> = HashMap::new();
+    let boundary: Vec<_> = edges
+        .into_iter()
+        .filter(|&(_, _, a, b)| count[&if a < b { (a, b) } else { (b, a) }] == 1)
+        .collect();
+    for (i, &(_, _, a, _)) in boundary.iter().enumerate() {
+        outgoing.entry(a).or_default().push(i);
+    }
+    let mut used = vec![false; boundary.len()];
+    let mut result = Vec::new();
+    for start in 0..boundary.len() {
+        if used[start] {
+            continue;
+        }
+        let mut ring = vec![boundary[start].0];
+        let mut current = start;
+        loop {
+            used[current] = true;
+            let (_, to, _, end) = boundary[current];
+            ring.push(to);
+            let next = outgoing
+                .get(&end)
+                .and_then(|list| list.iter().copied().find(|&e| !used[e]));
+            match next {
+                Some(e) => current = e,
+                None => break,
+            }
+        }
+        if ring.len() >= 4 {
+            result.push(ring);
+        }
+    }
+    result
+}
+
+fn assemble(
+    info: Info,
+    defs: &[CountryDef],
+    zones: &RegionsFile,
+    mut source: Source,
+    tolerance: Tolerance,
+) -> Result<World> {
+    let index: HashMap<&str, usize> = defs
+        .iter()
+        .enumerate()
+        .map(|(i, c)| (c.code.as_str(), i))
+        .collect();
+    // Ordre des régions : monde, continents, sous-régions, groupes.
     let continent_index = |id: &str| -> Result<usize> {
         zones
             .continent
@@ -140,82 +600,20 @@ fn build(defs: &CountriesFile, zones: &RegionsFile, features: &Value) -> Result<
             .ok_or_else(|| format!("sous-région inconnue : {id}").into())
     };
 
-    let mut rings: Vec<Vec<Ring>> = vec![Vec::new(); defs.countries.len()];
-    let mut labels: Vec<Option<[f32; 2]>> = vec![None; defs.countries.len()];
-    let mut english: Vec<Option<String>> = vec![None; defs.countries.len()];
-    // Territoire → partie principale (HOMEPART) de son État souverain.
-    let mut homes: HashMap<&str, &str> = HashMap::new();
-    for feature in features["features"].as_array().ok_or("GeoJSON invalide")? {
-        let props = &feature["properties"];
-        if props["HOMEPART"].as_i64() == Some(1)
-            && let (Some(sov), Some(code)) = (props["SOV_A3"].as_str(), props["ADM0_A3"].as_str())
-        {
-            homes.insert(sov, code);
-        }
-    }
-    let mut territories = Vec::new();
-
-    for feature in features["features"].as_array().ok_or("GeoJSON invalide")? {
-        let props = &feature["properties"];
-        let code = props["ADM0_A3"].as_str().ok_or("ADM0_A3 manquant")?;
-        if SKIPPED.contains(&code) {
-            continue;
-        }
-        let polygons = read_rings(&feature["geometry"])?;
-        let target = index
-            .get(code)
-            .copied()
-            .or_else(|| merges.get(code).and_then(|into| index.get(into).copied()));
-        match target {
-            Some(i) => {
-                rings[i].extend(polygons);
-                if defs.countries[i].code == code {
-                    let x = props["LABEL_X"].as_f64().unwrap_or(0.0) as f32;
-                    let y = props["LABEL_Y"].as_f64().unwrap_or(0.0) as f32;
-                    labels[i] = Some([x, y]);
-                    english[i] = props["NAME_EN"].as_str().map(str::to_owned);
-                }
-            }
-            None => {
-                let owner = props["SOV_A3"]
-                    .as_str()
-                    .and_then(|sov| homes.get(sov))
-                    .and_then(|home| index.get(home).copied());
-                let mut name = props["NAME_FR"].as_str().unwrap_or(code).to_owned();
-                if code == "SXM" {
-                    // Natural Earth nomme aussi « Saint-Martin » la partie néerlandaise.
-                    name = "Sint Maarten".into();
-                }
-                let name = capitalize(&name);
-                let mut answers = vec![normalize(&name)];
-                if let Some(en) = props["NAME_EN"].as_str() {
-                    push_unique(&mut answers, normalize(en));
-                }
-                territories.push(Territory {
-                    name,
-                    answers,
-                    owner,
-                    label: [
-                        props["LABEL_X"].as_f64().unwrap_or(0.0) as f32,
-                        props["LABEL_Y"].as_f64().unwrap_or(0.0) as f32,
-                    ],
-                    shape: make_shape(polygons),
-                });
-            }
-        }
-    }
-
-    let mut countries = Vec::with_capacity(defs.countries.len());
-    for (i, def) in defs.countries.iter().enumerate() {
-        if rings[i].is_empty() {
+    let mut countries = Vec::with_capacity(defs.len());
+    for (i, def) in defs.iter().enumerate() {
+        if source.rings[i].is_empty() {
             return Err(format!("aucun contour pour {} ({})", def.name, def.code).into());
         }
         let mut answers: Vec<String> = Vec::new();
         let mut spoken: Vec<String> = Vec::new();
         for name in std::iter::once(&def.name).chain(&def.aka) {
             push_unique(&mut answers, normalize(name));
-            for form in spoken_forms(name) {
-                push_unique(&mut spoken, form);
+            // Les numéros (« 75 », « 2A ») se tapent mais ne se disent pas.
+            if !name.chars().any(|c| c.is_ascii_digit()) {
+                for form in spoken_forms(name) {
+                    push_unique(&mut spoken, form);
+                }
             }
         }
         for form in &def.say {
@@ -224,7 +622,7 @@ fn build(defs: &CountriesFile, zones: &RegionsFile, features: &Value) -> Result<
         for form in &spoken {
             push_unique(&mut answers, normalize(form));
         }
-        if let Some(en) = &english[i] {
+        if let Some(en) = &source.english[i] {
             push_unique(&mut answers, normalize(en));
         }
         countries.push(Country {
@@ -233,10 +631,10 @@ fn build(defs: &CountriesFile, zones: &RegionsFile, features: &Value) -> Result<
             answers,
             spoken,
             sub: sub_index(&def.sub)?,
-            label: def.label.or(labels[i]).unwrap_or([0.0, 0.0]),
+            label: def.label.or(source.labels[i]).unwrap_or([0.0, 0.0]),
             bubble: def.bubble,
             one_bubble: def.one_bubble,
-            shape: make_shape(std::mem::take(&mut rings[i])),
+            shape: make_shape(std::mem::take(&mut source.rings[i]), tolerance),
         });
     }
     check_answers(&countries)?;
@@ -245,7 +643,7 @@ fn build(defs: &CountriesFile, zones: &RegionsFile, features: &Value) -> Result<
         index
             .get(code)
             .copied()
-            .ok_or_else(|| format!("pays inconnu : {code}").into())
+            .ok_or_else(|| format!("lieu inconnu : {code}").into())
     };
     let members_of_sub = |sub: usize| -> Vec<usize> {
         (0..countries.len())
@@ -322,8 +720,9 @@ fn build(defs: &CountriesFile, zones: &RegionsFile, features: &Value) -> Result<
     }
 
     Ok(World {
+        info,
         countries,
-        territories,
+        territories: source.territories,
         regions,
     })
 }
@@ -369,6 +768,7 @@ fn check_answers(countries: &[Country]) -> Result<()> {
     }
     // Vérifie que chaque pays est retrouvable par son nom.
     let world = World {
+        info: Info::default(),
         countries: countries.to_vec(),
         territories: vec![],
         regions: vec![],
@@ -424,6 +824,33 @@ fn auto_view(members: &[usize], countries: &[Country]) -> [f32; 4] {
     [b[0] - pad_x, b[1] - pad_y, b[2] + pad_x, b[3] + pad_y]
 }
 
+/// Anneaux d'une géométrie GeoJSON, en double précision (pour la fusion exacte).
+fn read_rings_f64(geometry: &Value) -> Result<Vec<Vec<[f64; 2]>>> {
+    let coords = &geometry["coordinates"];
+    let polygons: Vec<&Value> = match geometry["type"].as_str() {
+        Some("Polygon") => vec![coords],
+        Some("MultiPolygon") => coords
+            .as_array()
+            .ok_or("MultiPolygon invalide")?
+            .iter()
+            .collect(),
+        other => return Err(format!("géométrie non gérée : {other:?}").into()),
+    };
+    let mut rings = Vec::new();
+    for polygon in polygons {
+        for ring in polygon.as_array().ok_or("polygone invalide")? {
+            rings.push(
+                ring.as_array()
+                    .ok_or("anneau invalide")?
+                    .iter()
+                    .map(|p| [p[0].as_f64().unwrap_or(0.0), p[1].as_f64().unwrap_or(0.0)])
+                    .collect(),
+            );
+        }
+    }
+    Ok(rings)
+}
+
 fn read_rings(geometry: &Value) -> Result<Vec<Ring>> {
     let coords = &geometry["coordinates"];
     let polygons: Vec<&Value> = match geometry["type"].as_str() {
@@ -450,7 +877,7 @@ fn read_rings(geometry: &Value) -> Result<Vec<Ring>> {
     Ok(rings)
 }
 
-fn make_shape(rings: Vec<Ring>) -> Shape {
+fn make_shape(rings: Vec<Ring>, tolerance: Tolerance) -> Shape {
     let areas: Vec<f32> = rings.iter().map(|r| area(r)).collect();
     let largest = (0..rings.len())
         .max_by(|&a, &b| areas[a].total_cmp(&areas[b]))
@@ -466,12 +893,12 @@ fn make_shape(rings: Vec<Ring>) -> Shape {
             (dx * dx + dy * dy).sqrt() < 25.0 || a > areas[largest] * 0.3
         })
         .collect();
-    let hi: Vec<Ring> = rings.iter().map(|r| simplify(r, TOLERANCE_HI)).collect();
+    let hi: Vec<Ring> = rings.iter().map(|r| simplify(r, tolerance.hi)).collect();
     let lo: Vec<Ring> = rings
         .iter()
         .zip(&hi)
         .map(|(r, h)| {
-            let s = simplify(r, TOLERANCE_LO);
+            let s = simplify(r, tolerance.lo);
             if s.len() < 4 { h.clone() } else { s }
         })
         .collect();

@@ -1,4 +1,5 @@
-//! Données géographiques embarquées dans l'application (générées par `mapgen`).
+//! Données géographiques embarquées dans l'application (générées par `mapgen`) : un « atlas »
+//! par quiz. Les lieux à trouver s'appellent `countries` quel que soit le quiz.
 
 use serde::{Deserialize, Serialize};
 
@@ -73,8 +74,30 @@ pub struct Region {
     pub hidden: bool,
 }
 
+/// Description d'un atlas (un quiz) : le monde, les départements français…
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Info {
+    pub id: String,
+    pub title: String,
+    /// Catégorie du catalogue (« Monde », « France »…).
+    pub category: String,
+    /// Nom des lieux à trouver, au singulier et au pluriel (« pays », « départements »).
+    pub one: String,
+    pub many: String,
+    /// Accord au féminin (« 13 régions trouvées »).
+    pub feminine: bool,
+    /// Mode Nommer : un lieu trop petit est montré dans sa sous-région plutôt que dans son
+    /// continent (départements : leur région).
+    pub zoom_sub: bool,
+    /// Noms des deux niveaux de zones : continents et sous-régions pour le monde.
+    pub levels: [String; 2],
+    /// Cadres des encarts (outre-mer, Alaska…), en (lon, lat) : [lon_min, lat_min, lon_max, lat_max].
+    pub frames: Vec<[f32; 4]>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct World {
+    pub info: Info,
     pub countries: Vec<Country>,
     /// Terres qui ne sont pas des pays du quiz (Groenland, Porto Rico, Sahara occidental…).
     pub territories: Vec<Territory>,

@@ -16,6 +16,10 @@ pub fn data_dir() -> PathBuf {
 pub struct Session {
     /// Date de fin (secondes depuis l'epoch Unix).
     pub when: u64,
+    /// Atlas joué (« monde », « fr-departements »…) ; les parties d'avant les atlas sont
+    /// des parties du monde.
+    #[serde(default = "world_atlas")]
+    pub atlas: String,
     pub mode: Mode,
     /// Identifiant de la zone jouée.
     pub region: String,
@@ -27,6 +31,10 @@ pub struct Session {
     /// Codes des pays ratés.
     #[serde(default)]
     pub missed: Vec<String>,
+}
+
+fn world_atlas() -> String {
+    "monde".into()
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -67,10 +75,10 @@ impl Progress {
     }
 
     /// Meilleure partie pour un mode et une zone : meilleur score, puis temps le plus court.
-    pub fn best(&self, mode: Mode, region: &str) -> Option<&Session> {
+    pub fn best(&self, atlas: &str, mode: Mode, region: &str) -> Option<&Session> {
         self.sessions
             .iter()
-            .filter(|s| s.mode == mode && s.region == region)
+            .filter(|s| s.atlas == atlas && s.mode == mode && s.region == region)
             .max_by(|a, b| a.score.total_cmp(&b.score).then(b.seconds.cmp(&a.seconds)))
     }
 
@@ -78,10 +86,10 @@ impl Progress {
         self.sessions.iter().rev().take(count)
     }
 
-    /// Pays les plus souvent ratés (code, nombre d'échecs).
-    pub fn most_missed(&self, count: usize) -> Vec<(String, usize)> {
+    /// Lieux d'un atlas les plus souvent ratés (code, nombre d'échecs).
+    pub fn most_missed(&self, atlas: &str, count: usize) -> Vec<(String, usize)> {
         let mut tally: std::collections::HashMap<&str, usize> = Default::default();
-        for s in &self.sessions {
+        for s in self.sessions.iter().filter(|s| s.atlas == atlas) {
             for code in &s.missed {
                 *tally.entry(code).or_default() += 1;
             }
@@ -108,6 +116,7 @@ mod tests {
     fn session(mode: Mode, region: &str, score: f32, seconds: u32) -> Session {
         Session {
             when: 0,
+            atlas: "monde".into(),
             mode,
             region: region.into(),
             total: 10,
@@ -126,8 +135,8 @@ mod tests {
         p.sessions.push(session(Mode::Free, "europe", 1.0, 300));
         p.sessions.push(session(Mode::Free, "europe", 1.0, 200));
         p.sessions.push(session(Mode::Locate, "europe", 1.0, 10));
-        let best = p.best(Mode::Free, "europe").unwrap();
+        let best = p.best("monde", Mode::Free, "europe").unwrap();
         assert_eq!((best.score, best.seconds), (1.0, 200));
-        assert!(p.best(Mode::Identify, "europe").is_none());
+        assert!(p.best("monde", Mode::Identify, "europe").is_none());
     }
 }
