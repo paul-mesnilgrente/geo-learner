@@ -51,7 +51,10 @@ pub enum Message {
     ShowTab(Tab),
     /// Choix d'une série dans l'onglet Progression : mode et zone.
     SelectSeries(Mode, usize),
-    /// Supprime une partie (index dans l'historique).
+    /// Demande confirmation avant de supprimer une partie (index dans l'historique).
+    AskDelete(usize),
+    CancelDelete,
+    /// Supprime une partie (index dans l'historique), après confirmation.
     DeleteRun(usize),
     UndoDelete,
     /// Quitte la partie terminée pour voir la progression de sa série.
@@ -101,6 +104,8 @@ pub struct App {
     tab: Tab,
     /// Dernière partie supprimée et sa place dans l'historique, pour pouvoir l'annuler.
     deleted: Option<(usize, Session)>,
+    /// Partie dont la suppression attend confirmation.
+    confirm_delete: Option<usize>,
     game: Option<Game>,
     /// Aperçu de la zone choisie, sur l'écran d'accueil.
     preview: Preview,
@@ -252,6 +257,7 @@ impl App {
             region: 0,
             tab: Tab::Play,
             deleted: None,
+            confirm_delete: None,
             game: None,
             preview: Preview::new(0, 0),
             voice: Voice {
@@ -335,7 +341,12 @@ impl App {
             self.progress.sessions.extend(runs);
             if demo.delete {
                 let last = self.progress.sessions.len() - 1;
+                let _ = self.update(Message::AskDelete(last));
                 let _ = self.update(Message::DeleteRun(last));
+            }
+            if demo.confirm {
+                let last = self.progress.sessions.len() - 1;
+                let _ = self.update(Message::AskDelete(last));
             }
             return self;
         }
@@ -453,19 +464,26 @@ impl App {
             Message::ShowTab(tab) => {
                 self.tab = tab;
                 self.deleted = None;
+                self.confirm_delete = None;
             }
             Message::SelectSeries(mode, region) => {
                 self.mode = mode;
                 self.region = region;
                 self.deleted = None;
+                self.confirm_delete = None;
                 self.refresh_preview();
             }
+            Message::AskDelete(index) => self.confirm_delete = Some(index),
+            Message::CancelDelete => self.confirm_delete = None,
             Message::DeleteRun(index) => {
-                if let Some(session) = self.progress.remove(index) {
+                if self.confirm_delete.take() == Some(index)
+                    && let Some(session) = self.progress.remove(index)
+                {
                     self.deleted = Some((index, session));
                 }
             }
             Message::UndoDelete => {
+                self.confirm_delete = None;
                 if let Some((index, session)) = self.deleted.take() {
                     self.progress.restore(index, session);
                 }
@@ -478,6 +496,7 @@ impl App {
                 }
                 self.tab = Tab::Progress;
                 self.deleted = None;
+                self.confirm_delete = None;
                 self.refresh_preview();
                 self.send_voice(voice::Command::Stop);
             }
@@ -487,6 +506,7 @@ impl App {
                     self.atlas = atlas;
                     self.region = 0;
                     self.deleted = None;
+                    self.confirm_delete = None;
                     self.refresh_preview();
                 }
             }
@@ -583,6 +603,7 @@ impl App {
                         return self.update(Message::UndoDelete);
                     }
                     keyboard::Key::Named(Named::Escape) => {
+                        self.confirm_delete = None;
                         if let Some(game) = &mut self.game {
                             game.summary = false;
                         }

@@ -213,7 +213,7 @@ impl App {
                     .size(16)
                     .font(style::FONT_SEMIBOLD)
                     .width(Fill),
-                text("Supprimez celles qui ne reflètent pas votre niveau.")
+                text("Écartez celles qui ne reflètent pas votre niveau.")
                     .size(12)
                     .color(style::MUTED),
             ]
@@ -288,48 +288,72 @@ impl App {
             if session.timed_out() {
                 time = time.push(icon(Icon::Timer, 13.0, style::ORANGE));
             }
-            body = body.push(
-                container(
+            let date = text(DateTime::local(session.when).long(now))
+                .size(14)
+                .width(Fill);
+            let confirming = self.confirm_delete == Some(index);
+            let content = if confirming {
+                row![
+                    date,
+                    text(format!(
+                        "Supprimer cette partie ({}, {}) ?",
+                        percent(session.score),
+                        clock(Duration::from_secs(u64::from(session.seconds)))
+                    ))
+                    .size(13)
+                    .color(style::lighten(style::DANGER, 0.3)),
+                    button(text("Annuler").size(13))
+                        .padding([5, 12])
+                        .style(style::secondary)
+                        .on_press(Message::CancelDelete),
+                    button(text("Supprimer").size(13).font(style::FONT_SEMIBOLD))
+                        .padding([5, 12])
+                        .style(style::danger_soft)
+                        .on_press(Message::DeleteRun(index)),
+                ]
+            } else {
+                row![
+                    date,
                     row![
-                        text(DateTime::local(session.when).long(now))
+                        container(space())
+                            .width(8)
+                            .height(8)
+                            .style(style::dot(score_color(session.score))),
+                        text(percent(session.score))
                             .size(14)
-                            .width(Fill),
-                        row![
-                            container(space())
-                                .width(8)
-                                .height(8)
-                                .style(style::dot(score_color(session.score))),
-                            text(percent(session.score))
-                                .size(14)
-                                .font(style::FONT_SEMIBOLD),
-                        ]
-                        .spacing(8)
-                        .align_y(Center)
-                        .width(80),
-                        text(format!("{}/{}", session.found, session.total))
-                            .size(14)
-                            .width(90),
-                        container(time).width(90),
-                        button(container(icon(Icon::Trash, 15.0, style::MUTED)).center(Fill))
-                            .width(30)
-                            .height(30)
-                            .padding(0)
-                            .style(style::ghost)
-                            .on_press(Message::DeleteRun(index)),
+                            .font(style::FONT_SEMIBOLD),
                     ]
                     .spacing(8)
-                    .align_y(Center),
-                )
-                .padding([4, 8])
-                .style(|_: &Theme| container::Style {
-                    border: iced::Border {
-                        color: style::BORDER,
-                        width: 0.0,
-                        radius: 8.0.into(),
-                    },
-                    background: Some(style::with_alpha(style::SURFACE_2, 0.35).into()),
-                    ..Default::default()
-                }),
+                    .align_y(Center)
+                    .width(80),
+                    text(format!("{}/{}", session.found, session.total))
+                        .size(14)
+                        .width(90),
+                    container(time).width(90),
+                    button(container(icon(Icon::Trash, 15.0, style::MUTED)).center(Fill))
+                        .width(30)
+                        .height(30)
+                        .padding(0)
+                        .style(style::ghost)
+                        .on_press(Message::AskDelete(index)),
+                ]
+            };
+            body = body.push(
+                container(content.spacing(8).align_y(Center).height(30))
+                    .padding([4, 8])
+                    .style(move |_: &Theme| container::Style {
+                        border: iced::Border {
+                            color: style::with_alpha(style::DANGER, 0.45),
+                            width: if confirming { 1.0 } else { 0.0 },
+                            radius: 8.0.into(),
+                        },
+                        background: Some(if confirming {
+                            style::mix(style::SURFACE, style::DANGER, 0.10).into()
+                        } else {
+                            style::with_alpha(style::SURFACE_2, 0.35).into()
+                        }),
+                        ..Default::default()
+                    }),
             );
         }
         if timed_out {

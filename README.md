@@ -53,7 +53,8 @@ partie. Une série regroupe les parties d'un même quiz, mode et zone : « Tous 
 monde, sur l'Afrique et sur l'Afrique du Nord sont trois séries distinctes. Les séries jouées
 sont listées par mode. Le survol d'un point affiche la date et la valeur. Sous les courbes, la
 liste des parties permet d'écarter celles qui ne comptent pas (fenêtre oubliée, partie
-interrompue), avec un bouton « Annuler » (ou Ctrl+Z) en cas d'erreur. Les records et les lieux
+interrompue) : la corbeille demande confirmation dans la ligne même (Échap pour renoncer), puis
+un bouton « Annuler » (ou Ctrl+Z) permet encore de revenir en arrière. Les records et les lieux
 « à revoir » en tiennent compte.
 
 Sur la carte, les archipels (Maldives, Kiribati, Fidji, Cap-Vert…) sont entourés d'une **bulle**
@@ -189,7 +190,8 @@ Paramètres de `GEO_DEMO`, séparés par `;` :
 - `timer` : minuteur imposé, en secondes ;
 - `giveup`, `summary` : partie abandonnée, bilan affiché ;
 - `progress=14` : onglet Progression, avec 14 parties fictives dans la zone choisie
-  (et quelques autres séries) ; `delete` supprime la dernière, `bottom` défile en bas de page.
+  (et quelques autres séries) ; `delete` supprime la dernière, `confirm` affiche sa demande de
+  confirmation, `bottom` défile en bas de page.
 
 `GEO_WINDOW=1600x900` impose la taille de la fenêtre.
 

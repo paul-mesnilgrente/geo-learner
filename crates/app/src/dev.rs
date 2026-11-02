@@ -40,6 +40,8 @@ pub struct Demo {
     pub delete: bool,
     /// Page d'accueil défilée jusqu'en bas (`bottom=1`).
     pub bottom: bool,
+    /// Demande de confirmation affichée sur la partie la plus récente (`confirm`).
+    pub confirm: bool,
 }
 
 /// Parties fictives d'une série : scores en progrès, temps en baisse, un minuteur dépassé.
@@ -111,6 +113,7 @@ pub fn demo() -> Option<Demo> {
             "progress" => demo.progress = value.parse().ok(),
             "delete" => demo.delete = true,
             "bottom" => demo.bottom = true,
+            "confirm" => demo.confirm = true,
             "type" => demo.typed = value.split('|').map(str::to_owned).collect(),
             _ => {}
         }
