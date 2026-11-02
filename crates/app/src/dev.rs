@@ -33,15 +33,55 @@ pub struct Demo {
     pub by_continent: bool,
     /// Quiz à ouvrir (identifiant d'atlas : « fr-departements »…).
     pub atlas: Option<String>,
+    /// Onglet Progression avec ce nombre de parties fictives dans la zone choisie
+    /// (mode « Tous les pays »), plus quelques autres séries.
+    pub progress: Option<usize>,
+    /// Supprime la partie la plus récente de la série (`delete=1`, bandeau d'annulation).
+    pub delete: bool,
+    /// Page d'accueil défilée jusqu'en bas (`bottom=1`).
+    pub bottom: bool,
+}
+
+/// Parties fictives d'une série : scores en progrès, temps en baisse, un minuteur dépassé.
+pub fn fake_runs(
+    atlas: &str,
+    mode: Mode,
+    region: &str,
+    total: u32,
+    count: usize,
+) -> Vec<crate::progress::Session> {
+    let now = crate::progress::now();
+    (0..count)
+        .map(|i| {
+            let t = i as f32 / count.max(2) as f32;
+            let wobble = ((i * 7919) % 13) as f32 / 13.0 - 0.5;
+            let score = (0.45 + 0.5 * t + 0.12 * wobble).clamp(0.0, 1.0);
+            let seconds = (780.0 - 330.0 * t + 90.0 * wobble) as u32;
+            let limit = (i == count / 3).then_some(seconds);
+            crate::progress::Session {
+                when: now - (count - i) as u64 * 86_400 * 2 + (i as u64 % 5) * 3600,
+                atlas: atlas.into(),
+                mode,
+                region: region.into(),
+                total,
+                found: (score * total as f32).round() as u32,
+                perfect: (score * total as f32 * 0.9) as u32,
+                score,
+                seconds,
+                missed: vec!["SVN".into(), "GNB".into(), "TUV".into(), "BTN".into()][..(i % 4) + 1]
+                    .to_vec(),
+                limit,
+            }
+        })
+        .collect()
 }
 
 pub fn demo() -> Option<Demo> {
     let spec = std::env::var("GEO_DEMO").ok()?;
     let mut demo = Demo::default();
     for part in spec.split(';') {
-        let Some((key, value)) = part.split_once('=') else {
-            continue;
-        };
+        // Les options sans valeur (`giveup`, `summary`…) sont des drapeaux.
+        let (key, value) = part.split_once('=').unwrap_or((part, ""));
         match key {
             "mode" => {
                 demo.mode = match value {
@@ -68,6 +108,9 @@ pub fn demo() -> Option<Demo> {
             "timer" => demo.timer = value.parse().ok(),
             "continents" => demo.by_continent = true,
             "atlas" => demo.atlas = Some(value.to_owned()),
+            "progress" => demo.progress = value.parse().ok(),
+            "delete" => demo.delete = true,
+            "bottom" => demo.bottom = true,
             "type" => demo.typed = value.split('|').map(str::to_owned).collect(),
             _ => {}
         }

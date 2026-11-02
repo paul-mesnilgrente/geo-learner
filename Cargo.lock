@@ -1171,11 +1171,13 @@ dependencies = [
  "fastrand",
  "geo-core",
  "iced",
+ "libc",
  "postcard",
  "serde",
  "serde_json",
  "sha2",
  "utter",
+ "windows-sys 0.61.2",
  "zip",
 ]
 

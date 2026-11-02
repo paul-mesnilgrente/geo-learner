@@ -48,6 +48,14 @@ citer les 197 pays du monde, au prorata du nombre de pays de la zone, et un peu 
 « Nommer » (7 s) et « Trouver » (9 s). La durée se règle pour chaque mode et chaque zone. À zéro,
 la partie est validée : les pays restants comptent comme ratés.
 
+L'onglet **Progression** de chaque quiz trace l'évolution du **score** et du **temps** partie après
+partie. Une série regroupe les parties d'un même quiz, mode et zone : « Tous les pays » sur le
+monde, sur l'Afrique et sur l'Afrique du Nord sont trois séries distinctes. Les séries jouées
+sont listées par mode. Le survol d'un point affiche la date et la valeur. Sous les courbes, la
+liste des parties permet d'écarter celles qui ne comptent pas (fenêtre oubliée, partie
+interrompue), avec un bouton « Annuler » (ou Ctrl+Z) en cas d'erreur. Les records et les lieux
+« à revoir » en tiennent compte.
+
 Sur la carte, les archipels (Maldives, Kiribati, Fidji, Cap-Vert…) sont entourés d'une **bulle**
 cliquable, comme sur JetPunk, pour être repérables malgré leur taille. Il y a une bulle par
 groupe d'îles proches : leur enveloppe, lissée, avec une marge de quelques pixels qui se réduit
@@ -179,7 +187,9 @@ Paramètres de `GEO_DEMO`, séparés par `;` :
 - `zoom=lon,lat,z` : position de la caméra ;
 - `elapsed` : temps déjà écoulé, en secondes ;
 - `timer` : minuteur imposé, en secondes ;
-- `giveup`, `summary` : partie abandonnée, bilan affiché.
+- `giveup`, `summary` : partie abandonnée, bilan affiché ;
+- `progress=14` : onglet Progression, avec 14 parties fictives dans la zone choisie
+  (et quelques autres séries) ; `delete` supprime la dernière, `bottom` défile en bas de page.
 
 `GEO_WINDOW=1600x900` impose la taille de la fenêtre.
 

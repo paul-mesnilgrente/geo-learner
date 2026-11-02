@@ -17,6 +17,8 @@ pub enum Icon {
     Download,
     Refresh,
     Timer,
+    Trash,
+    Chart,
 }
 
 struct Program {
@@ -139,6 +141,31 @@ impl<Message> canvas::Program<Message> for Program {
                 b.line_to(p(14.0, 3.0));
                 b.move_to(p(18.0, 6.5));
                 b.line_to(p(19.5, 5.0));
+            }
+            Icon::Trash => {
+                b.move_to(p(4.0, 7.0));
+                b.line_to(p(20.0, 7.0));
+                b.move_to(p(9.0, 7.0));
+                b.line_to(p(9.0, 4.0));
+                b.line_to(p(15.0, 4.0));
+                b.line_to(p(15.0, 7.0));
+                b.move_to(p(6.0, 7.0));
+                b.line_to(p(7.0, 20.0));
+                b.line_to(p(17.0, 20.0));
+                b.line_to(p(18.0, 7.0));
+                b.move_to(p(10.0, 11.0));
+                b.line_to(p(10.0, 16.0));
+                b.move_to(p(14.0, 11.0));
+                b.line_to(p(14.0, 16.0));
+            }
+            Icon::Chart => {
+                b.move_to(p(4.0, 4.0));
+                b.line_to(p(4.0, 20.0));
+                b.line_to(p(20.0, 20.0));
+                b.move_to(p(7.5, 15.5));
+                b.line_to(p(11.0, 11.0));
+                b.line_to(p(14.0, 13.5));
+                b.line_to(p(19.0, 7.0));
             }
         });
         frame.stroke(&path, stroke);

@@ -1,4 +1,6 @@
-//! Application : écran d'accueil (choix du mode et de la zone) et écran de jeu.
+//! Application : écran d'accueil (choix du mode et de la zone, progression) et écran de jeu.
+
+mod progression;
 
 use std::time::{Duration, Instant};
 
@@ -21,6 +23,7 @@ use crate::voice;
 use crate::words::{Words, capitalize};
 
 const ANSWER_INPUT: &str = "answer";
+const HOME_SCROLL: &str = "home";
 /// Délai avant de valider un nom qui est aussi le début d'un autre (« Niger » / « Nigeria »).
 const AMBIGUOUS_DELAY: Duration = Duration::from_millis(900);
 const FEEDBACK_DURATION: Duration = Duration::from_millis(2600);
@@ -36,8 +39,23 @@ const SAFE_AREA: map::Insets = map::Insets {
     left: 40.0,
 };
 
+/// Onglet de l'écran d'accueil.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Tab {
+    Play,
+    Progress,
+}
+
 #[derive(Debug, Clone)]
 pub enum Message {
+    ShowTab(Tab),
+    /// Choix d'une série dans l'onglet Progression : mode et zone.
+    SelectSeries(Mode, usize),
+    /// Supprime une partie (index dans l'historique).
+    DeleteRun(usize),
+    UndoDelete,
+    /// Quitte la partie terminée pour voir la progression de sa série.
+    ShowProgress,
     SelectMode(Mode),
     /// Choix du quiz (index dans `ATLASES`).
     SelectAtlas(usize),
@@ -80,6 +98,9 @@ pub struct App {
     settings: Settings,
     mode: Mode,
     region: usize,
+    tab: Tab,
+    /// Dernière partie supprimée et sa place dans l'historique, pour pouvoir l'annuler.
+    deleted: Option<(usize, Session)>,
     game: Option<Game>,
     /// Aperçu de la zone choisie, sur l'écran d'accueil.
     preview: Preview,
@@ -229,6 +250,8 @@ impl App {
             mode: Mode::Free,
             atlas: 0,
             region: 0,
+            tab: Tab::Play,
+            deleted: None,
             game: None,
             preview: Preview::new(0, 0),
             voice: Voice {
@@ -248,13 +271,17 @@ impl App {
         #[cfg(debug_assertions)]
         {
             // Saisie simulée (`type=…` dans GEO_DEMO), par le même chemin que le clavier.
-            let typed = crate::dev::demo().map(|d| d.typed).unwrap_or_default();
+            let demo = crate::dev::demo().unwrap_or_default();
             let app = app.with_demo();
-            let task = typed
+            let mut task = demo
+                .typed
                 .into_iter()
                 .fold(operation::focus(ANSWER_INPUT), |task, t| {
                     task.chain(Task::done(Message::Input(t)))
                 });
+            if demo.bottom {
+                task = task.chain(operation::snap_to_end(HOME_SCROLL));
+            }
             (app, task)
         }
         #[cfg(not(debug_assertions))]
@@ -288,6 +315,29 @@ impl App {
         if demo.timer.is_some() {
             // En mémoire seulement : les réglages ne sont enregistrés que sur action.
             self.settings.timer = true;
+        }
+        if let Some(count) = demo.progress {
+            self.tab = Tab::Progress;
+            let world = self.world();
+            let zone = &world.regions[self.region];
+            let id = &world.info.id;
+            for (mode, region, n) in [
+                (Mode::Identify, 0, 3),
+                (Mode::Free, 0, 2),
+                (Mode::Locate, 1, 1),
+            ] {
+                let r = &world.regions[region];
+                let runs = crate::dev::fake_runs(id, mode, &r.id, r.members.len() as u32, n);
+                self.progress.sessions.extend(runs);
+            }
+            let runs =
+                crate::dev::fake_runs(id, Mode::Free, &zone.id, zone.members.len() as u32, count);
+            self.progress.sessions.extend(runs);
+            if demo.delete {
+                let last = self.progress.sessions.len() - 1;
+                let _ = self.update(Message::DeleteRun(last));
+            }
+            return self;
         }
         if demo.mode.is_none() {
             return self;
@@ -400,11 +450,43 @@ impl App {
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::ShowTab(tab) => {
+                self.tab = tab;
+                self.deleted = None;
+            }
+            Message::SelectSeries(mode, region) => {
+                self.mode = mode;
+                self.region = region;
+                self.deleted = None;
+                self.refresh_preview();
+            }
+            Message::DeleteRun(index) => {
+                if let Some(session) = self.progress.remove(index) {
+                    self.deleted = Some((index, session));
+                }
+            }
+            Message::UndoDelete => {
+                if let Some((index, session)) = self.deleted.take() {
+                    self.progress.restore(index, session);
+                }
+            }
+            Message::ShowProgress => {
+                if let Some(game) = self.game.take() {
+                    self.atlas = game.atlas;
+                    self.region = game.region;
+                    self.mode = game.quiz.mode();
+                }
+                self.tab = Tab::Progress;
+                self.deleted = None;
+                self.refresh_preview();
+                self.send_voice(voice::Command::Stop);
+            }
             Message::SelectMode(mode) => self.mode = mode,
             Message::SelectAtlas(atlas) => {
                 if atlas != self.atlas {
                     self.atlas = atlas;
                     self.region = 0;
+                    self.deleted = None;
                     self.refresh_preview();
                 }
             }
@@ -497,6 +579,9 @@ impl App {
                 use keyboard::key::Named;
                 match key.as_ref() {
                     keyboard::Key::Character("m") if modifiers.command() => self.toggle_mic(),
+                    keyboard::Key::Character("z") if modifiers.command() && self.game.is_none() => {
+                        return self.update(Message::UndoDelete);
+                    }
                     keyboard::Key::Named(Named::Escape) => {
                         if let Some(game) = &mut self.game {
                             game.summary = false;
@@ -822,6 +907,7 @@ impl App {
                 .filter(|&&c| quiz.mark(c) == Some(Mark::Missed))
                 .map(|&c| game.world.countries[c].code.clone())
                 .collect(),
+            limit: game.limit.map(|d| d.as_secs() as u32),
         };
         game.new_record = match self
             .progress
@@ -847,16 +933,82 @@ impl App {
     }
 
     fn home_view(&self) -> Element<'_, Message> {
-        let info = &self.world().info;
-        let words = Words::of(info);
-        let header = column![
-            text(info.title.clone()).size(26).font(style::FONT_BOLD),
-            text(format!("{} {}", self.world().countries.len(), info.many))
-                .size(14)
-                .color(style::MUTED),
-        ]
-        .spacing(2);
+        let (main, side) = match self.tab {
+            Tab::Play => (
+                self.play_main(),
+                column![self.preview_card(), self.voice_card(), self.history_card()]
+                    .spacing(16)
+                    .into(),
+            ),
+            Tab::Progress => (self.progress_main(), self.progress_side()),
+        };
+        let main = column![self.home_header(), main].spacing(24).width(Fill);
+        let side = container(side).width(320);
+        let content = container(row![self.catalog(), main, side].spacing(28))
+            .padding(32)
+            .max_width(1440);
+        container(
+            scrollable(container(content).center_x(Fill))
+                .id(HOME_SCROLL)
+                .height(Fill),
+        )
+        .style(style::page)
+        .width(Fill)
+        .height(Fill)
+        .into()
+    }
 
+    /// Titre du quiz choisi et onglets Jouer / Progression.
+    fn home_header(&self) -> Element<'_, Message> {
+        let info = &self.world().info;
+        let tab = |tab: Tab, i: Icon, label: &'static str| {
+            let on = self.tab == tab;
+            button(
+                row![
+                    icon(i, 14.0, if on { Color::WHITE } else { style::TEXT }),
+                    text(label).size(14)
+                ]
+                .spacing(8)
+                .align_y(Center),
+            )
+            .padding([8, 16])
+            .style(style::pill(on))
+            .on_press(Message::ShowTab(tab))
+        };
+        row![
+            column![
+                text(info.title.clone()).size(26).font(style::FONT_BOLD),
+                text(format!("{} {}", self.world().countries.len(), info.many))
+                    .size(14)
+                    .color(style::MUTED),
+            ]
+            .spacing(2)
+            .width(Fill),
+            container(
+                row![
+                    tab(Tab::Play, Icon::Play, "Jouer"),
+                    tab(Tab::Progress, Icon::Chart, "Progression"),
+                ]
+                .spacing(4)
+            )
+            .padding(4)
+            .style(|_: &Theme| container::Style {
+                background: Some(style::SURFACE.into()),
+                border: iced::Border {
+                    color: style::BORDER,
+                    width: 1.0,
+                    radius: 999.0.into(),
+                },
+                ..Default::default()
+            }),
+        ]
+        .align_y(Center)
+        .into()
+    }
+
+    /// Onglet Jouer : mode, zone et lancement.
+    fn play_main(&self) -> Element<'_, Message> {
+        let words = Words::of(&self.world().info);
         let modes = Row::with_children(Mode::ALL.iter().map(|&mode| {
             button(
                 column![
@@ -978,27 +1130,13 @@ impl App {
         .padding(22)
         .style(style::card);
 
-        let main = column![
-            header,
+        column![
             column![section_title("Mode de jeu"), modes].spacing(12),
             zones,
             launch,
         ]
         .spacing(24)
-        .width(Fill);
-
-        let side = column![self.preview_card(), self.voice_card(), self.history_card()]
-            .spacing(16)
-            .width(320);
-
-        let content = container(row![self.catalog(), main, side].spacing(28))
-            .padding(32)
-            .max_width(1440);
-        container(scrollable(container(content).center_x(Fill)).height(Fill))
-            .style(style::page)
-            .width(Fill)
-            .height(Fill)
-            .into()
+        .into()
     }
 
     /// Réglage du minuteur pour le mode et la zone choisis.
@@ -1259,7 +1397,8 @@ impl App {
             list
         ]
         .spacing(14);
-        let missed = self.progress.most_missed(&self.world().info.id, 10);
+        let id = &self.world().info.id;
+        let missed = self.progress.most_missed(|s| &s.atlas == id, 10);
         if !missed.is_empty() {
             let names = missed
                 .iter()
@@ -1910,6 +2049,17 @@ impl App {
                     .padding([10, 16])
                     .style(style::secondary)
                     .on_press(Message::BackToMenu),
+                button(
+                    row![
+                        icon(Icon::Chart, 14.0, style::TEXT),
+                        text("Progression").size(14)
+                    ]
+                    .spacing(8)
+                    .align_y(Center)
+                )
+                .padding([10, 16])
+                .style(style::secondary)
+                .on_press(Message::ShowProgress),
                 button(text("Rejouer").size(14).font(style::FONT_SEMIBOLD))
                     .padding([10, 20])
                     .style(style::primary)
