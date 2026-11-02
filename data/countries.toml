@@ -7,7 +7,7 @@
 # say  : formes orales supplémentaires pour la reconnaissance vocale
 # label: point de référence [lon, lat] si celui de Natural Earth ne convient pas
 # bubble: archipel entouré d'une « bulle » sur la carte pour le rendre visible (comme JetPunk) ;
-#         one_bubble : une seule bulle pour toutes ses îles, même éloignées
+#         one_bubble : une seule bulle pour toutes ses îles, même éloignées (Micronésie)
 
 countries = [
   { code = "AFG", name = "Afghanistan", sub = "asie-sud" },
@@ -102,7 +102,7 @@ countries = [
   { code = "KAZ", name = "Kazakhstan", sub = "asie-centrale" },
   { code = "KEN", name = "Kenya", sub = "afr-est" },
   { code = "KGZ", name = "Kirghizistan", sub = "asie-centrale", aka = ["Kirghizstan", "Kirghizie"] },
-  { code = "KIR", name = "Kiribati", sub = "micronesie", label = [173.0, 1.4], bubble = true, one_bubble = true },  # Tarawa, la capitale
+  { code = "KIR", name = "Kiribati", sub = "micronesie", label = [173.0, 1.4], bubble = true },  # Tarawa, la capitale
   { code = "KOS", name = "Kosovo", sub = "balkans" },
   { code = "KWT", name = "Koweït", sub = "moyen-orient" },
   { code = "LAO", name = "Laos", sub = "asie-se" },

@@ -6,7 +6,9 @@ use iced::alignment::Vertical;
 use iced::mouse::{self, ScrollDelta};
 use iced::widget::canvas::fill::{Fill, Rule};
 use iced::widget::canvas::path::Builder;
-use iced::widget::canvas::{self, Action, Cache, Event, Frame, Geometry, Path, Stroke, Text};
+use iced::widget::canvas::{
+    self, Action, Cache, Event, Frame, Geometry, LineCap, LineJoin, Path, Stroke, Text,
+};
 use iced::widget::text::Alignment;
 use iced::{Color, Pixels, Point, Rectangle, Renderer, Size, Theme, Vector, color};
 
@@ -17,10 +19,10 @@ const TINY_PX: f32 = 7.0;
 const MARKER_RADIUS: f32 = 4.5;
 /// Au-delà de cette échelle (pixels par unité projetée), on dessine les contours détaillés.
 const DETAIL_SCALE: f32 = 650.0;
-/// Marge (en pixels) autour des îles d'un archipel pour former sa bulle.
-const BUBBLE_PX: f32 = 7.0;
-/// Demi-axe minimal d'une bulle, en pixels.
-const BUBBLE_MIN_PX: f32 = 9.0;
+/// Marge (en pixels) autour des îles d'un archipel pour former sa bulle, réduite (sans
+/// descendre sous `BUBBLE_MIN_PX`) quand une autre terre est proche.
+const BUBBLE_PX: f32 = 5.0;
+const BUBBLE_MIN_PX: f32 = 2.0;
 /// Écart maximal (coordonnées projetées, environ 7°) entre deux groupes d'îles d'une même bulle.
 const BUBBLE_GAP: f32 = 0.12;
 pub const MIN_ZOOM: f32 = 0.6;
@@ -55,7 +57,7 @@ impl Projection {
             .iter()
             .map(|c| ProjShape::new(&c.shape, c.label, center))
             .collect();
-        let territories = world
+        let territories: Vec<ProjShape> = world
             .territories
             .iter()
             .map(|t| ProjShape::new(&t.shape, t.label, center))
@@ -63,13 +65,20 @@ impl Projection {
         let bubbles = world
             .countries
             .iter()
-            .zip(&countries)
-            .map(|(c, shape): (_, &ProjShape)| {
-                if c.bubble {
-                    bubbles(shape, c.one_bubble)
-                } else {
-                    Vec::new()
+            .enumerate()
+            .map(|(i, c)| {
+                if !c.bubble {
+                    return Vec::new();
                 }
+                // Toutes les autres terres, pour que la bulle ne les touche pas.
+                let others: Vec<&ProjShape> = countries
+                    .iter()
+                    .enumerate()
+                    .filter(|&(j, _)| j != i)
+                    .map(|(_, s)| s)
+                    .chain(&territories)
+                    .collect();
+                bubbles(&countries[i], c.one_bubble, &others)
             })
             .collect();
         Self {
@@ -156,40 +165,55 @@ impl ProjShape {
     }
 }
 
-/// Bulle d'un archipel : ellipse (coordonnées projetées) qui englobe un groupe d'îles.
-#[derive(Debug, Clone, Copy)]
+/// Bulle d'un archipel : enveloppe convexe d'un groupe d'îles, lissée et élargie d'une petite
+/// marge au dessin. Coordonnées projetées.
+#[derive(Debug, Clone)]
 struct Bubble {
-    center: Point,
-    /// Direction du grand axe (vecteur unitaire).
-    axis: Vector,
-    /// Demi-axes, le long de `axis` puis perpendiculairement.
-    radii: Vector,
+    hull: Vec<Point>,
+    /// Distance à la terre la plus proche d'un autre pays, qui borne la marge.
+    clearance: f32,
 }
 
 impl Bubble {
-    /// Centre, demi-axes (marge comprise) et rotation horaire, en pixels.
-    fn on_screen(&self, t: &Transform) -> (Point, Vector, f32) {
-        let radii = Vector::new(
-            (self.radii.x * t.scale + BUBBLE_PX).max(BUBBLE_MIN_PX),
-            (self.radii.y * t.scale + BUBBLE_PX).max(BUBBLE_MIN_PX),
-        );
-        // L'axe y de l'écran pointe vers le bas.
-        let rotation = (-self.axis.y).atan2(self.axis.x);
-        (t.to_screen(self.center), radii, rotation)
+    /// Marge en pixels : jamais plus de la moitié de l'écart avec la terre voisine.
+    fn margin(&self, t: &Transform) -> f32 {
+        (self.clearance * t.scale * 0.45).clamp(BUBBLE_MIN_PX, BUBBLE_PX)
     }
 
+    /// Contour lissé (coins arrondis par l'algorithme de Chaikin), en pixels.
+    fn outline(&self, t: &Transform) -> Vec<Point> {
+        let mut points: Vec<Point> = self.hull.iter().map(|&p| t.to_screen(p)).collect();
+        if points.len() < 3 {
+            return points;
+        }
+        for _ in 0..3 {
+            let n = points.len();
+            points = (0..n)
+                .flat_map(|i| {
+                    let (a, b) = (points[i], points[(i + 1) % n]);
+                    [
+                        Point::new(a.x * 0.75 + b.x * 0.25, a.y * 0.75 + b.y * 0.25),
+                        Point::new(a.x * 0.25 + b.x * 0.75, a.y * 0.25 + b.y * 0.75),
+                    ]
+                })
+                .collect();
+        }
+        points
+    }
+
+    /// Le point (en pixels) est-il dans la bulle ?
     fn contains(&self, t: &Transform, p: Point) -> bool {
-        let (center, radii, rotation) = self.on_screen(t);
-        let (dx, dy) = (p.x - center.x, p.y - center.y);
-        let (sin, cos) = rotation.sin_cos();
-        let (x, y) = (dx * cos + dy * sin, -dx * sin + dy * cos);
-        (x / radii.x).powi(2) + (y / radii.y).powi(2) <= 1.0
+        let outline = self.outline(t);
+        let margin = self.margin(t);
+        let n = outline.len();
+        (n >= 3 && contains(std::slice::from_ref(&outline), p))
+            || (0..n).any(|i| segment_distance(p, outline[i], outline[(i + 1) % n]) <= margin)
     }
 }
 
-/// Bulles d'un archipel : ses îles proches sont regroupées (ou toutes ensemble avec `one`),
-/// sans jamais mêler une île et sa copie de l'autre côté de la carte.
-fn bubbles(shape: &ProjShape, one: bool) -> Vec<Bubble> {
+/// Bulles d'un archipel : une par groupe d'îles proches, ou une seule avec `one`. Une île et
+/// sa copie de l'autre côté de la carte ne sont jamais mêlées.
+fn bubbles(shape: &ProjShape, one: bool, others: &[&ProjShape]) -> Vec<Bubble> {
     let mut groups: Vec<Vec<&Vec<Point>>> = Vec::new();
     for copy in [false, true] {
         let rings: Vec<&Vec<Point>> = shape
@@ -210,8 +234,81 @@ fn bubbles(shape: &ProjShape, one: bool) -> Vec<Bubble> {
     }
     groups
         .iter()
-        .map(|group| fit_ellipse(group.iter().flat_map(|r| r.iter().copied())))
+        .map(|group| {
+            let points: Vec<Point> = group.iter().flat_map(|r| r.iter().copied()).collect();
+            Bubble {
+                clearance: clearance(&points, others),
+                hull: convex_hull(points),
+            }
+        })
         .collect()
+}
+
+/// Distance (coordonnées projetées) entre des îles et la terre d'autres pays, plafonnée.
+fn clearance(points: &[Point], others: &[&ProjShape]) -> f32 {
+    const CAP: f32 = 0.1;
+    let area = bounds(points.iter());
+    let near = Rectangle::new(
+        Point::new(area.x - CAP, area.y - CAP),
+        Size::new(area.width + 2.0 * CAP, area.height + 2.0 * CAP),
+    );
+    let mut best = CAP;
+    for other in others.iter().filter(|o| o.bbox.intersects(&near)) {
+        for ring in other
+            .lo
+            .iter()
+            .filter(|r| bounds(r.iter()).intersects(&near))
+        {
+            for q in ring {
+                for p in points {
+                    best = best.min(p.distance(*q));
+                }
+            }
+        }
+    }
+    best
+}
+
+/// Enveloppe convexe (chaîne monotone d'Andrew).
+fn convex_hull(mut points: Vec<Point>) -> Vec<Point> {
+    points.sort_by(|a, b| a.x.total_cmp(&b.x).then(a.y.total_cmp(&b.y)));
+    points.dedup();
+    if points.len() < 3 {
+        return points;
+    }
+    let cross =
+        |o: Point, a: Point, b: Point| (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    let mut hull: Vec<Point> = Vec::with_capacity(points.len() * 2);
+    for pass in 0..2 {
+        let start = hull.len();
+        let ordered: Vec<Point> = if pass == 0 {
+            points.clone()
+        } else {
+            points.iter().rev().copied().collect()
+        };
+        for p in ordered {
+            while hull.len() >= start + 2
+                && cross(hull[hull.len() - 2], hull[hull.len() - 1], p) <= 0.0
+            {
+                hull.pop();
+            }
+            hull.push(p);
+        }
+        hull.pop();
+    }
+    hull
+}
+
+/// Distance d'un point au segment [a, b].
+fn segment_distance(p: Point, a: Point, b: Point) -> f32 {
+    let (dx, dy) = (b.x - a.x, b.y - a.y);
+    let len2 = dx * dx + dy * dy;
+    let t = if len2 == 0.0 {
+        0.0
+    } else {
+        (((p.x - a.x) * dx + (p.y - a.y) * dy) / len2).clamp(0.0, 1.0)
+    };
+    p.distance(Point::new(a.x + t * dx, a.y + t * dy))
 }
 
 /// Regroupe les anneaux dont les boîtes sont à moins de `BUBBLE_GAP` l'une de l'autre.
@@ -249,42 +346,6 @@ fn nearby_groups(rings: Vec<&Vec<Point>>) -> Vec<Vec<&Vec<Point>>> {
         }
     }
     groups.into_iter().map(|(_, members)| members).collect()
-}
-
-/// Ellipse orientée selon la direction principale des points (analyse en composantes
-/// principales), juste assez grande pour tous les contenir.
-fn fit_ellipse(points: impl Iterator<Item = Point> + Clone) -> Bubble {
-    let n = points.clone().count().max(1) as f32;
-    let (sx, sy) = points
-        .clone()
-        .fold((0.0, 0.0), |(x, y), p| (x + p.x, y + p.y));
-    let center = Point::new(sx / n, sy / n);
-    let (mut xx, mut yy, mut xy) = (0.0, 0.0, 0.0);
-    for p in points.clone() {
-        let (dx, dy) = (p.x - center.x, p.y - center.y);
-        xx += dx * dx;
-        yy += dy * dy;
-        xy += dx * dy;
-    }
-    let angle = 0.5 * (2.0 * xy).atan2(xx - yy);
-    let axis = Vector::new(angle.cos(), angle.sin());
-    let along = |p: Point| (p.x - center.x) * axis.x + (p.y - center.y) * axis.y;
-    let across = |p: Point| -(p.x - center.x) * axis.y + (p.y - center.y) * axis.x;
-    let mut a = points.clone().map(|p| along(p).abs()).fold(0.0, f32::max);
-    let mut b = points.clone().map(|p| across(p).abs()).fold(0.0, f32::max);
-    // Pas d'ellipse trop aplatie : une chaîne d'îles garde une bulle bien visible.
-    let longest = a.max(b).max(1e-4);
-    a = a.max(longest * 0.25);
-    b = b.max(longest * 0.25);
-    // Agrandie juste ce qu'il faut pour contenir aussi les points « en coin ».
-    let scale = points
-        .map(|p| ((along(p) / a).powi(2) + (across(p) / b).powi(2)).sqrt())
-        .fold(1.0, f32::max);
-    Bubble {
-        center,
-        axis,
-        radii: Vector::new(a * scale, b * scale),
-    }
 }
 
 fn bounds<'a>(points: impl Iterator<Item = &'a Point>) -> Rectangle {
@@ -666,20 +727,36 @@ impl MapView<'_> {
             .rposition(|bubbles| bubbles.iter().any(|b| b.contains(t, screen)))
     }
 
-    /// Bulles d'un archipel : ellipses autour de ses groupes d'îles, avec une marge.
+    /// Bulles d'un archipel : contour lissé de chaque groupe d'îles, élargi de sa marge.
     fn draw_bubble(&self, frame: &mut Frame, country: usize, t: &Transform, color: Color) {
         for bubble in &self.projection.bubbles[country] {
-            let (center, radii, rotation) = bubble.on_screen(t);
+            let outline = bubble.outline(t);
+            let margin = bubble.margin(t);
             let path = Path::new(|b| {
-                b.ellipse(canvas::path::arc::Elliptical {
-                    center,
-                    radii,
-                    rotation: iced::Radians(rotation),
-                    start_angle: iced::Radians(0.0),
-                    end_angle: iced::Radians(std::f32::consts::TAU),
-                });
+                let mut points = outline.iter().copied();
+                if let Some(first) = points.next() {
+                    b.move_to(first);
+                    for p in points {
+                        b.line_to(p);
+                    }
+                    b.close();
+                }
             });
             frame.fill(&path, color);
+            frame.stroke(
+                &path,
+                Stroke::default()
+                    .with_color(color)
+                    .with_width(margin * 2.0)
+                    .with_line_cap(LineCap::Round)
+                    .with_line_join(LineJoin::Round),
+            );
+            // Île minuscule : contour dégénéré, un disque garantit la bulle.
+            if outline.len() < 3
+                && let Some(&p) = outline.first()
+            {
+                frame.fill(&Path::circle(p, margin), color);
+            }
         }
     }
 
@@ -1182,25 +1259,32 @@ mod tests {
     }
 
     #[test]
-    fn fitted_ellipse_contains_all_points_and_follows_the_chain() {
-        // Chaîne d'îles en diagonale.
-        let points: Vec<Point> = (0..10)
-            .map(|i| {
-                Point::new(
-                    i as f32 * 0.1,
-                    i as f32 * 0.1 + if i % 2 == 0 { 0.02 } else { 0.0 },
-                )
-            })
-            .collect();
-        let bubble = fit_ellipse(points.iter().copied());
-        // Grand axe le long de la diagonale.
-        assert!((bubble.axis.x.abs() - bubble.axis.y.abs()).abs() < 0.1);
-        assert!(bubble.radii.x > bubble.radii.y);
+    fn bubble_wraps_its_islands_and_keeps_clear_of_other_land() {
+        let island = |x: f32, y: f32| {
+            vec![
+                Point::new(x, y),
+                Point::new(x + 0.01, y),
+                Point::new(x, y + 0.01),
+            ]
+        };
+        let (a, b) = (island(0.0, 0.0), island(0.05, 0.02));
+        let points: Vec<Point> = a.iter().chain(&b).copied().collect();
         let view = rect(-2.0, -1.0, 4.0, 2.0);
         let t = Transform::new(Camera::fit(view), view, Size::new(800.0, 600.0));
-        for p in points {
-            assert!(bubble.contains(&t, t.to_screen(p)), "{p:?}");
-        }
+        // Loin de toute terre : marge pleine.
+        let free = Bubble {
+            hull: convex_hull(points.clone()),
+            clearance: 1.0,
+        };
+        assert_eq!(free.margin(&t), BUBBLE_PX);
+        assert!(free.contains(&t, t.to_screen(Point::new(0.03, 0.01))));
+        assert!(!free.contains(&t, t.to_screen(Point::new(0.3, 0.3))));
+        // Terre voisine à 0,01 unité (environ 2 px) : marge réduite au minimum.
+        let tight = Bubble {
+            hull: convex_hull(points),
+            clearance: 0.01,
+        };
+        assert!(tight.margin(&t) < BUBBLE_PX);
     }
 
     #[test]
