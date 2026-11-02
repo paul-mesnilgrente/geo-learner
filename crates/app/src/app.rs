@@ -73,6 +73,8 @@ pub struct App {
     mode: Mode,
     region: usize,
     game: Option<Game>,
+    /// Aperçu de la zone choisie, sur l'écran d'accueil.
+    preview: Preview,
     voice: Voice,
     #[cfg(debug_assertions)]
     dev_ticks: u32,
@@ -132,6 +134,64 @@ struct Game {
     history: Vec<usize>,
 }
 
+/// Carte de l'écran d'accueil : la zone choisie, ses pays mis en évidence.
+struct Preview {
+    region: usize,
+    projection: Projection,
+    view: iced::Rectangle,
+    /// Partie fictive dont les pays « à trouver » sont ceux de la zone.
+    quiz: Quiz,
+    cache: Cache,
+}
+
+impl Preview {
+    fn new(region: usize) -> Self {
+        let zone = &WORLD.regions[region];
+        let members = zone.members.clone();
+        Self {
+            region,
+            projection: Projection::new(&WORLD, zone.center),
+            view: map::view_rect(zone.view, zone.center),
+            quiz: Quiz::new(Mode::Free, WORLD.countries.len(), members, Vec::new()),
+            cache: Cache::new(),
+        }
+    }
+
+    fn view(&self) -> Element<'_, Message> {
+        let map_view = MapView {
+            world: &WORLD,
+            projection: &self.projection,
+            view: self.view,
+            camera: Camera::fit(self.view),
+            quiz: &self.quiz,
+            hover: None,
+            target: None,
+            flash: None,
+            pulse: 0.0,
+            reveal_all: false,
+            clickable: false,
+            preview: true,
+            cache: &self.cache,
+        };
+        let map: Element<'_, MapEvent> = canvas(map_view).width(Fill).height(Fill).into();
+        container(map.map(Message::Map))
+            .width(Fill)
+            .height(200)
+            .padding(2)
+            .clip(true)
+            .style(|_: &Theme| container::Style {
+                background: Some(style::OCEAN.into()),
+                border: iced::Border {
+                    color: style::BORDER,
+                    width: 1.0,
+                    radius: 14.0.into(),
+                },
+                ..Default::default()
+            })
+            .into()
+    }
+}
+
 struct Animation {
     from: Camera,
     to: Camera,
@@ -153,6 +213,7 @@ impl App {
             mode: Mode::Free,
             region: 0,
             game: None,
+            preview: Preview::new(0),
             voice: Voice {
                 commands: None,
                 installed: false,
@@ -195,6 +256,7 @@ impl App {
         }
         if let Some(region) = demo.region.as_deref().and_then(|r| WORLD.region(r)) {
             self.region = region;
+            self.preview = Preview::new(region);
         }
         if demo.timer.is_some() {
             // En mémoire seulement : les réglages ne sont enregistrés que sur action.
@@ -299,7 +361,12 @@ impl App {
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::SelectMode(mode) => self.mode = mode,
-            Message::SelectRegion(region) => self.region = region,
+            Message::SelectRegion(region) => {
+                self.region = region;
+                if self.preview.region != region {
+                    self.preview = Preview::new(region);
+                }
+            }
             Message::ToggleTimer => self.settings.toggle_timer(),
             Message::StepTimer(up) => {
                 let zone = &WORLD.regions[self.region];
@@ -836,7 +903,7 @@ impl App {
         .spacing(28)
         .width(Fill);
 
-        let side = column![self.voice_card(), self.history_card()]
+        let side = column![self.preview_card(), self.voice_card(), self.history_card()]
             .spacing(16)
             .width(340);
 
@@ -902,6 +969,31 @@ impl App {
         container(setting)
             .padding(iced::Padding::ZERO.top(8))
             .into()
+    }
+
+    /// Aperçu de la zone choisie : ses pays en bleu sur la carte.
+    fn preview_card(&self) -> Element<'_, Message> {
+        let zone = &WORLD.regions[self.region];
+        container(
+            column![
+                row![
+                    text("Aperçu")
+                        .size(16)
+                        .font(style::FONT_SEMIBOLD)
+                        .width(Fill),
+                    text(format!("{} pays", zone.members.len()))
+                        .size(13)
+                        .color(style::MUTED),
+                ]
+                .align_y(Center),
+                self.preview.view(),
+            ]
+            .spacing(12),
+        )
+        .padding(18)
+        .width(Fill)
+        .style(style::card)
+        .into()
     }
 
     fn voice_card(&self) -> Element<'_, Message> {
@@ -1218,6 +1310,7 @@ impl App {
             pulse,
             reveal_all: quiz.is_finished(),
             clickable: quiz.mode() == Mode::Locate && !quiz.is_finished(),
+            preview: false,
             cache: &game.cache,
         };
         let map: Element<'a, MapEvent> = canvas(map_view).width(Fill).height(Fill).into();
@@ -1878,5 +1971,21 @@ fn clock(d: Duration) -> String {
         format!("{}:{:02}:{:02}", s / 3600, s / 60 % 60, s % 60)
     } else {
         format!("{:02}:{:02}", s / 60, s % 60)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Durée de construction de l'aperçu (refait à chaque changement de zone).
+    #[test]
+    #[ignore]
+    fn preview_build_time() {
+        for region in ["monde", "europe", "oceanie"] {
+            let start = Instant::now();
+            let _ = Preview::new(WORLD.region(region).unwrap());
+            println!("{region} : {:?}", start.elapsed());
+        }
     }
 }

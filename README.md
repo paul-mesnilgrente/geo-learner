@@ -32,6 +32,9 @@ Zones jouables :
 - leurs sous-régions (Balkans, Caraïbes, Asie centrale, Polynésie…) ;
 - des regroupements libres : Petites Antilles, Grandes Antilles, Union européenne, îles africaines.
 
+Sur l'écran d'accueil, un **aperçu** montre la zone choisie, cadrée comme en partie, avec ses pays
+en bleu.
+
 La liste compte 197 pays : les 193 membres de l'ONU, plus le Vatican, la Palestine, le Kosovo
 et Taïwan. Elle se modifie dans `data/countries.toml`.
 

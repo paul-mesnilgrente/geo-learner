@@ -570,6 +570,8 @@ pub struct MapView<'a> {
     pub reveal_all: bool,
     /// Les clics désignent un pays (mode Localiser).
     pub clickable: bool,
+    /// Aperçu de l'écran d'accueil : pays de la zone mis en évidence, carte figée.
+    pub preview: bool,
     pub cache: &'a Cache,
 }
 
@@ -592,16 +594,19 @@ enum Tint {
     Second,
     Third,
     Missed,
+    /// Pays de la zone, dans l'aperçu.
+    Highlight,
 }
 
 impl Tint {
-    const ALL: [Tint; 6] = [
+    const ALL: [Tint; 7] = [
         Tint::Outside,
         Tint::Pending,
         Tint::Perfect,
         Tint::Second,
         Tint::Third,
         Tint::Missed,
+        Tint::Highlight,
     ];
 
     fn color(self) -> Color {
@@ -612,6 +617,7 @@ impl Tint {
             Tint::Second => style::WARNING,
             Tint::Third => style::ORANGE,
             Tint::Missed => style::DANGER,
+            Tint::Highlight => style::mix(style::LAND, style::ACCENT, 0.6),
         }
     }
 }
@@ -632,6 +638,14 @@ fn tint(mark: Option<Mark>) -> Tint {
 }
 
 impl MapView<'_> {
+    /// Teinte d'un pays : son état dans la partie, ou sa présence dans la zone (aperçu).
+    fn tint_of(&self, country: usize) -> Tint {
+        match self.quiz.mark(country) {
+            Some(Mark::Pending) if self.preview => Tint::Highlight,
+            mark => tint(mark),
+        }
+    }
+
     fn rings(&self, country: usize, t: &Transform) -> &Vec<Vec<Point>> {
         let shape = &self.projection.countries[country];
         if t.scale >= DETAIL_SCALE {
@@ -765,6 +779,7 @@ impl MapView<'_> {
         let water = color!(0x8fbfff);
         match self.quiz.mark(country) {
             None => style::mix(style::OCEAN, water, 0.10),
+            Some(Mark::Pending) if self.preview => style::mix(style::OCEAN, style::ACCENT, 0.5),
             Some(Mark::Pending) => style::mix(style::OCEAN, water, 0.32),
             mark => style::mix(style::OCEAN, mark_color(mark), 0.45),
         }
@@ -830,7 +845,7 @@ impl MapView<'_> {
                 continue;
             }
             let rings = self.rings(i, t);
-            let k = tint(self.quiz.mark(i));
+            let k = self.tint_of(i);
             let bucket = &mut buckets.iter_mut().find(|(b, _)| *b == k).expect("teinte").1;
             Self::add_rings(bucket, rings, t);
             Self::add_rings(&mut coast, rings, t);
@@ -858,8 +873,14 @@ impl MapView<'_> {
                 continue;
             }
             let center = t.to_screen(self.projection.label(c));
-            let color = mark_color(self.quiz.mark(c));
-            let dot = Path::circle(center, MARKER_RADIUS);
+            let color = self.tint_of(c).color();
+            // Plus discrètes sur la petite carte d'aperçu.
+            let radius = if self.preview {
+                MARKER_RADIUS * 0.6
+            } else {
+                MARKER_RADIUS
+            };
+            let dot = Path::circle(center, radius);
             frame.fill(&dot, style::lighten(color, 0.15));
             frame.stroke(
                 &dot,
@@ -1086,6 +1107,9 @@ impl canvas::Program<MapEvent> for MapView<'_> {
         bounds: Rectangle,
         cursor: mouse::Cursor,
     ) -> Option<Action<MapEvent>> {
+        if self.preview {
+            return None;
+        }
         let t = Transform::new(self.camera, self.view, bounds.size());
         let Event::Mouse(event) = event else {
             return None;
