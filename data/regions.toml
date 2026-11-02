@@ -1,5 +1,15 @@
 # Zones sélectionnables dans le menu.
 #
+# Origine : le découpage géographique de l'ONU (géoschéma M49), adapté aux usages scolaires
+# français :
+# - les Amériques forment deux continents (Amérique du Nord, avec l'Amérique centrale et les
+#   Caraïbes, et Amérique du Sud) ; le Mexique est rangé avec le Canada et les États-Unis ;
+# - l'Asie occidentale est scindée en Moyen-Orient (avec l'Iran, que l'ONU met en Asie du Sud)
+#   et Caucase ; Chypre est en Europe du Sud ;
+# - le Royaume-Uni et l'Irlande sont en Europe de l'Ouest (Europe du Nord pour l'ONU) ;
+# - les Balkans (avec la Bulgarie) sont séparés de l'Europe du Sud et de l'Est.
+# Les regroupements (Petites Antilles, Union européenne…) sont propres à GeoLearner.
+#
 # view   : cadrage [lon_min, lat_min, lon_max, lat_max] ; les longitudes peuvent dépasser 180
 #          pour les zones qui chevauchent l'antiméridien. Sans `view`, le cadrage est calculé
 #          à partir des pays de la zone.

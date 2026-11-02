@@ -40,6 +40,8 @@ pub enum Message {
     SelectMode(Mode),
     SelectRegion(usize),
     ToggleTimer,
+    /// Avancement affiché par continent (`true`) ou par sous-région.
+    ByContinent(bool),
     /// Allonge (`true`) ou raccourcit la durée du minuteur.
     StepTimer(bool),
     ResetTimer,
@@ -258,6 +260,8 @@ impl App {
             self.region = region;
             self.preview = Preview::new(region);
         }
+        // En mémoire seulement, comme le minuteur ci-dessous.
+        self.settings.by_continent = demo.by_continent;
         if demo.timer.is_some() {
             // En mémoire seulement : les réglages ne sont enregistrés que sur action.
             self.settings.timer = true;
@@ -368,6 +372,7 @@ impl App {
                 }
             }
             Message::ToggleTimer => self.settings.toggle_timer(),
+            Message::ByContinent(by_continent) => self.settings.set_by_continent(by_continent),
             Message::StepTimer(up) => {
                 let zone = &WORLD.regions[self.region];
                 self.settings
@@ -1547,11 +1552,26 @@ impl App {
         };
         body = body.push(headline.spacing(2));
 
-        // Avancement par sous-région (mode libre, zones assez grandes).
+        // Avancement par continent ou par sous-région (mode libre, zones assez grandes).
         if quiz.mode() == Mode::Free {
+            let in_quiz =
+                |region: &&geo_core::Region| region.members.iter().any(|&c| quiz.mark(c).is_some());
+            let continents = WORLD
+                .regions
+                .iter()
+                .filter(|r| r.kind == RegionKind::Continent)
+                .filter(in_quiz)
+                .count();
+            // Le choix n'a de sens que si la partie couvre plusieurs continents.
+            let by_continent = self.settings.by_continent && continents > 1;
+            let kind = if by_continent {
+                RegionKind::Continent
+            } else {
+                RegionKind::Sub
+            };
             let mut rows = Column::new().spacing(12);
             let mut count = 0;
-            for region in WORLD.regions.iter().filter(|r| r.kind == RegionKind::Sub) {
+            for region in WORLD.regions.iter().filter(|r| r.kind == kind) {
                 let members: Vec<usize> = region
                     .members
                     .iter()
@@ -1587,7 +1607,21 @@ impl App {
                 );
             }
             if count > 1 {
-                body = body.push(column![section_title("Par région"), rows].spacing(12));
+                let mut header = row![section_title("Avancement"), space::horizontal()]
+                    .align_y(Center)
+                    .spacing(4);
+                if continents > 1 {
+                    let choice = |label: &'static str, value: bool| {
+                        button(text(label).size(11))
+                            .padding([3, 8])
+                            .style(style::pill(by_continent == value))
+                            .on_press(Message::ByContinent(value))
+                    };
+                    header = header
+                        .push(choice("Continents", true))
+                        .push(choice("Régions", false));
+                }
+                body = body.push(column![header, rows].spacing(12));
             }
         }
 

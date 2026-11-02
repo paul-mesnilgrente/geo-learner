@@ -29,6 +29,8 @@ pub struct Demo {
     pub elapsed: Option<u64>,
     /// Minuteur imposé, en secondes.
     pub timer: Option<u64>,
+    /// Avancement affiché par continent.
+    pub by_continent: bool,
 }
 
 pub fn demo() -> Option<Demo> {
@@ -62,6 +64,7 @@ pub fn demo() -> Option<Demo> {
             "target" => demo.target = Some(value.to_owned()),
             "elapsed" => demo.elapsed = value.parse().ok(),
             "timer" => demo.timer = value.parse().ok(),
+            "continents" => demo.by_continent = true,
             "type" => demo.typed = value.split('|').map(str::to_owned).collect(),
             _ => {}
         }

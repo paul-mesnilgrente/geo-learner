@@ -17,6 +17,9 @@ pub struct Settings {
     /// Minuteur activé.
     #[serde(default)]
     pub timer: bool,
+    /// Avancement de la partie affiché par continent plutôt que par sous-région.
+    #[serde(default)]
+    pub by_continent: bool,
     /// Durées choisies par l'utilisateur (secondes), par mode et zone (`"Free/europe"`).
     #[serde(default)]
     durations: BTreeMap<String, u32>,
@@ -80,6 +83,11 @@ impl Settings {
 
     pub fn is_custom(&self, mode: Mode, region: &str) -> bool {
         self.durations.contains_key(&key(mode, region))
+    }
+
+    pub fn set_by_continent(&mut self, by_continent: bool) {
+        self.by_continent = by_continent;
+        self.save();
     }
 
     pub fn toggle_timer(&mut self) {
