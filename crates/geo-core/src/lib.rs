@@ -10,7 +10,7 @@ pub mod world;
 pub use matcher::Matcher;
 pub use normalize::normalize;
 pub use quiz::{Mark, Mode, Outcome, Quiz};
-pub use world::{Country, Info, Region, RegionKind, Shape, Territory, World};
+pub use world::{Country, Info, Inset, Region, RegionKind, Shape, Territory, World};
 
 #[cfg(test)]
 mod testing {

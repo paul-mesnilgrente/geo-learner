@@ -17,7 +17,8 @@ liste peut s'allonger sans changer l'interface. Les textes s'accordent au quiz (
 région », « 13 régions trouvées », « Quel est cet État ? »).
 
 Les départements et régions d'outre-mer, l'Alaska et Hawaï sont déplacés en **encarts** près de
-la carte principale, dans un cadre. Les numéros de département sont acceptés au clavier
+la carte principale, dans un cadre. La pastille « globe » au coin de chaque cadre ouvre une
+petite carte du monde qui situe ces terres, sans les nommer. Les numéros de département sont acceptés au clavier
 (« 75 », « 2A », « 971 »), et les noms anglais des États (« California »).
 
 ### Ajouter un quiz
@@ -191,7 +192,8 @@ Paramètres de `GEO_DEMO`, séparés par `;` :
 - `giveup`, `summary` : partie abandonnée, bilan affiché ;
 - `progress=14` : onglet Progression, avec 14 parties fictives dans la zone choisie
   (et quelques autres séries) ; `delete` supprime la dernière, `confirm` affiche sa demande de
-  confirmation, `bottom` défile en bas de page.
+  confirmation, `bottom` défile en bas de page ;
+- `globe=N` : carte de situation de l'encart n° N ouverte.
 
 `GEO_WINDOW=1600x900` impose la taille de la fenêtre.
 

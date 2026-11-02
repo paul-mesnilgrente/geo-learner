@@ -81,6 +81,31 @@ mod tests {
         assert_eq!(owner("Sahara occidental"), None);
     }
 
+    /// « Centre » est le début de « Centre-Val de Loire » : il ne doit pas suffire.
+    #[test]
+    fn partial_region_names_are_not_answers() {
+        let regions = ATLASES.iter().find(|a| a.info.id == "fr-regions").unwrap();
+        let matcher = geo_core::Matcher::new(regions);
+        assert_eq!(matcher.lookup("Centre"), None);
+        assert!(matcher.lookup("Centre-Val de Loire").is_some());
+        assert!(matcher.lookup("PACA").is_some());
+    }
+
+    /// Chaque encart connaît la position réelle de ses terres (carte de situation).
+    #[test]
+    fn insets_know_where_they_really_are() {
+        let us = ATLASES.iter().find(|a| a.info.id == "us-etats").unwrap();
+        let [x0, y0, x1, y1] = us.info.insets[1].origin; // Hawaï : tout l'archipel principal
+        assert!(x0 < -159.0 && x1 > -155.5 && y0 > 18.0 && y1 < 23.0);
+        let fr = ATLASES
+            .iter()
+            .find(|a| a.info.id == "fr-departements")
+            .unwrap();
+        let [x0, y0, x1, y1] = fr.info.insets[3].origin; // La Réunion
+        assert!((55.0..56.0).contains(&((x0 + x1) / 2.0)));
+        assert!((-21.5..-20.8).contains(&((y0 + y1) / 2.0)));
+    }
+
     #[test]
     fn atlases_are_complete() {
         let counts: Vec<(String, usize)> = ATLASES

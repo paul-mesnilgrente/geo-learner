@@ -91,8 +91,18 @@ pub struct Info {
     pub zoom_sub: bool,
     /// Noms des deux niveaux de zones : continents et sous-régions pour le monde.
     pub levels: [String; 2],
-    /// Cadres des encarts (outre-mer, Alaska…), en (lon, lat) : [lon_min, lat_min, lon_max, lat_max].
-    pub frames: Vec<[f32; 4]>,
+    /// Encarts : terres rapprochées de la carte principale (outre-mer, Alaska…).
+    pub insets: Vec<Inset>,
+}
+
+/// Encart, en (lon, lat) : `[lon_min, lat_min, lon_max, lat_max]`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+pub struct Inset {
+    /// Cadre de l'encart sur la carte.
+    pub frame: [f32; 4],
+    /// Emprise réelle de ces terres (leur plus grande île ou masse), pour les situer sur le
+    /// globe.
+    pub origin: [f32; 4],
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -546,6 +546,8 @@ pub enum MapEvent {
     Resized(Size),
     /// Fin d'un déplacement de la carte à la souris.
     DragEnded,
+    /// Clic sur la pastille « globe » d'un encart (index dans `info.insets`).
+    Globe(usize),
 }
 
 /// Mise en évidence temporaire d'un pays (bonne ou mauvaise réponse).
@@ -575,13 +577,20 @@ pub struct MapView<'a> {
     pub clickable: bool,
     /// Aperçu de l'écran d'accueil : pays de la zone mis en évidence, carte figée.
     pub preview: bool,
+    /// Lieu à entourer, en (lon, lat) : `[lon_min, lat_min, lon_max, lat_max]`.
+    pub marker: Option<[f32; 4]>,
     pub cache: &'a Cache,
 }
 
 #[derive(Default)]
 pub struct Interaction {
     drag: Option<Drag>,
+    /// Le curseur survole la pastille « globe » d'un encart.
+    on_globe: bool,
 }
+
+/// Rayon de la pastille « globe » posée au coin de chaque encart.
+const GLOBE_RADIUS: f32 = 11.0;
 
 struct Drag {
     start: Point,
@@ -645,6 +654,8 @@ impl MapView<'_> {
     fn tint_of(&self, country: usize) -> Tint {
         match self.quiz.mark(country) {
             Some(Mark::Pending) if self.preview => Tint::Highlight,
+            // Carte de situation : toutes les terres en gris neutre, aucune n'est à trouver.
+            None if self.marker.is_some() => Tint::Pending,
             mark => tint(mark),
         }
     }
@@ -868,8 +879,8 @@ impl MapView<'_> {
         );
 
         // Cadres des encarts (outre-mer, Alaska, Hawaï) : ces terres ont été déplacées.
-        for &frame_view in &self.world.info.frames {
-            let r = view_rect(frame_view, self.projection.center);
+        for inset in &self.world.info.insets {
+            let r = view_rect(inset.frame, self.projection.center);
             let a = t.to_screen(Point::new(r.x, r.y + r.height));
             let b = t.to_screen(Point::new(r.x + r.width, r.y));
             let path = Path::rounded_rectangle(a, Size::new(b.x - a.x, b.y - a.y), 6.0.into());
@@ -941,7 +952,103 @@ impl MapView<'_> {
         }
     }
 
+    /// Pastilles « globe » des encarts (coin supérieur droit du cadre), en pixels.
+    fn globes(&self, t: &Transform) -> Vec<Point> {
+        if self.preview {
+            return Vec::new();
+        }
+        self.world
+            .info
+            .insets
+            .iter()
+            .map(|inset| {
+                let r = view_rect(inset.frame, self.projection.center);
+                t.to_screen(Point::new(r.x + r.width, r.y + r.height))
+            })
+            .collect()
+    }
+
+    fn globe_at(&self, t: &Transform, p: Point) -> Option<usize> {
+        self.globes(t)
+            .iter()
+            .position(|c| c.distance(p) <= GLOBE_RADIUS + 3.0)
+    }
+
+    fn draw_globes(&self, frame: &mut Frame, t: &Transform, cursor: Option<Point>) {
+        let hovered = cursor.and_then(|p| self.globe_at(t, p));
+        for (i, center) in self.globes(t).into_iter().enumerate() {
+            let on = hovered == Some(i);
+            let badge = Path::circle(center, GLOBE_RADIUS);
+            frame.fill(&badge, if on { style::ACCENT } else { style::SURFACE_3 });
+            frame.stroke(
+                &badge,
+                Stroke::default()
+                    .with_color(if on { style::ACCENT } else { style::BORDER })
+                    .with_width(1.0),
+            );
+            // Globe : contour, équateur et méridien.
+            let r = GLOBE_RADIUS * 0.55;
+            let globe = Path::new(|b| {
+                b.circle(center, r);
+                b.move_to(Point::new(center.x - r, center.y));
+                b.line_to(Point::new(center.x + r, center.y));
+                b.ellipse(canvas::path::arc::Elliptical {
+                    center,
+                    radii: Vector::new(r * 0.45, r),
+                    rotation: iced::Radians(0.0),
+                    start_angle: iced::Radians(0.0),
+                    end_angle: iced::Radians(std::f32::consts::TAU),
+                });
+            });
+            frame.stroke(
+                &globe,
+                Stroke::default()
+                    .with_color(if on { Color::WHITE } else { style::TEXT })
+                    .with_width(1.2),
+            );
+        }
+        if let (Some(_), Some(p)) = (hovered, cursor) {
+            tag(
+                frame,
+                "Voir sur la carte du monde",
+                Point::new(p.x, p.y - 24.0),
+                style::SURFACE_3,
+                1.0,
+            );
+        }
+    }
+
+    /// Lieu entouré (carte de situation d'un encart), visible même s'il est minuscule.
+    fn draw_marker(&self, frame: &mut Frame, t: &Transform) {
+        let Some(marker) = self.marker else { return };
+        let r = view_rect(marker, self.projection.center);
+        let a = t.to_screen(Point::new(r.x, r.y + r.height));
+        let b = t.to_screen(Point::new(r.x + r.width, r.y));
+        let center = Point::new((a.x + b.x) / 2.0, (a.y + b.y) / 2.0);
+        let radii = Vector::new(
+            ((b.x - a.x) / 2.0 + 8.0).max(14.0),
+            ((b.y - a.y) / 2.0 + 8.0).max(14.0),
+        );
+        let ring = Path::new(|p| {
+            p.ellipse(canvas::path::arc::Elliptical {
+                center,
+                radii,
+                rotation: iced::Radians(0.0),
+                start_angle: iced::Radians(0.0),
+                end_angle: iced::Radians(std::f32::consts::TAU),
+            });
+        });
+        frame.fill(&ring, style::with_alpha(style::ACCENT, 0.08));
+        frame.stroke(
+            &ring,
+            Stroke::default()
+                .with_color(style::lighten(style::ACCENT, 0.3))
+                .with_width(2.5),
+        );
+    }
+
     fn draw_overlay(&self, frame: &mut Frame, t: &Transform, cursor: Option<Point>) {
+        self.draw_marker(frame, t);
         if let Some(target) = self.target {
             let pulse = 0.5 + 0.5 * (self.pulse * std::f32::consts::TAU).sin();
             let bubbled = !self.projection.bubbles[target].is_empty();
@@ -1061,6 +1168,7 @@ impl MapView<'_> {
                 );
             }
         }
+        self.draw_globes(frame, t, cursor);
     }
 }
 
@@ -1145,6 +1253,9 @@ impl canvas::Program<MapEvent> for MapView<'_> {
             }
             mouse::Event::ButtonPressed(mouse::Button::Left) => {
                 let start = cursor.position_in(bounds)?;
+                if let Some(inset) = self.globe_at(&t, start) {
+                    return Some(Action::publish(MapEvent::Globe(inset)).and_capture());
+                }
                 state.drag = Some(Drag {
                     start,
                     camera: self.camera,
@@ -1171,6 +1282,23 @@ impl canvas::Program<MapEvent> for MapView<'_> {
                         return Some(Action::publish(MapEvent::Camera(camera)));
                     }
                     return None;
+                }
+                let on_globe = cursor
+                    .position_in(bounds)
+                    .and_then(|p| self.globe_at(&t, p))
+                    .is_some();
+                if on_globe != state.on_globe {
+                    state.on_globe = on_globe;
+                    if !on_globe {
+                        return Some(Action::request_redraw());
+                    }
+                }
+                if on_globe {
+                    // Info-bulle de la pastille, à la place du nom du lieu survolé.
+                    return Some(match self.hover {
+                        Some(_) => Action::publish(MapEvent::Hover(None)),
+                        None => Action::request_redraw(),
+                    });
                 }
                 let hit = cursor.position_in(bounds).and_then(|p| self.hit(&t, p));
                 if hit != self.hover {
@@ -1220,6 +1348,7 @@ impl canvas::Program<MapEvent> for MapView<'_> {
     ) -> mouse::Interaction {
         match &state.drag {
             Some(drag) if drag.moved => mouse::Interaction::Grabbing,
+            _ if state.on_globe && cursor.is_over(bounds) => mouse::Interaction::Pointer,
             _ if self.clickable
                 && self.hover.and_then(Place::country).is_some()
                 && cursor.is_over(bounds) =>
@@ -1237,6 +1366,60 @@ mod tests {
 
     fn rect(x: f32, y: f32, w: f32, h: f32) -> Rectangle {
         Rectangle::new(Point::new(x, y), Size::new(w, h))
+    }
+
+    /// Un clic sur la pastille « globe » d'un encart ouvre sa carte de situation ; un clic à
+    /// côté reste un clic sur la carte.
+    #[test]
+    fn globe_badges_are_clickable() {
+        let world = crate::ATLASES
+            .iter()
+            .find(|a| a.info.id == "fr-departements")
+            .unwrap();
+        let zone = &world.regions[0];
+        let projection = Projection::new(world, zone.center);
+        let view = view_rect(zone.view, zone.center);
+        let quiz = Quiz::new(
+            geo_core::Mode::Locate,
+            world.countries.len(),
+            zone.members.clone(),
+            Vec::new(),
+        );
+        let cache = Cache::new();
+        let map = MapView {
+            world,
+            projection: &projection,
+            view,
+            camera: Camera::fit(view),
+            quiz: &quiz,
+            hover: None,
+            target: None,
+            flash: None,
+            pulse: 0.0,
+            reveal_all: false,
+            clickable: true,
+            preview: false,
+            marker: None,
+            cache: &cache,
+        };
+        let bounds = rect(0.0, 0.0, 1000.0, 700.0);
+        let t = Transform::new(map.camera, view, bounds.size());
+        let badges = map.globes(&t);
+        assert_eq!(badges.len(), 5);
+        let press = |at: Point| {
+            let mut state = Interaction::default();
+            let event = Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left));
+            canvas::Program::update(
+                &map,
+                &mut state,
+                &event,
+                bounds,
+                mouse::Cursor::Available(at),
+            )
+            .and_then(|action| action.into_inner().0)
+        };
+        assert!(matches!(press(badges[3]), Some(MapEvent::Globe(3))));
+        assert!(press(Point::new(badges[3].x + 40.0, badges[3].y)).is_none());
     }
 
     #[test]

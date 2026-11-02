@@ -42,6 +42,8 @@ pub struct Demo {
     pub bottom: bool,
     /// Demande de confirmation affichée sur la partie la plus récente (`confirm`).
     pub confirm: bool,
+    /// Carte de situation de l'encart n° N ouverte (`globe=N`).
+    pub globe: Option<usize>,
 }
 
 /// Parties fictives d'une série : scores en progrès, temps en baisse, un minuteur dépassé.
@@ -114,6 +116,7 @@ pub fn demo() -> Option<Demo> {
             "delete" => demo.delete = true,
             "bottom" => demo.bottom = true,
             "confirm" => demo.confirm = true,
+            "globe" => demo.globe = value.parse().ok(),
             "type" => demo.typed = value.split('|').map(str::to_owned).collect(),
             _ => {}
         }

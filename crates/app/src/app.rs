@@ -81,6 +81,8 @@ pub enum Message {
     ZoomOut,
     ResetView,
     CloseSummary,
+    /// Ferme la carte de situation d'un encart.
+    CloseLocator,
     Tick(Instant),
     Voice(voice::Event),
     ToggleMic,
@@ -169,6 +171,104 @@ struct Game {
     new_record: bool,
     /// Derniers pays joués (plus récent à la fin).
     history: Vec<usize>,
+    /// Carte de situation d'un encart (outre-mer, Alaska…), ouverte par sa pastille.
+    locator: Option<Locator>,
+}
+
+/// Petite carte du monde qui situe les terres d'un encart.
+struct Locator {
+    inset: usize,
+    projection: Projection,
+    view: iced::Rectangle,
+    origin: [f32; 4],
+    /// Partie vide : aucun lieu mis en évidence ni nommé (pas d'indice).
+    quiz: Quiz,
+    cache: Cache,
+}
+
+impl Locator {
+    fn new(inset: usize, origin: [f32; 4]) -> Self {
+        let world = &ATLASES[0];
+        let [x0, y0, x1, y1] = origin;
+        let (lon, lat) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
+        // Assez large pour voir les terres voisines (Caraïbes, Madagascar, Californie…).
+        let half_w = (1.3 * (x1 - x0)).max(45.0);
+        let half_h = (1.3 * (y1 - y0)).max(25.0);
+        let view = [
+            lon - half_w,
+            (lat - half_h).max(-80.0),
+            lon + half_w,
+            (lat + half_h).min(85.0),
+        ];
+        Self {
+            inset,
+            projection: Projection::new(world, lon),
+            view: map::view_rect(view, lon),
+            origin,
+            quiz: Quiz::new(Mode::Free, world.countries.len(), Vec::new(), Vec::new()),
+            cache: Cache::new(),
+        }
+    }
+
+    fn view(&self) -> Element<'_, Message> {
+        let map_view = MapView {
+            world: &ATLASES[0],
+            projection: &self.projection,
+            view: self.view,
+            camera: Camera::fit(self.view),
+            quiz: &self.quiz,
+            hover: None,
+            target: None,
+            flash: None,
+            pulse: 0.0,
+            reveal_all: false,
+            clickable: false,
+            preview: true,
+            marker: Some(self.origin),
+            cache: &self.cache,
+        };
+        let map: Element<'_, MapEvent> = canvas(map_view).width(Fill).height(Fill).into();
+        let close = button(container(icon(Icon::Close, 12.0, style::TEXT)).center(Fill))
+            .width(28)
+            .height(28)
+            .padding(0)
+            .style(style::map_control)
+            .on_press(Message::CloseLocator);
+        let card = column![
+            row![
+                icon(Icon::Globe, 16.0, style::TEXT),
+                text("Sur la carte du monde")
+                    .size(14)
+                    .font(style::FONT_SEMIBOLD)
+                    .width(Fill),
+                close,
+            ]
+            .spacing(8)
+            .align_y(Center),
+            container(map.map(Message::Map))
+                .width(Fill)
+                .height(210)
+                .clip(true)
+                .style(|_: &Theme| container::Style {
+                    background: Some(style::OCEAN.into()),
+                    border: iced::Border {
+                        color: style::BORDER,
+                        width: 1.0,
+                        radius: 10.0.into(),
+                    },
+                    ..Default::default()
+                }),
+        ]
+        .spacing(10);
+        container(card)
+            .padding(14)
+            .width(360)
+            .style(|theme: &Theme| container::Style {
+                background: Some(style::SURFACE.into()),
+                ..style::floating(theme)
+            })
+            .into()
+    }
 }
 
 /// Carte de l'écran d'accueil : la zone choisie, ses pays mis en évidence.
@@ -213,6 +313,7 @@ impl Preview {
             reveal_all: false,
             clickable: false,
             preview: true,
+            marker: None,
             cache: &self.cache,
         };
         let map: Element<'_, MapEvent> = canvas(map_view).width(Fill).height(Fill).into();
@@ -394,6 +495,12 @@ impl App {
         }
         if demo.give_up {
             game.quiz.give_up();
+        }
+        if let Some(inset) = demo
+            .globe
+            .and_then(|i| self.world().info.insets.get(i).map(|x| (i, x)))
+        {
+            game.locator = Some(Locator::new(inset.0, inset.1.origin));
         }
         game.flash = None;
         self.game = Some(game);
@@ -586,6 +693,12 @@ impl App {
                 }
                 return operation::focus(ANSWER_INPUT);
             }
+            Message::CloseLocator => {
+                if let Some(game) = &mut self.game {
+                    game.locator = None;
+                }
+                return operation::focus(ANSWER_INPUT);
+            }
             Message::CloseSummary => {
                 if let Some(game) = &mut self.game {
                     game.summary = false;
@@ -605,6 +718,7 @@ impl App {
                     keyboard::Key::Named(Named::Escape) => {
                         self.confirm_delete = None;
                         if let Some(game) = &mut self.game {
+                            game.locator = None;
                             game.summary = false;
                         }
                     }
@@ -655,10 +769,25 @@ impl App {
             MapEvent::Click(Some(country)) if game.quiz.mode() == Mode::Locate => {
                 self.on_click(country);
             }
+            MapEvent::Globe(inset) => {
+                // Un second clic sur la même pastille referme la carte.
+                game.locator = match &game.locator {
+                    Some(l) if l.inset == inset => None,
+                    _ => game
+                        .world
+                        .info
+                        .insets
+                        .get(inset)
+                        .map(|i| Locator::new(inset, i.origin)),
+                };
+            }
             MapEvent::Click(_) | MapEvent::DragEnded => {}
         }
         // Un clic sur la carte retire le focus du champ de saisie : on le lui rend.
-        if matches!(event, MapEvent::Click(_) | MapEvent::DragEnded) {
+        if matches!(
+            event,
+            MapEvent::Click(_) | MapEvent::DragEnded | MapEvent::Globe(_)
+        ) {
             operation::focus(ANSWER_INPUT)
         } else {
             Task::none()
@@ -1622,6 +1751,7 @@ impl App {
             reveal_all: quiz.is_finished(),
             clickable: quiz.mode() == Mode::Locate && !quiz.is_finished(),
             preview: false,
+            marker: None,
             cache: &game.cache,
         };
         let map: Element<'a, MapEvent> = canvas(map_view).width(Fill).height(Fill).into();
@@ -1683,6 +1813,16 @@ impl App {
                     .align_x(Horizontal::Center)
                     .align_y(Vertical::Bottom)
                     .padding(28),
+            );
+        }
+        if let Some(locator) = &game.locator {
+            // À droite, sous l'invite : les encarts sont à gauche (France) ou en bas à gauche
+            // (États-Unis) et les boutons de zoom en bas.
+            layers = layers.push(
+                container(opaque(locator.view()))
+                    .width(Fill)
+                    .align_x(Horizontal::Right)
+                    .padding(iced::Padding::from(16).top(SAFE_AREA.top)),
             );
         }
         if quiz.is_finished() && game.summary {
@@ -2137,6 +2277,7 @@ impl Game {
             summary: false,
             new_record: false,
             history: Vec::new(),
+            locator: None,
         }
     }
 

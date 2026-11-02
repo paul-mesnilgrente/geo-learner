@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::error::Error;
 
-use geo_core::world::{Country, Info, Region, RegionKind, Ring, Shape, Territory, World};
+use geo_core::world::{Country, Info, Inset, Region, RegionKind, Ring, Shape, Territory, World};
 use geo_core::{Matcher, normalize};
 use serde::Deserialize;
 use serde_json::Value;
@@ -276,7 +276,7 @@ fn build_world(defs: &CountriesFile, zones: &RegionsFile, features: &Value) -> R
         feminine: false,
         zoom_sub: false,
         levels: default_levels(),
-        frames: Vec::new(),
+        insets: Vec::new(),
     };
     assemble(info, &defs.countries, zones, source, WORLD_TOLERANCE)
 }
@@ -326,7 +326,7 @@ fn build_atlas(file: &AtlasFile, admin0: &Value, admin1: &Value) -> Result<World
 
     // Encarts : déplacement de chaque entité concernée.
     let mut moves: HashMap<&str, (Move, Option<[f64; 4]>)> = HashMap::new();
-    let mut frames = Vec::new();
+    let mut insets = Vec::new();
     for inset in &file.inset {
         let mut rings = Vec::new();
         for code in &inset.codes {
@@ -342,12 +342,28 @@ fn build_atlas(file: &AtlasFile, admin0: &Value, admin1: &Value) -> Result<World
             .collect();
         let b = bounds_f64(moved.iter().flatten());
         let pad = 0.35;
-        frames.push([
-            (b[0] - pad) as f32,
-            (b[1] - pad) as f32,
-            (b[2] + pad) as f32,
-            (b[3] + pad) as f32,
-        ]);
+        // Position réelle : emprise de toutes ces terres, ou de la plus grande si elles passent
+        // l'antiméridien (Alaska et ses Aléoutiennes).
+        let all = bounds_f64(rings.iter().flatten());
+        let area = |b: &[f64; 4]| (b[2] - b[0]) * (b[3] - b[1]);
+        let origin = if all[2] - all[0] < 180.0 {
+            all
+        } else {
+            rings
+                .iter()
+                .map(|r| bounds_f64(r.iter()))
+                .max_by(|a, b| area(a).total_cmp(&area(b)))
+                .ok_or("encart vide")?
+        };
+        insets.push(Inset {
+            frame: [
+                (b[0] - pad) as f32,
+                (b[1] - pad) as f32,
+                (b[2] + pad) as f32,
+                (b[3] + pad) as f32,
+            ],
+            origin: origin.map(|v| v as f32),
+        });
         for code in &inset.codes {
             moves.insert(code.as_str(), (shift, inset.crop));
         }
@@ -434,7 +450,7 @@ fn build_atlas(file: &AtlasFile, admin0: &Value, admin1: &Value) -> Result<World
         feminine: def.feminine,
         zoom_sub: def.zoom_sub,
         levels: def.levels.clone(),
-        frames,
+        insets,
     };
     assemble(info, &file.items, &file.zones, source, ATLAS_TOLERANCE)
 }

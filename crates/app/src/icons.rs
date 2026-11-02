@@ -19,6 +19,8 @@ pub enum Icon {
     Timer,
     Trash,
     Chart,
+    Globe,
+    Close,
 }
 
 struct Program {
@@ -157,6 +159,24 @@ impl<Message> canvas::Program<Message> for Program {
                 b.line_to(p(10.0, 16.0));
                 b.move_to(p(14.0, 11.0));
                 b.line_to(p(14.0, 16.0));
+            }
+            Icon::Globe => {
+                b.circle(p(12.0, 12.0), 8.5 * s);
+                b.move_to(p(3.5, 12.0));
+                b.line_to(p(20.5, 12.0));
+                b.ellipse(canvas::path::arc::Elliptical {
+                    center: p(12.0, 12.0),
+                    radii: iced::Vector::new(3.8 * s, 8.5 * s),
+                    rotation: iced::Radians(0.0),
+                    start_angle: iced::Radians(0.0),
+                    end_angle: iced::Radians(std::f32::consts::TAU),
+                });
+            }
+            Icon::Close => {
+                b.move_to(p(6.0, 6.0));
+                b.line_to(p(18.0, 18.0));
+                b.move_to(p(18.0, 6.0));
+                b.line_to(p(6.0, 18.0));
             }
             Icon::Chart => {
                 b.move_to(p(4.0, 4.0));

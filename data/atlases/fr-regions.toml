@@ -5,7 +5,7 @@ items = [
   { code = "FR-ARA", name = "Auvergne-Rhône-Alpes", sub = "regions-metropole", parts = ["FR-01", "FR-03", "FR-07", "FR-15", "FR-26", "FR-38", "FR-42", "FR-43", "FR-63", "FR-69", "FR-73", "FR-74"] },
   { code = "FR-BFC", name = "Bourgogne-Franche-Comté", sub = "regions-metropole", parts = ["FR-21", "FR-25", "FR-39", "FR-58", "FR-70", "FR-71", "FR-89", "FR-90"] },
   { code = "FR-BRE", name = "Bretagne", sub = "regions-metropole", parts = ["FR-22", "FR-29", "FR-35", "FR-56"] },
-  { code = "FR-CVL", name = "Centre-Val de Loire", sub = "regions-metropole", aka = ["Centre"], parts = ["FR-18", "FR-28", "FR-36", "FR-37", "FR-41", "FR-45"] },
+  { code = "FR-CVL", name = "Centre-Val de Loire", sub = "regions-metropole", parts = ["FR-18", "FR-28", "FR-36", "FR-37", "FR-41", "FR-45"] },
   { code = "FR-COR", name = "Corse", sub = "regions-metropole", parts = ["FR-2A", "FR-2B"] },
   { code = "FR-GES", name = "Grand Est", sub = "regions-metropole", parts = ["FR-08", "FR-10", "FR-51", "FR-52", "FR-54", "FR-55", "FR-57", "FR-67", "FR-68", "FR-88"] },
   { code = "FR-HDF", name = "Hauts-de-France", sub = "regions-metropole", parts = ["FR-02", "FR-59", "FR-60", "FR-62", "FR-80"] },
