@@ -6,7 +6,8 @@
 # aka  : autres noms acceptés (la casse, les accents, les tirets et les articles sont ignorés)
 # say  : formes orales supplémentaires pour la reconnaissance vocale
 # label: point de référence [lon, lat] si celui de Natural Earth ne convient pas
-# bubble: archipel entouré d'une « bulle » sur la carte pour le rendre visible (comme JetPunk)
+# bubble: archipel entouré d'une « bulle » sur la carte pour le rendre visible (comme JetPunk) ;
+#         one_bubble : une seule bulle pour toutes ses îles, même éloignées
 
 countries = [
   { code = "AFG", name = "Afghanistan", sub = "asie-sud" },
@@ -101,7 +102,7 @@ countries = [
   { code = "KAZ", name = "Kazakhstan", sub = "asie-centrale" },
   { code = "KEN", name = "Kenya", sub = "afr-est" },
   { code = "KGZ", name = "Kirghizistan", sub = "asie-centrale", aka = ["Kirghizstan", "Kirghizie"] },
-  { code = "KIR", name = "Kiribati", sub = "micronesie", label = [173.0, 1.4], bubble = true },  # Tarawa, la capitale
+  { code = "KIR", name = "Kiribati", sub = "micronesie", label = [173.0, 1.4], bubble = true, one_bubble = true },  # Tarawa, la capitale
   { code = "KOS", name = "Kosovo", sub = "balkans" },
   { code = "KWT", name = "Koweït", sub = "moyen-orient" },
   { code = "LAO", name = "Laos", sub = "asie-se" },
@@ -125,7 +126,7 @@ countries = [
   { code = "MUS", name = "Maurice", sub = "afr-est", aka = ["Île Maurice"], bubble = true },
   { code = "MRT", name = "Mauritanie", sub = "afr-ouest" },
   { code = "MEX", name = "Mexique", sub = "am-nord" },
-  { code = "FSM", name = "Micronésie", sub = "micronesie", aka = ["États fédérés de Micronésie"], bubble = true },
+  { code = "FSM", name = "Micronésie", sub = "micronesie", aka = ["États fédérés de Micronésie"], bubble = true, one_bubble = true },
   { code = "MDA", name = "Moldavie", sub = "eur-est", aka = ["Moldova"] },
   { code = "MCO", name = "Monaco", sub = "eur-ouest" },
   { code = "MNG", name = "Mongolie", sub = "asie-est" },
@@ -165,7 +166,7 @@ countries = [
   { code = "SMR", name = "Saint-Marin", sub = "eur-sud" },
   { code = "VCT", name = "Saint-Vincent-et-les-Grenadines", sub = "caraibes", aka = ["Saint-Vincent"] },
   { code = "LCA", name = "Sainte-Lucie", sub = "caraibes" },
-  { code = "SLB", name = "Îles Salomon", sub = "melanesie", aka = ["Salomon"] },
+  { code = "SLB", name = "Îles Salomon", sub = "melanesie", aka = ["Salomon"], bubble = true },
   { code = "SLV", name = "Salvador", sub = "am-centrale", aka = ["El Salvador"] },
   { code = "WSM", name = "Samoa", sub = "polynesie", bubble = true },
   { code = "STP", name = "Sao Tomé-et-Principe", sub = "afr-centre", aka = ["Sao Tomé"], bubble = true },

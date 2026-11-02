@@ -29,9 +29,19 @@ fn project_raw(lon: f32, lat: f32) -> [f32; 2] {
 /// les longitudes sont « déroulées » pour rester continues, quitte à sortir de [-180, 180].
 ///
 /// `anchor` (longitude du pays) place l'anneau du même côté que le reste du pays : les îles
-/// de Kiribati restent groupées, même de part et d'autre de la coupure.
-pub fn project_ring(ring: &[[f32; 2]], center: f32, anchor: f32, out: &mut Vec<[f32; 2]>) {
+/// de Kiribati restent groupées, même de part et d'autre de la coupure. `shift` (±360) produit
+/// la copie de l'autre côté de la carte, pour les pays qui débordent du bord.
+///
+/// Renvoie l'étendue des longitudes, relatives au méridien central, après déroulement.
+pub fn project_ring(
+    ring: &[[f32; 2]],
+    center: f32,
+    anchor: f32,
+    shift: f32,
+    out: &mut Vec<[f32; 2]>,
+) -> [f32; 2] {
     out.clear();
+    let mut range = [f32::MAX, f32::MIN];
     let mut prev = wrap(anchor, center);
     for &[lon, lat] in ring {
         let mut l = wrap(lon, center);
@@ -42,8 +52,10 @@ pub fn project_ring(ring: &[[f32; 2]], center: f32, anchor: f32, out: &mut Vec<[
             l += 360.0;
         }
         prev = l;
-        out.push(project_raw(l, lat));
+        range = [range[0].min(l), range[1].max(l)];
+        out.push(project_raw(l + shift, lat));
     }
+    range
 }
 
 /// Boîte englobante projetée d'un cadrage [lon_min, lat_min, lon_max, lat_max].
@@ -100,7 +112,7 @@ mod tests {
             [179.5, -16.0],
         ];
         let mut out = Vec::new();
-        project_ring(&ring, 0.0, 179.0, &mut out);
+        project_ring(&ring, 0.0, 179.0, 0.0, &mut out);
         let width = out.iter().map(|p| p[0]).fold(f32::MIN, f32::max)
             - out.iter().map(|p| p[0]).fold(f32::MAX, f32::min);
         assert!(width < 0.1, "l'anneau a été déchiré : largeur {width}");
@@ -111,7 +123,13 @@ mod tests {
         // Île à 157° O d'un pays ancré à 173° E (Kiribati), méridien central à 11° E :
         // elle passe à l'est de la coupure, à côté du reste du pays.
         let mut out = Vec::new();
-        project_ring(&[[-157.0, 1.8]], 11.0, 173.0, &mut out);
+        let range = project_ring(&[[-157.0, 1.8]], 11.0, 173.0, 0.0, &mut out);
+        // Au-delà du bord droit de la carte (180° du méridien central)…
+        assert!(range[1] > 180.0);
+        // … sa copie décalée d'un tour réapparaît à gauche.
+        let mut copy = Vec::new();
+        project_ring(&[[-157.0, 1.8]], 11.0, 173.0, -360.0, &mut copy);
+        assert!(copy[0][0] < -2.5);
         let east = project(173.0, 1.8, 11.0)[0];
         assert!(
             out[0][0] > east,

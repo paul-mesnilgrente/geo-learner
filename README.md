@@ -17,7 +17,10 @@ citer les 197 pays du monde, au prorata du nombre de pays de la zone, et un peu 
 la partie est validée : les pays restants comptent comme ratés.
 
 Sur la carte, les archipels (Maldives, Kiribati, Fidji, Cap-Vert…) sont entourés d'une **bulle**
-cliquable, comme sur JetPunk, pour être repérables malgré leur taille.
+cliquable, comme sur JetPunk, pour être repérables malgré leur taille : une ellipse par groupe
+d'îles, ou une seule pour tout le pays (`one_bubble`, Kiribati et Micronésie). Les îles qui
+dépassent un bord de la carte (îles de la Ligne de Kiribati, Aléoutiennes) réapparaissent de
+l'autre côté.
 
 En « Nommer » et « Trouver », on a trois essais par pays. Le score vaut 1 point au premier essai,
 ½ au deuxième et ¼ au troisième.

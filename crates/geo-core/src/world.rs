@@ -31,6 +31,8 @@ pub struct Country {
     pub label: [f32; 2],
     /// Archipel entouré d'une « bulle » sur la carte pour être repérable.
     pub bubble: bool,
+    /// Une seule bulle pour toutes ses îles (Kiribati, Micronésie), même éloignées.
+    pub one_bubble: bool,
     pub shape: Shape,
 }
 
