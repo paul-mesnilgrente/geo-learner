@@ -27,6 +27,8 @@ pub struct Demo {
     pub target: Option<String>,
     /// Temps de jeu déjà écoulé, en secondes.
     pub elapsed: Option<u64>,
+    /// Minuteur imposé, en secondes.
+    pub timer: Option<u64>,
 }
 
 pub fn demo() -> Option<Demo> {
@@ -59,6 +61,7 @@ pub fn demo() -> Option<Demo> {
             "summary" => demo.summary = true,
             "target" => demo.target = Some(value.to_owned()),
             "elapsed" => demo.elapsed = value.parse().ok(),
+            "timer" => demo.timer = value.parse().ok(),
             "type" => demo.typed = value.split('|').map(str::to_owned).collect(),
             _ => {}
         }

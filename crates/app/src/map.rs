@@ -6,9 +6,11 @@ use iced::alignment::Vertical;
 use iced::mouse::{self, ScrollDelta};
 use iced::widget::canvas::fill::{Fill, Rule};
 use iced::widget::canvas::path::Builder;
-use iced::widget::canvas::{self, Action, Cache, Event, Frame, Geometry, Path, Stroke, Text};
+use iced::widget::canvas::{
+    self, Action, Cache, Event, Frame, Geometry, LineCap, LineJoin, Path, Stroke, Text,
+};
 use iced::widget::text::Alignment;
-use iced::{Color, Pixels, Point, Rectangle, Renderer, Size, Theme, Vector};
+use iced::{Color, Pixels, Point, Rectangle, Renderer, Size, Theme, Vector, color};
 
 use crate::style;
 
@@ -17,6 +19,10 @@ const TINY_PX: f32 = 7.0;
 const MARKER_RADIUS: f32 = 4.5;
 /// Au-delà de cette échelle (pixels par unité projetée), on dessine les contours détaillés.
 const DETAIL_SCALE: f32 = 650.0;
+/// Marge (en pixels) autour des îles d'un archipel pour former sa bulle.
+const BUBBLE_PX: f32 = 8.0;
+/// Écart maximal (coordonnées projetées, environ 7°) entre deux groupes d'îles d'une même bulle.
+const BUBBLE_GAP: f32 = 0.12;
 pub const MIN_ZOOM: f32 = 0.6;
 pub const MAX_ZOOM: f32 = 600.0;
 
@@ -24,6 +30,8 @@ pub const MAX_ZOOM: f32 = 600.0;
 pub struct Projection {
     countries: Vec<ProjShape>,
     territories: Vec<ProjShape>,
+    /// Bulles des archipels : enveloppes convexes de chaque groupe d'îles (vide sinon).
+    bubbles: Vec<Vec<Vec<Point>>>,
 }
 
 struct ProjShape {
@@ -39,7 +47,7 @@ struct ProjShape {
 
 impl Projection {
     pub fn new(world: &World, center: f32) -> Self {
-        let countries = world
+        let countries: Vec<ProjShape> = world
             .countries
             .iter()
             .map(|c| ProjShape::new(&c.shape, c.label, center))
@@ -49,9 +57,22 @@ impl Projection {
             .iter()
             .map(|t| ProjShape::new(&t.shape, t.label, center))
             .collect();
+        let bubbles = world
+            .countries
+            .iter()
+            .zip(&countries)
+            .map(|(c, shape): (_, &ProjShape)| {
+                if c.bubble {
+                    bubble_hulls(&shape.lo)
+                } else {
+                    Vec::new()
+                }
+            })
+            .collect();
         Self {
             countries,
             territories,
+            bubbles,
         }
     }
 
@@ -106,6 +127,89 @@ impl ProjShape {
             label,
         }
     }
+}
+
+/// Regroupe les îles proches puis renvoie l'enveloppe convexe de chaque groupe.
+fn bubble_hulls(rings: &[Vec<Point>]) -> Vec<Vec<Point>> {
+    let boxes: Vec<Rectangle> = rings.iter().map(|r| bounds(r.iter())).collect();
+    let gap = |a: &Rectangle, b: &Rectangle| {
+        let dx = (a.x - (b.x + b.width)).max(b.x - (a.x + a.width)).max(0.0);
+        let dy = (a.y - (b.y + b.height))
+            .max(b.y - (a.y + a.height))
+            .max(0.0);
+        dx.hypot(dy)
+    };
+    // Groupes par proximité (union de proche en proche).
+    let mut group: Vec<usize> = (0..rings.len()).collect();
+    fn root(group: &mut [usize], mut i: usize) -> usize {
+        while group[i] != i {
+            group[i] = group[group[i]];
+            i = group[i];
+        }
+        i
+    }
+    for i in 0..rings.len() {
+        for j in i + 1..rings.len() {
+            if gap(&boxes[i], &boxes[j]) < BUBBLE_GAP {
+                let (a, b) = (root(&mut group, i), root(&mut group, j));
+                group[a] = b;
+            }
+        }
+    }
+    let mut clusters: Vec<(usize, Vec<Point>)> = Vec::new();
+    for (i, ring) in rings.iter().enumerate() {
+        let r = root(&mut group, i);
+        match clusters.iter_mut().find(|(k, _)| *k == r) {
+            Some((_, points)) => points.extend(ring),
+            None => clusters.push((r, ring.clone())),
+        }
+    }
+    clusters
+        .into_iter()
+        .map(|(_, points)| convex_hull(points))
+        .collect()
+}
+
+/// Enveloppe convexe (chaîne monotone d'Andrew).
+fn convex_hull(mut points: Vec<Point>) -> Vec<Point> {
+    points.sort_by(|a, b| a.x.total_cmp(&b.x).then(a.y.total_cmp(&b.y)));
+    points.dedup();
+    if points.len() < 3 {
+        return points;
+    }
+    let cross =
+        |o: Point, a: Point, b: Point| (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    let mut hull: Vec<Point> = Vec::with_capacity(points.len() * 2);
+    for pass in 0..2 {
+        let start = hull.len();
+        let iter: Box<dyn Iterator<Item = &Point>> = if pass == 0 {
+            Box::new(points.iter())
+        } else {
+            Box::new(points.iter().rev())
+        };
+        for &p in iter {
+            while hull.len() >= start + 2
+                && cross(hull[hull.len() - 2], hull[hull.len() - 1], p) <= 0.0
+            {
+                hull.pop();
+            }
+            hull.push(p);
+        }
+        hull.pop();
+    }
+    hull
+}
+
+/// Distance d'un point au segment [a, b].
+fn segment_distance(p: Point, a: Point, b: Point) -> f32 {
+    let (dx, dy) = (b.x - a.x, b.y - a.y);
+    let len2 = dx * dx + dy * dy;
+    let t = if len2 == 0.0 {
+        0.0
+    } else {
+        (((p.x - a.x) * dx + (p.y - a.y) * dy) / len2).clamp(0.0, 1.0)
+    };
+    p.distance(Point::new(a.x + t * dx, a.y + t * dy))
 }
 
 fn bounds<'a>(points: impl Iterator<Item = &'a Point>) -> Rectangle {
@@ -301,6 +405,8 @@ pub enum MapEvent {
     Hover(Option<Place>),
     Click(Option<usize>),
     Resized(Size),
+    /// Fin d'un déplacement de la carte à la souris.
+    DragEnded,
 }
 
 /// Mise en évidence temporaire d'un pays (bonne ou mauvaise réponse).
@@ -411,7 +517,8 @@ impl MapView<'_> {
 
     fn hit(&self, t: &Transform, screen: Point) -> Option<Place> {
         for &c in self.quiz.members() {
-            if self.is_tiny(c, t)
+            if self.projection.bubbles[c].is_empty()
+                && self.is_tiny(c, t)
                 && t.to_screen(self.projection.label(c)).distance(screen) <= MARKER_RADIUS + 5.0
             {
                 return Some(Place::Country(c));
@@ -424,6 +531,7 @@ impl MapView<'_> {
             .iter()
             .position(inside)
             .map(Place::Country)
+            .or_else(|| self.bubble_at(t, p).map(Place::Country))
             .or_else(|| {
                 self.projection
                     .territories
@@ -474,6 +582,53 @@ impl MapView<'_> {
         }
     }
 
+    /// Archipel dont la bulle contient le point (coordonnées projetées).
+    fn bubble_at(&self, t: &Transform, p: Point) -> Option<usize> {
+        let margin = BUBBLE_PX / t.scale;
+        self.projection.bubbles.iter().position(|hulls| {
+            hulls.iter().any(|hull| {
+                contains(std::slice::from_ref(hull), p)
+                    || (0..hull.len())
+                        .any(|i| segment_distance(p, hull[i], hull[(i + 1) % hull.len()]) <= margin)
+            })
+        })
+    }
+
+    /// Bulle d'un archipel : enveloppe convexe élargie de `BUBBLE_PX` pixels, aux angles arrondis.
+    fn draw_bubble(&self, frame: &mut Frame, country: usize, t: &Transform, color: Color) {
+        for hull in &self.projection.bubbles[country] {
+            let path = Path::new(|b| {
+                let mut points = hull.iter().map(|&p| t.to_screen(p));
+                if let Some(first) = points.next() {
+                    b.move_to(first);
+                    for p in points {
+                        b.line_to(p);
+                    }
+                    b.close();
+                }
+            });
+            frame.fill(&path, color);
+            frame.stroke(
+                &path,
+                Stroke::default()
+                    .with_color(color)
+                    .with_width(BUBBLE_PX * 2.0)
+                    .with_line_join(LineJoin::Round)
+                    .with_line_cap(LineCap::Round),
+            );
+        }
+    }
+
+    /// Couleur de la bulle d'un archipel selon son état dans la partie (opaque, sur l'océan).
+    fn bubble_color(&self, country: usize) -> Color {
+        let water = color!(0x8fbfff);
+        match self.quiz.mark(country) {
+            None => style::mix(style::OCEAN, water, 0.10),
+            Some(Mark::Pending) => style::mix(style::OCEAN, water, 0.32),
+            mark => style::mix(style::OCEAN, mark_color(mark), 0.45),
+        }
+    }
+
     fn add_rings(builder: &mut Builder, rings: &[Vec<Point>], t: &Transform) {
         for ring in rings {
             let mut points = ring.iter().map(|&p| t.to_screen(p));
@@ -491,6 +646,13 @@ impl MapView<'_> {
         let visible = t.visible();
         let detailed = t.scale >= DETAIL_SCALE;
         let mut coast = Builder::new();
+
+        // Bulles des archipels, sous les terres.
+        for (c, shape) in self.projection.countries.iter().enumerate() {
+            if !self.projection.bubbles[c].is_empty() && shape.bbox.intersects(&visible) {
+                self.draw_bubble(frame, c, t, self.bubble_color(c));
+            }
+        }
 
         // Territoires, regroupés par couleur.
         let mut groups: Vec<(Color, Builder)> = Vec::new();
@@ -546,9 +708,12 @@ impl MapView<'_> {
             Stroke::default().with_color(style::COAST).with_width(0.8),
         );
 
-        // Pastilles des micro-États.
+        // Pastilles des micro-États (les archipels ont leur bulle).
         for &c in self.quiz.members() {
-            if !self.is_tiny(c, t) || !visible.contains(self.projection.label(c)) {
+            if !self.projection.bubbles[c].is_empty()
+                || !self.is_tiny(c, t)
+                || !visible.contains(self.projection.label(c))
+            {
                 continue;
             }
             let center = t.to_screen(self.projection.label(c));
@@ -600,6 +765,11 @@ impl MapView<'_> {
     fn draw_overlay(&self, frame: &mut Frame, t: &Transform, cursor: Option<Point>) {
         if let Some(target) = self.target {
             let pulse = 0.5 + 0.5 * (self.pulse * std::f32::consts::TAU).sin();
+            let bubbled = !self.projection.bubbles[target].is_empty();
+            if bubbled {
+                let color = style::mix(style::OCEAN, style::ACCENT, 0.35 + 0.25 * pulse);
+                self.draw_bubble(frame, target, t, color);
+            }
             let mut b = Builder::new();
             Self::add_rings(&mut b, self.rings(target, t), t);
             let path = b.build();
@@ -617,7 +787,7 @@ impl MapView<'_> {
                     .with_width(1.5),
             );
             let core = self.projection.core(target);
-            if core.width.max(core.height) * t.scale < 24.0 {
+            if !bubbled && core.width.max(core.height) * t.scale < 24.0 {
                 let center = t.to_screen(self.projection.label(target));
                 for (r, a) in [(10.0 + 10.0 * pulse, 1.0 - pulse), (6.0, 1.0)] {
                     frame.stroke(
@@ -631,6 +801,15 @@ impl MapView<'_> {
         }
 
         if let Some(flash) = self.flash {
+            let bubbled = !self.projection.bubbles[flash.country].is_empty();
+            if bubbled {
+                let color = style::mix(
+                    self.bubble_color(flash.country),
+                    flash.color,
+                    0.6 * flash.strength,
+                );
+                self.draw_bubble(frame, flash.country, t, color);
+            }
             let mut b = Builder::new();
             Self::add_rings(&mut b, self.rings(flash.country, t), t);
             let path = b.build();
@@ -642,7 +821,7 @@ impl MapView<'_> {
                 },
             );
             let center = t.to_screen(self.projection.label(flash.country));
-            if self.is_tiny(flash.country, t) {
+            if !bubbled && self.is_tiny(flash.country, t) {
                 frame.stroke(
                     &Path::circle(center, 12.0),
                     Stroke::default()
@@ -663,13 +842,28 @@ impl MapView<'_> {
         if let Some(place) = self.hover {
             let mut b = Builder::new();
             Self::add_rings(&mut b, self.place_rings(place, t), t);
+            let path = b.build();
+            // Archipel : bulle éclaircie, puis ses îles redessinées par-dessus.
+            if let Place::Country(c) = place
+                && !self.projection.bubbles[c].is_empty()
+            {
+                self.draw_bubble(frame, c, t, style::lighten(self.bubble_color(c), 0.12));
+                frame.fill(
+                    &path,
+                    Fill {
+                        style: mark_color(self.quiz.mark(c)).into(),
+                        rule: Rule::EvenOdd,
+                    },
+                );
+            }
             frame.stroke(
-                &b.build(),
+                &path,
                 Stroke::default()
                     .with_color(style::with_alpha(Color::WHITE, 0.85))
                     .with_width(1.6),
             );
             if let Place::Country(hover) = place
+                && self.projection.bubbles[hover].is_empty()
                 && self.is_tiny(hover, t)
             {
                 let center = t.to_screen(self.projection.label(hover));
@@ -809,7 +1003,7 @@ impl canvas::Program<MapEvent> for MapView<'_> {
             mouse::Event::ButtonReleased(mouse::Button::Left) => {
                 let drag = state.drag.take()?;
                 if drag.moved {
-                    return Some(Action::capture());
+                    return Some(Action::publish(MapEvent::DragEnded).and_capture());
                 }
                 let country = self.hit(&t, drag.start).and_then(Place::country);
                 Some(Action::publish(MapEvent::Click(country)).and_capture())
@@ -921,6 +1115,34 @@ mod tests {
         assert_eq!(t.nudge(low, insets), Vector::ZERO);
         let bottom = t.to_screen(Point::new(low.x, low.y)).y;
         assert!(bottom <= 600.0 - 150.0 + 0.5, "{bottom}");
+    }
+
+    #[test]
+    fn convex_hull_drops_inner_points() {
+        let points = vec![
+            Point::new(0.0, 0.0),
+            Point::new(2.0, 0.0),
+            Point::new(1.0, 1.0),
+            Point::new(2.0, 2.0),
+            Point::new(0.0, 2.0),
+        ];
+        let hull = convex_hull(points);
+        assert_eq!(hull.len(), 4);
+        assert!(!hull.contains(&Point::new(1.0, 1.0)));
+    }
+
+    #[test]
+    fn bubbles_group_nearby_islands_only() {
+        let island = |x: f32| {
+            vec![
+                Point::new(x, 0.0),
+                Point::new(x + 0.01, 0.0),
+                Point::new(x, 0.01),
+            ]
+        };
+        // Deux îles voisines, une troisième loin : deux bulles.
+        let hulls = bubble_hulls(&[island(0.0), island(0.05), island(1.0)]);
+        assert_eq!(hulls.len(), 2);
     }
 
     #[test]

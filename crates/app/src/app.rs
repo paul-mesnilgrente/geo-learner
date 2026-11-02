@@ -15,6 +15,7 @@ use crate::WORLD;
 use crate::icons::{Icon, icon};
 use crate::map::{self, Camera, Flash, MapEvent, MapView, Projection, Transform};
 use crate::progress::{self, Progress, Session};
+use crate::settings::Settings;
 use crate::style;
 use crate::voice;
 
@@ -38,6 +39,10 @@ const SAFE_AREA: map::Insets = map::Insets {
 pub enum Message {
     SelectMode(Mode),
     SelectRegion(usize),
+    ToggleTimer,
+    /// Allonge (`true`) ou raccourcit la durée du minuteur.
+    StepTimer(bool),
+    ResetTimer,
     Start,
     Restart,
     BackToMenu,
@@ -64,6 +69,7 @@ pub enum Message {
 pub struct App {
     matcher: Matcher,
     progress: Progress,
+    settings: Settings,
     mode: Mode,
     region: usize,
     game: Option<Game>,
@@ -115,6 +121,10 @@ struct Game {
     started: Instant,
     now: Instant,
     ended: Option<Instant>,
+    /// Durée du minuteur, s'il est activé.
+    limit: Option<Duration>,
+    /// La partie s'est terminée faute de temps.
+    timed_out: bool,
     /// Résumé affiché en fin de partie ; `new_record` indique un meilleur score.
     summary: bool,
     new_record: bool,
@@ -139,6 +149,7 @@ impl App {
         let app = Self {
             matcher: Matcher::new(&WORLD),
             progress: Progress::load(),
+            settings: Settings::load(),
             mode: Mode::Free,
             region: 0,
             game: None,
@@ -185,10 +196,14 @@ impl App {
         if let Some(region) = demo.region.as_deref().and_then(|r| WORLD.region(r)) {
             self.region = region;
         }
+        if demo.timer.is_some() {
+            // En mémoire seulement : les réglages ne sont enregistrés que sur action.
+            self.settings.timer = true;
+        }
         if demo.mode.is_none() {
             return self;
         }
-        let mut game = Game::new(self.region, self.mode);
+        let mut game = Game::new(self.region, self.mode, self.time_limit());
         if let Some(first) = demo
             .target
             .as_deref()
@@ -219,6 +234,9 @@ impl App {
             self.voice.state = voice::State::Listening;
             self.voice.speaking = true;
             self.voice.level = 0.4;
+        }
+        if let Some(seconds) = demo.timer {
+            game.limit = Some(Duration::from_secs(seconds));
         }
         if let Some(seconds) = demo.elapsed {
             game.started -= Duration::from_secs(seconds);
@@ -282,12 +300,22 @@ impl App {
         match message {
             Message::SelectMode(mode) => self.mode = mode,
             Message::SelectRegion(region) => self.region = region,
+            Message::ToggleTimer => self.settings.toggle_timer(),
+            Message::StepTimer(up) => {
+                let zone = &WORLD.regions[self.region];
+                self.settings
+                    .step_duration(self.mode, &zone.id, zone.members.len(), up);
+            }
+            Message::ResetTimer => {
+                let zone = &WORLD.regions[self.region];
+                self.settings.reset_duration(self.mode, &zone.id);
+            }
             Message::Start | Message::Restart => {
                 if let Some(game) = &self.game {
                     self.region = game.region;
                     self.mode = game.quiz.mode();
                 }
-                self.game = Some(Game::new(self.region, self.mode));
+                self.game = Some(Game::new(self.region, self.mode, self.time_limit()));
                 return operation::focus(ANSWER_INPUT);
             }
             Message::BackToMenu => {
@@ -396,9 +424,10 @@ impl App {
             MapEvent::Click(Some(country)) if game.quiz.mode() == Mode::Locate => {
                 self.on_click(country);
             }
-            MapEvent::Click(_) => {}
+            MapEvent::Click(_) | MapEvent::DragEnded => {}
         }
-        if matches!(event, MapEvent::Click(_)) {
+        // Un clic sur la carte retire le focus du champ de saisie : on le lui rend.
+        if matches!(event, MapEvent::Click(_) | MapEvent::DragEnded) {
             operation::focus(ANSWER_INPUT)
         } else {
             Task::none()
@@ -524,6 +553,17 @@ impl App {
             .is_some_and(|f| now - f.at > FEEDBACK_DURATION)
         {
             game.feedback = None;
+        }
+        // Minuteur écoulé : la partie est validée telle quelle.
+        if let Some(limit) = game.limit
+            && game.ended.is_none()
+            && now.saturating_duration_since(game.started) >= limit
+        {
+            game.timed_out = true;
+            game.quiz.give_up();
+            game.pending = None;
+            self.check_finished();
+            return;
         }
         if let Some((country, at)) = game.pending
             && now - at > AMBIGUOUS_DELAY
@@ -766,6 +806,7 @@ impl App {
                     text(best.unwrap_or_else(|| "Pas encore de record".into()))
                         .size(13)
                         .color(style::MUTED),
+                    self.timer_setting(),
                 ]
                 .spacing(4)
                 .width(Fill),
@@ -807,6 +848,59 @@ impl App {
             .style(style::page)
             .width(Fill)
             .height(Fill)
+            .into()
+    }
+
+    /// Réglage du minuteur pour le mode et la zone choisis.
+    fn timer_setting(&self) -> Element<'_, Message> {
+        let zone = &WORLD.regions[self.region];
+        let on = self.settings.timer;
+        let fg = if on { Color::WHITE } else { style::TEXT };
+        let mut setting = row![
+            button(
+                row![icon(Icon::Timer, 14.0, fg), text("Minuteur").size(13)]
+                    .spacing(6)
+                    .align_y(Center)
+            )
+            .padding([6, 12])
+            .style(style::pill(on))
+            .on_press(Message::ToggleTimer),
+        ]
+        .spacing(8)
+        .align_y(Center);
+        if on {
+            let seconds = self
+                .settings
+                .duration(self.mode, &zone.id, zone.members.len());
+            let step = |i: Icon, message: Message| {
+                button(container(icon(i, 12.0, style::TEXT)).center(Fill))
+                    .width(26)
+                    .height(26)
+                    .padding(0)
+                    .style(style::map_control)
+                    .on_press(message)
+            };
+            setting = setting
+                .push(step(Icon::Minus, Message::StepTimer(false)))
+                .push(
+                    text(clock(Duration::from_secs(u64::from(seconds))))
+                        .size(15)
+                        .font(style::FONT_SEMIBOLD),
+                )
+                .push(step(Icon::Plus, Message::StepTimer(true)));
+            if self.settings.is_custom(self.mode, &zone.id) {
+                setting = setting.push(
+                    button(text("Par défaut").size(12))
+                        .padding([4, 8])
+                        .style(style::ghost)
+                        .on_press(Message::ResetTimer),
+                );
+            }
+        } else {
+            setting = setting.push(text("désactivé").size(13).color(style::MUTED));
+        }
+        container(setting)
+            .padding(iced::Padding::ZERO.top(8))
             .into()
     }
 
@@ -969,6 +1063,45 @@ impl App {
             .into()
     }
 
+    /// Durée du minuteur pour le mode et la zone choisis, s'il est activé.
+    fn time_limit(&self) -> Option<Duration> {
+        let zone = &WORLD.regions[self.region];
+        self.settings.timer.then(|| {
+            Duration::from_secs(u64::from(self.settings.duration(
+                self.mode,
+                &zone.id,
+                zone.members.len(),
+            )))
+        })
+    }
+
+    /// Chronomètre, ou compte à rebours qui vire à l'orange puis au rouge.
+    fn clock_chip<'a>(&self, game: &Game) -> Element<'a, Message> {
+        let (value, color) = match game.remaining() {
+            Some(left) if !game.quiz.is_finished() => {
+                // Arrondi à la seconde supérieure : « 00:00 » coïncide avec la fin.
+                let shown =
+                    Duration::from_secs(left.as_secs() + u64::from(left.subsec_nanos() > 0));
+                let color = match left.as_secs() {
+                    0..10 => style::DANGER,
+                    10..60 => style::ORANGE,
+                    _ => style::ACCENT,
+                };
+                (shown, color)
+            }
+            _ => (game.elapsed(), style::ACCENT),
+        };
+        let mut content = row![].spacing(6).align_y(Center);
+        if game.limit.is_some() {
+            content = content.push(icon(Icon::Timer, 14.0, style::lighten(color, 0.25)));
+        }
+        content = content.push(text(clock(value)).size(16).font(style::FONT_SEMIBOLD));
+        container(content)
+            .padding([6, 12])
+            .style(style::chip(color))
+            .into()
+    }
+
     fn top_bar<'a>(&'a self, game: &'a Game) -> Element<'a, Message> {
         let quiz = &game.quiz;
         let region = &WORLD.regions[game.region];
@@ -1049,13 +1182,7 @@ impl App {
             ]
             .spacing(6)
             .align_x(Horizontal::Right),
-            container(
-                text(clock(game.elapsed()))
-                    .size(16)
-                    .font(style::FONT_SEMIBOLD)
-            )
-            .padding([6, 12])
-            .style(style::chip(style::ACCENT)),
+            self.clock_chip(game),
             actions,
         ]
         .spacing(18)
@@ -1412,6 +1539,8 @@ impl App {
         let region = &WORLD.regions[game.region];
         let title = if quiz.score() >= 1.0 {
             "Parfait !"
+        } else if game.timed_out {
+            "Temps écoulé !"
         } else {
             "Partie terminée"
         };
@@ -1496,7 +1625,7 @@ impl App {
 }
 
 impl Game {
-    fn new(region: usize, mode: Mode) -> Self {
+    fn new(region: usize, mode: Mode, limit: Option<Duration>) -> Self {
         let zone = &WORLD.regions[region];
         let members = zone.members.clone();
         let mut order = members.clone();
@@ -1521,6 +1650,8 @@ impl Game {
             started: now,
             now,
             ended: None,
+            limit,
+            timed_out: false,
             summary: false,
             new_record: false,
             history: Vec::new(),
@@ -1528,9 +1659,16 @@ impl Game {
     }
 
     fn elapsed(&self) -> Duration {
-        self.ended
+        let elapsed = self
+            .ended
             .unwrap_or(self.now)
-            .saturating_duration_since(self.started)
+            .saturating_duration_since(self.started);
+        self.limit.map_or(elapsed, |limit| elapsed.min(limit))
+    }
+
+    /// Temps restant au minuteur, s'il est activé.
+    fn remaining(&self) -> Option<Duration> {
+        self.limit.map(|limit| limit.saturating_sub(self.elapsed()))
     }
 
     fn say(&mut self, text: impl Into<String>, color: Color) {

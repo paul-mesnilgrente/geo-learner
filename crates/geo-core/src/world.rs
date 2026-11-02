@@ -29,6 +29,8 @@ pub struct Country {
     pub sub: usize,
     /// Point d'ancrage de l'étiquette (lon, lat).
     pub label: [f32; 2],
+    /// Archipel entouré d'une « bulle » sur la carte pour être repérable.
+    pub bubble: bool,
     pub shape: Shape,
 }
 

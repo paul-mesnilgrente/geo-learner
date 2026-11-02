@@ -11,6 +11,14 @@ Application de bureau pour apprendre les pays du monde sur une carte, au clavier
 | **Nommer le pays** | Un pays s'allume sur la carte : il faut donner son nom. |
 | **Trouver sur la carte** | Un nom s'affiche : il faut cliquer sur le bon pays. |
 
+Un **minuteur** facultatif s'active sur l'écran d'accueil. Par défaut, il dure 15 minutes pour
+citer les 197 pays du monde, au prorata du nombre de pays de la zone, et un peu plus par pays en
+« Nommer » (7 s) et « Trouver » (9 s). La durée se règle pour chaque mode et chaque zone. À zéro,
+la partie est validée : les pays restants comptent comme ratés.
+
+Sur la carte, les archipels (Maldives, Kiribati, Fidji, Cap-Vert…) sont entourés d'une **bulle**
+cliquable, comme sur JetPunk, pour être repérables malgré leur taille.
+
 En « Nommer » et « Trouver », on a trois essais par pays. Le score vaut 1 point au premier essai,
 ½ au deuxième et ¼ au troisième.
 
@@ -60,6 +68,7 @@ Pour le diagnostic :
 
 Contenu :
 - `progress.json` : historique des parties ;
+- `settings.json` : minuteur (activé ou non, durées personnalisées) ;
 - `models/` : modèle vocal.
 
 ## Compiler et lancer
@@ -129,6 +138,7 @@ Paramètres de `GEO_DEMO`, séparés par `;` :
 - `type=a|b` : saisie simulée au clavier ;
 - `zoom=lon,lat,z` : position de la caméra ;
 - `elapsed` : temps déjà écoulé, en secondes ;
+- `timer` : minuteur imposé, en secondes ;
 - `giveup`, `summary` : partie abandonnée, bilan affiché.
 
 `GEO_WINDOW=1600x900` impose la taille de la fenêtre.

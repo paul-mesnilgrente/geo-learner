@@ -7,6 +7,7 @@ mod dev;
 mod icons;
 mod map;
 mod progress;
+mod settings;
 mod style;
 mod voice;
 

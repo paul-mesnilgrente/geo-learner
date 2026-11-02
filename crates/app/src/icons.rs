@@ -16,6 +16,7 @@ pub enum Icon {
     Play,
     Download,
     Refresh,
+    Timer,
 }
 
 struct Program {
@@ -129,6 +130,15 @@ impl<Message> canvas::Program<Message> for Program {
                 b.move_to(p(19.5, 4.0));
                 b.line_to(p(19.0, 8.6));
                 b.line_to(p(14.6, 8.0));
+            }
+            Icon::Timer => {
+                b.circle(p(12.0, 13.5), 7.5 * s);
+                b.move_to(p(12.0, 13.5));
+                b.line_to(p(12.0, 9.5));
+                b.move_to(p(10.0, 3.0));
+                b.line_to(p(14.0, 3.0));
+                b.move_to(p(18.0, 6.5));
+                b.line_to(p(19.5, 5.0));
             }
         });
         frame.stroke(&path, stroke);

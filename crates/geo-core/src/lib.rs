@@ -27,6 +27,7 @@ mod testing {
                     spoken: vec![],
                     sub: 0,
                     label: [0.0, 0.0],
+                    bubble: false,
                     shape: Shape {
                         rings: vec![],
                         rings_lo: vec![],
