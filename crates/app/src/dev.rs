@@ -48,6 +48,8 @@ pub struct Demo {
     pub home: bool,
     /// Zoom de la carte de situation figé à cet instant, entre 0 et 1 (`flight=0.5`).
     pub flight: Option<f32>,
+    /// Exploration de la carte ouverte (`explore`), avec ce lieu choisi (`explore=FR-75`).
+    pub explore: Option<String>,
 }
 
 /// Parties fictives d'une série : scores en progrès, temps en baisse, un minuteur dépassé.
@@ -123,6 +125,7 @@ pub fn demo() -> Option<Demo> {
             "globe" => demo.globe = value.parse().ok(),
             "home" => demo.home = true,
             "flight" => demo.flight = value.parse().ok(),
+            "explore" => demo.explore = Some(value.to_owned()),
             "type" => demo.typed = value.split('|').map(str::to_owned).collect(),
             _ => {}
         }

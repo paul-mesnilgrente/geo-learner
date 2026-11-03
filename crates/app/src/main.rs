@@ -41,7 +41,6 @@ fn numbers_quiz(departements: &World) -> World {
     world.info.id = "fr-numeros".into();
     world.info.title = "Numéros des départements".into();
     world.info.numbers = true;
-    world.territories.clear();
     world
 }
 

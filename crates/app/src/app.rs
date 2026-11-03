@@ -1,5 +1,6 @@
 //! Application : écran d'accueil (choix du mode et de la zone, progression) et écran de jeu.
 
+mod explore;
 mod home;
 mod locator;
 mod progression;
@@ -10,11 +11,12 @@ use geo_core::{Info, Mark, Matcher, Mode, Outcome, Quiz, RegionKind, World};
 use iced::alignment::{Horizontal, Vertical};
 use iced::widget::canvas::Cache;
 use iced::widget::{
-    Column, Row, button, canvas, column, container, opaque, operation, progress_bar, row,
-    scrollable, sensor, space, stack, text, text_input,
+    Column, Row, button, canvas, column, container, mouse_area, opaque, operation, progress_bar,
+    row, scrollable, sensor, space, stack, text, text_input,
 };
 use iced::{Center, Color, Element, Fill, Size, Subscription, Task, Theme, Vector, keyboard, time};
 
+use self::explore::Explorer;
 use self::locator::Locator;
 use crate::ATLASES;
 use crate::icons::{Icon, icon};
@@ -53,6 +55,17 @@ pub enum Screen {
 pub enum Message {
     /// Retour à l'accueil.
     GoHome,
+    /// Ouvre l'exploration de la carte (quiz et zone choisis), sans quiz.
+    OpenExplore,
+    CloseExplore,
+    ExploreMap(MapEvent),
+    /// Lieu choisi dans la liste : la carte s'y déplace.
+    ExploreSelect(usize),
+    /// Survol d'un nom de la liste.
+    ExploreHover(Option<usize>),
+    /// Zoom avant (`true`) ou arrière.
+    ExploreZoom(bool),
+    ExploreReset,
     /// Ouvre la page d'un quiz (index dans `ATLASES`).
     OpenQuiz(usize),
     /// Ouvre la page d'un quiz réglée sur un mode et une zone (dernières parties).
@@ -123,6 +136,8 @@ pub struct App {
     /// Partie dont la suppression attend confirmation.
     confirm_delete: Option<usize>,
     game: Option<Game>,
+    /// Exploration de la carte, sans quiz.
+    explorer: Option<Explorer>,
     /// Aperçu de la zone choisie, sur l'écran d'accueil.
     preview: Preview,
     voice: Voice,
@@ -232,6 +247,7 @@ impl Preview {
             clickable: false,
             preview: true,
             situation: None,
+            explore: false,
             cache: &self.cache,
         };
         let map: Element<'_, MapEvent> = canvas(map_view).width(Fill).height(Fill).into();
@@ -290,6 +306,7 @@ impl App {
             deleted: None,
             confirm_delete: None,
             game: None,
+            explorer: None,
             preview: Preview::new(0, 0),
             voice: Voice {
                 commands: None,
@@ -385,6 +402,14 @@ impl App {
             }
             return self;
         }
+        if let Some(code) = &demo.explore {
+            let mut explorer = Explorer::new(self.atlas, self.region);
+            if let Some(c) = explorer.find(code) {
+                explorer.on_map(MapEvent::Click(Some(c)));
+            }
+            self.explorer = Some(explorer);
+            return self;
+        }
         if demo.mode.is_none() {
             return self;
         }
@@ -457,6 +482,14 @@ impl App {
         }
     }
 
+    /// Carte de situation ouverte : celle de la partie, sinon celle de l'exploration.
+    fn locator_mut(&mut self) -> Option<&mut Locator> {
+        match &mut self.game {
+            Some(game) => game.locator.as_mut(),
+            None => self.explorer.as_mut()?.locator.as_mut(),
+        }
+    }
+
     /// Affiche la page du quiz choisi (atlas, mode et zone déjà réglés).
     fn open_quiz(&mut self) {
         let modes = modes(&self.world().info);
@@ -482,6 +515,10 @@ impl App {
                 "{} · {} — GeoLearner",
                 game.world.regions[game.region].name,
                 mode_title(game.quiz.mode(), &game.world.info)
+            ),
+            None if self.explorer.is_some() => format!(
+                "Explorer · {} — GeoLearner",
+                self.world().regions[self.region].name
             ),
             None => "GeoLearner".into(),
         }
@@ -513,6 +550,8 @@ impl App {
             } else if game.ended.is_none() || game.feedback.is_some() {
                 subs.push(time::every(Duration::from_millis(250)).map(Message::Tick));
             }
+        } else if self.explorer.as_ref().is_some_and(Explorer::animating) {
+            subs.push(time::every(Duration::from_millis(16)).map(Message::Tick));
         }
         Subscription::batch(subs)
     }
@@ -521,6 +560,35 @@ impl App {
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            Message::OpenExplore => {
+                self.explorer = Some(Explorer::new(self.atlas, self.region));
+            }
+            Message::CloseExplore => self.explorer = None,
+            Message::ExploreMap(event) => {
+                if let Some(explorer) = &mut self.explorer {
+                    explorer.on_map(event);
+                }
+            }
+            Message::ExploreSelect(country) => {
+                if let Some(explorer) = &mut self.explorer {
+                    explorer.select(country);
+                }
+            }
+            Message::ExploreHover(country) => {
+                if let Some(explorer) = &mut self.explorer {
+                    explorer.hover_list(country);
+                }
+            }
+            Message::ExploreZoom(zoom_in) => {
+                if let Some(explorer) = &mut self.explorer {
+                    explorer.zoom(if zoom_in { 1.6 } else { 1.0 / 1.6 });
+                }
+            }
+            Message::ExploreReset => {
+                if let Some(explorer) = &mut self.explorer {
+                    explorer.reset();
+                }
+            }
             Message::GoHome => {
                 self.screen = Screen::Home;
                 self.clear_run_actions();
@@ -584,6 +652,7 @@ impl App {
                     .reset_duration(&self.world().info.id, self.mode, &zone.id);
             }
             Message::Start | Message::Restart => {
+                self.explorer = None;
                 if let Some(game) = &self.game {
                     self.atlas = game.atlas;
                     self.region = game.region;
@@ -639,7 +708,7 @@ impl App {
                 return operation::focus(ANSWER_INPUT);
             }
             Message::LocatorMap(event) => {
-                if let Some(locator) = self.game.as_mut().and_then(|g| g.locator.as_mut()) {
+                if let Some(locator) = self.locator_mut() {
                     let refocus = matches!(event, MapEvent::Click(_) | MapEvent::DragEnded);
                     locator.on_map(event);
                     if refocus {
@@ -648,7 +717,7 @@ impl App {
                 }
             }
             Message::LocatorRecenter => {
-                if let Some(locator) = self.game.as_mut().and_then(|g| g.locator.as_mut()) {
+                if let Some(locator) = self.locator_mut() {
                     locator.recenter();
                 }
                 return operation::focus(ANSWER_INPUT);
@@ -656,6 +725,8 @@ impl App {
             Message::CloseLocator => {
                 if let Some(game) = &mut self.game {
                     game.locator = None;
+                } else if let Some(explorer) = &mut self.explorer {
+                    explorer.locator = None;
                 }
                 return operation::focus(ANSWER_INPUT);
             }
@@ -677,6 +748,14 @@ impl App {
                     }
                     keyboard::Key::Named(Named::Escape) => {
                         self.confirm_delete = None;
+                        if self.game.is_none()
+                            && let Some(explorer) = &mut self.explorer
+                        {
+                            // La carte de situation d'abord, puis l'exploration elle-même.
+                            if explorer.locator.take().is_none() {
+                                self.explorer = None;
+                            }
+                        }
                         if let Some(game) = &mut self.game {
                             game.locator = None;
                             game.summary = false;
@@ -867,6 +946,11 @@ impl App {
     }
 
     fn on_tick(&mut self, now: Instant) {
+        if self.game.is_none()
+            && let Some(explorer) = &mut self.explorer
+        {
+            explorer.tick(now);
+        }
         let Some(game) = &mut self.game else { return };
         // Captures de développement : chronomètre figé pour un rendu reproductible.
         #[cfg(debug_assertions)]
@@ -1051,9 +1135,10 @@ impl App {
     // --- Vues ---
 
     pub fn view(&self) -> Element<'_, Message> {
-        match &self.game {
-            Some(game) => self.game_view(game),
-            None => self.home_view(),
+        match (&self.game, &self.explorer) {
+            (Some(game), _) => self.game_view(game),
+            (None, Some(explorer)) => explorer.view(),
+            (None, None) => self.home_view(),
         }
     }
 
@@ -1316,7 +1401,22 @@ impl App {
                         .color(style::MUTED),
                 ]
                 .align_y(Center),
-                self.preview.view(200.0),
+                // Un clic sur l'aperçu ouvre la carte à explorer, sans quiz.
+                mouse_area(self.preview.view(200.0))
+                    .on_press(Message::OpenExplore)
+                    .interaction(iced::mouse::Interaction::Pointer),
+                button(
+                    row![
+                        icon(Icon::Globe, 14.0, style::TEXT),
+                        text("Explorer la carte").size(13)
+                    ]
+                    .spacing(8)
+                    .align_y(Center)
+                )
+                .padding([8, 12])
+                .width(Fill)
+                .style(style::secondary)
+                .on_press(Message::OpenExplore),
             ]
             .spacing(12),
         )
@@ -1566,6 +1666,7 @@ impl App {
             clickable: quiz.mode() == Mode::Locate && !quiz.is_finished(),
             preview: false,
             situation: None,
+            explore: false,
             cache: &game.cache,
         };
         let map: Element<'a, MapEvent> = canvas(map_view).width(Fill).height(Fill).into();

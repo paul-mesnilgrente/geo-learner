@@ -579,6 +579,8 @@ pub struct MapView<'a> {
     pub preview: bool,
     /// Carte de situation : terres d'un encart replacées à leur position réelle.
     pub situation: Option<&'a Situation>,
+    /// Exploration, sans quiz : lieux de la zone en évidence, tous nommés (ou numérotés).
+    pub explore: bool,
     pub cache: &'a Cache,
 }
 
@@ -683,7 +685,7 @@ impl MapView<'_> {
     /// Teinte d'un pays : son état dans la partie, ou sa présence dans la zone (aperçu).
     fn tint_of(&self, country: usize) -> Tint {
         match self.quiz.mark(country) {
-            Some(Mark::Pending) if self.preview => Tint::Highlight,
+            Some(Mark::Pending) if self.preview || self.explore => Tint::Highlight,
             // Carte de situation : toutes les terres en gris neutre, aucune n'est à trouver.
             None if self.situation.is_some() => Tint::Pending,
             mark => tint(mark),
@@ -761,9 +763,19 @@ impl MapView<'_> {
     /// Nom affiché au survol, s'il peut être révélé.
     fn place_name(&self, place: Place) -> Option<String> {
         match place {
-            Place::Country(c) => self
-                .reveals(c)
-                .then(|| self.world.countries[c].name.clone()),
+            Place::Country(c) => self.reveals(c).then(|| {
+                let country = &self.world.countries[c];
+                match self
+                    .world
+                    .info
+                    .numbers
+                    .then(|| crate::number_of(country))
+                    .flatten()
+                {
+                    Some(number) => format!("{number} · {}", country.name),
+                    None => country.name.clone(),
+                }
+            }),
             Place::Territory(i) => {
                 let territory = &self.world.territories[i];
                 Some(match territory.owner {
@@ -823,7 +835,9 @@ impl MapView<'_> {
         let water = color!(0x8fbfff);
         match self.quiz.mark(country) {
             None => style::mix(style::OCEAN, water, 0.10),
-            Some(Mark::Pending) if self.preview => style::mix(style::OCEAN, style::ACCENT, 0.5),
+            Some(Mark::Pending) if self.preview || self.explore => {
+                style::mix(style::OCEAN, style::ACCENT, 0.5)
+            }
             Some(Mark::Pending) => style::mix(style::OCEAN, water, 0.32),
             mark => style::mix(style::OCEAN, mark_color(mark), 0.45),
         }
@@ -950,13 +964,20 @@ impl MapView<'_> {
             );
         }
 
-        // Noms des pays déjà joués, quand ils tiennent dans leur contour.
+        // Noms des pays déjà joués (tous en exploration), quand ils tiennent dans leur contour.
+        // Sans carte dans le quiz, ce sont les numéros qui s'affichent.
         for &c in self.quiz.members() {
-            if !matches!(self.quiz.mark(c), Some(Mark::Found { .. } | Mark::Missed)) {
+            if !self.explore
+                && !matches!(self.quiz.mark(c), Some(Mark::Found { .. } | Mark::Missed))
+            {
                 continue;
             }
             let core = self.projection.countries[c].core;
-            let name = &self.world.countries[c].name;
+            let country = &self.world.countries[c];
+            let name = &match self.world.info.numbers.then(|| crate::number_of(country)) {
+                Some(Some(number)) => number,
+                _ => country.name.clone(),
+            };
             let size = if t.scale > 2000.0 { 13.0 } else { 11.0 };
             let width = name.chars().count() as f32 * size * 0.56;
             if core.width * t.scale < width * 0.9 || core.height * t.scale < size + 2.0 {
@@ -1441,6 +1462,7 @@ mod tests {
             clickable: true,
             preview: false,
             situation: None,
+            explore: false,
             cache: &cache,
         };
         let bounds = rect(0.0, 0.0, 1000.0, 700.0);

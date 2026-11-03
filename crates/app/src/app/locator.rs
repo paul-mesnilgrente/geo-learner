@@ -139,6 +139,7 @@ impl Locator {
             clickable: false,
             preview: false,
             situation: Some(&self.situation),
+            explore: false,
             cache: &self.cache,
         };
         let map: Element<'_, MapEvent> = canvas(map_view)
@@ -196,7 +197,7 @@ impl Locator {
 /// le zoom progresse de façon géométrique et la position de `anchor` à l'écran glisse
 /// linéairement de son point de départ à son point d'arrivée. Interpoler le centre de la carte
 /// à vitesse constante ferait sortir `anchor` du cadre pendant le zoom.
-fn fly(from: Camera, to: Camera, anchor: Point, t: f32) -> Camera {
+pub(super) fn fly(from: Camera, to: Camera, anchor: Point, t: f32) -> Camera {
     let zoom = (from.zoom.ln() + (to.zoom.ln() - from.zoom.ln()) * t).exp();
     // Écart entre `anchor` et le centre de l'écran, en unités proportionnelles aux pixels.
     let offset = |c: Camera| {

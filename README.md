@@ -92,6 +92,10 @@ Zones jouables :
 - leurs sous-régions (Balkans, Caraïbes, Asie centrale, Polynésie…) ;
 - des regroupements libres : Petites Antilles, Grandes Antilles, Union européenne, îles africaines.
 
+Un clic sur l'aperçu (ou « Explorer la carte ») ouvre la carte **sans quiz** : tous les lieux de
+la zone nommés (numérotés pour les numéros des départements), et leur liste à côté, par
+sous-région ; un nom cliqué y emmène la carte. De quoi faire connaissance avant de se tester.
+
 Sur la page du quiz, un **aperçu** montre la zone choisie, cadrée comme en partie, avec ses pays
 en bleu.
 
@@ -212,6 +216,7 @@ Paramètres de `GEO_DEMO`, séparés par `;` :
   (et quelques autres séries) ; `delete` supprime la dernière, `confirm` affiche sa demande de
   confirmation, `bottom` défile en bas de page ;
 - `globe=N` : carte de situation de l'encart n° N ouverte ;
+- `explore` : exploration ouverte, avec un lieu choisi (`explore=CA-PE`) ;
 - `home` : accueil affiché, même avec `atlas`, `region` ou `progress` (sinon page du quiz) ;
 - `flight=0.5` : zoom de la carte de situation figé à cet instant (0 à 1).
 
