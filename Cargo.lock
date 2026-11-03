@@ -1155,7 +1155,7 @@ dependencies = [
 
 [[package]]
 name = "geo-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "postcard",
  "serde",
@@ -1164,7 +1164,7 @@ dependencies = [
 
 [[package]]
 name = "geo-learner"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "cpal",
  "dirs",
@@ -1880,7 +1880,7 @@ dependencies = [
 
 [[package]]
 name = "mapgen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "geo-core",
  "postcard",
