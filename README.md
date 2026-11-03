@@ -124,7 +124,8 @@ Deux façons de s'améliorer s'appuient dessus :
 - **Seconde chance** (modes « Nommer » et « Localiser ») : un lieu raté ou passé revient trois
   questions plus tard, affiché comme « à trouver » pour que la carte ne souffle pas la réponse.
   Le score et le bilan du lieu restent ceux d'un raté ; le bilan de fin compte les lieux
-  retrouvés. Pas de seconde chance s'il ne reste plus de question après le lieu raté.
+  retrouvés. Pas de seconde chance s'il ne reste plus de question après le lieu raté. Activée
+  par défaut, elle se désactive sur la page du quiz, à côté du minuteur (réglage enregistré).
 
 Sur la carte, les archipels (Maldives, Kiribati, Fidji, Cap-Vert…) sont entourés d'une **bulle**
 cliquable, comme sur JetPunk, pour être repérables malgré leur taille. Il y a une bulle par
@@ -189,7 +190,7 @@ Pour le diagnostic :
 
 Contenu :
 - `progress.json` : historique des parties, avec le détail par lieu (JSON compact) ;
-- `settings.json` : minuteur (activé ou non, durées personnalisées) ;
+- `settings.json` : langue, minuteur (activé ou non, durées personnalisées), seconde chance ;
 - `models/` : modèle vocal.
 
 ## Compiler et lancer

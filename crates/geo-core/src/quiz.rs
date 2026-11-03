@@ -95,6 +95,8 @@ pub struct Quiz {
     retry: Vec<usize>,
     /// Lieux retrouvés lors de leur seconde chance.
     recovered: usize,
+    /// Les lieux ratés reviennent plus tard (activé par défaut).
+    second_chance: bool,
 }
 
 impl Quiz {
@@ -123,6 +125,7 @@ impl Quiz {
             asked: now,
             retry: Vec::new(),
             recovered: 0,
+            second_chance: true,
         };
         if mode != Mode::Free {
             quiz.advance();
@@ -145,6 +148,12 @@ impl Quiz {
             return Some(Mark::Pending);
         }
         self.marks.get(country).copied().flatten()
+    }
+
+    /// Active ou désactive la seconde chance des lieux ratés (à régler avant de jouer).
+    pub fn with_second_chance(mut self, enabled: bool) -> Self {
+        self.second_chance = enabled;
+        self
     }
 
     /// La question en cours est une seconde chance.
@@ -318,6 +327,9 @@ impl Quiz {
 
     /// Repropose un lieu raté quelques questions plus tard, s'il en reste.
     fn requeue(&mut self, target: usize) {
+        if !self.second_chance {
+            return;
+        }
         let more = self
             .queue
             .iter()
@@ -551,6 +563,17 @@ mod tests {
         q.skip();
         assert!(q.is_finished());
         assert_eq!((q.found(), q.missed(), q.mistakes()), (4, 2, 0));
+    }
+
+    #[test]
+    fn second_chance_can_be_disabled() {
+        let order: Vec<usize> = (0..3).collect();
+        let mut q = Quiz::new(Mode::Identify, 3, order.clone(), order).with_second_chance(false);
+        q.skip();
+        q.submit(1);
+        q.submit(2);
+        assert!(q.is_finished());
+        assert_eq!(q.mark(0), Some(Mark::Missed));
     }
 
     #[test]

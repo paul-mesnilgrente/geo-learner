@@ -12,7 +12,7 @@ use crate::progress::data_dir;
 const MIN_DURATION: u32 = 30;
 const MAX_DURATION: u32 = 2 * 3600;
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Settings {
     /// Langue choisie par l'utilisateur ; sans choix, celle du système.
     #[serde(default)]
@@ -23,12 +23,32 @@ pub struct Settings {
     /// Avancement de la partie affiché par continent plutôt que par sous-région.
     #[serde(default)]
     pub by_continent: bool,
+    /// Modes Nommer et Localiser : un lieu raté revient quelques questions plus tard.
+    #[serde(default = "enabled")]
+    pub second_chance: bool,
     /// Durées choisies par l'utilisateur (secondes), par atlas, mode et zone
     /// (`"monde/Free/europe"`).
     #[serde(default)]
     durations: BTreeMap<String, u32>,
     #[serde(skip)]
     path: Option<PathBuf>,
+}
+
+fn enabled() -> bool {
+    true
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            language: None,
+            timer: false,
+            by_continent: false,
+            second_chance: true,
+            durations: BTreeMap::new(),
+            path: None,
+        }
+    }
 }
 
 /// Durée par défaut : 15 minutes pour citer les 197 pays du monde (comme JetPunk), au prorata
@@ -110,6 +130,11 @@ impl Settings {
         self.save();
     }
 
+    pub fn toggle_second_chance(&mut self) {
+        self.second_chance = !self.second_chance;
+        self.save();
+    }
+
     /// Allonge (`up`) ou raccourcit la durée d'un pas.
     pub fn step_duration(
         &mut self,
@@ -142,6 +167,15 @@ impl Settings {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn second_chance_defaults_to_on() {
+        // Réglages enregistrés avant l'option : activée.
+        let old: Settings = serde_json::from_str(r#"{"timer":true}"#).unwrap();
+        assert!(old.second_chance);
+        assert!(Settings::default().second_chance);
+    }
+
     use super::*;
 
     #[test]

@@ -87,6 +87,8 @@ pub enum Message {
     SelectMode(Mode),
     SelectRegion(usize),
     ToggleTimer,
+    /// Active ou désactive la seconde chance des lieux ratés.
+    ToggleSecondChance,
     /// Avancement affiché par continent (`true`) ou par sous-région.
     ByContinent(bool),
     /// Allonge (`true`) ou raccourcit la durée du minuteur.
@@ -466,6 +468,7 @@ impl App {
             order.insert(0, first);
             game.quiz = Quiz::new(self.mode, self.world().countries.len(), members, order);
         }
+        game.quiz = game.quiz.with_second_chance(self.settings.second_chance);
         for code in &demo.answers {
             if let Some(c) = self.world().countries.iter().position(|c| &c.code == code) {
                 let outcome = game.quiz.submit(c);
@@ -703,6 +706,7 @@ impl App {
                 self.refresh_preview();
             }
             Message::ToggleTimer => self.settings.toggle_timer(),
+            Message::ToggleSecondChance => self.settings.toggle_second_chance(),
             Message::ByContinent(by_continent) => self.settings.set_by_continent(by_continent),
             Message::StepTimer(up) => {
                 let zone = &self.world().regions[self.region];
@@ -738,14 +742,10 @@ impl App {
                 } else {
                     self.time_limit()
                 };
-                self.game = Some(Game::new(
-                    self.atlas,
-                    self.region,
-                    self.mode,
-                    limit,
-                    self.lang,
-                    review,
-                ));
+                let mut game =
+                    Game::new(self.atlas, self.region, self.mode, limit, self.lang, review);
+                game.quiz = game.quiz.with_second_chance(self.settings.second_chance);
+                self.game = Some(game);
                 return operation::focus(ANSWER_INPUT);
             }
             Message::BackToMenu => {
@@ -1454,7 +1454,10 @@ impl App {
                     ))
                     .size(14)
                     .color(style::MUTED),
-                    self.timer_setting(),
+                    row![self.timer_setting(), self.second_chance_setting()]
+                        .spacing(16)
+                        .align_y(Center)
+                        .wrap(),
                 ]
                 .spacing(4)
                 .width(Fill),
@@ -1548,6 +1551,40 @@ impl App {
         } else {
             setting = setting.push(
                 text(tr!(self.lang, "désactivé", "off"))
+                    .size(13)
+                    .color(style::MUTED),
+            );
+        }
+        container(setting)
+            .padding(iced::Padding::ZERO.top(8))
+            .into()
+    }
+
+    /// Réglage de la seconde chance, pour les modes où une question est posée.
+    fn second_chance_setting(&self) -> Element<'_, Message> {
+        if self.mode == Mode::Free {
+            return space().into();
+        }
+        let on = self.settings.second_chance;
+        let fg = if on { Color::WHITE } else { style::TEXT };
+        let mut setting = row![
+            button(
+                row![
+                    icon(Icon::Refresh, 14.0, fg),
+                    text(tr!(self.lang, "Seconde chance", "Second chance")).size(13)
+                ]
+                .spacing(6)
+                .align_y(Center),
+            )
+            .padding([6, 12])
+            .style(style::pill(on))
+            .on_press(Message::ToggleSecondChance),
+        ]
+        .spacing(8)
+        .align_y(Center);
+        if !on {
+            setting = setting.push(
+                text(tr!(self.lang, "désactivée", "off"))
                     .size(13)
                     .color(style::MUTED),
             );
