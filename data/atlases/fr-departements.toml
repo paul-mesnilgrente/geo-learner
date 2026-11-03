@@ -1,5 +1,5 @@
-# Départements français (Natural Earth admin-1). Codes ISO 3166-2 ; les numéros de
-# département sont acceptés comme réponses (« 75 », « 2A », « 971 »).
+# Départements français (Natural Earth admin-1). Codes ISO 3166-2. Les numéros (`aka`) servent
+# au quiz des numéros (« Nom → numéro ») ; ils ne valent pas comme noms dans ce quiz-ci.
 
 # Lieux à trouver (avant toute section : en TOML, une clé suit sinon la dernière section).
 items = [

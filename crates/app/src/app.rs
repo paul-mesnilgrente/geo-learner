@@ -131,6 +131,8 @@ pub struct App {
     /// Langue de l'interface, des noms et de la voix.
     lang: Lang,
     /// Reconnaissance des noms, une par atlas (sans les numéros pour un quiz sans carte).
+    /// Les numéros des départements n'y figurent pas : ils ne s'acceptent que dans le quiz des
+    /// numéros (sinon taper 30, 31… suffirait à citer les départements de la zone 30–39).
     matchers: Vec<Matcher>,
     /// Reconnaissance des numéros seuls, pour les quiz sans carte (mode « Nom → numéro »).
     number_matchers: Vec<Option<Matcher>>,
@@ -318,13 +320,7 @@ impl App {
         let settings = Settings::load();
         let app = Self {
             lang: settings.lang(),
-            matchers: ATLASES
-                .iter()
-                .map(|a| match a.info.numbers {
-                    true => Matcher::with_filter(a, |answer| !has_digit(answer)),
-                    false => Matcher::new(a),
-                })
-                .collect(),
+            matchers: ATLASES.iter().map(name_matcher).collect(),
             number_matchers: ATLASES
                 .iter()
                 .map(|a| a.info.numbers.then(|| Matcher::with_filter(a, has_digit)))
@@ -2364,13 +2360,20 @@ impl App {
                 .font(style::FONT_BOLD),
                 text({
                     let words = Words::of(&game.world.info, self.lang);
+                    let found = quiz.found();
+                    // « 1 département trouvé », « 2 régions trouvées ».
+                    let (noun, participle) = if plural(self.lang, found).is_empty() {
+                        (words.one(), words.agree("trouvé", "found"))
+                    } else {
+                        (words.many(), words.agree("trouvés", "found"))
+                    };
                     tr!(
                         self.lang,
                         "{} {} {} sur {}",
                         "{} {} {} of {}",
-                        quiz.found(),
-                        words.many(),
-                        words.agree("trouvés", "found"),
+                        found,
+                        noun,
+                        participle,
                         quiz.total()
                     )
                 })
@@ -2968,6 +2971,11 @@ fn has_digit(answer: &str) -> bool {
     answer.chars().any(|c| c.is_ascii_digit())
 }
 
+/// Reconnaissance des noms seuls, sans les numéros (« 75 », « 2A »).
+fn name_matcher(world: &World) -> Matcher {
+    Matcher::with_filter(world, |answer| !has_digit(answer))
+}
+
 /// Le texte saisi est-il aussi le début du nom d'un autre pays encore à trouver ?
 fn is_prefix_of_other(world: &World, input: &str, country: usize, quiz: &Quiz) -> bool {
     let typed = geo_core::normalize(input);
@@ -3102,6 +3110,20 @@ fn clock(d: Duration) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn numbers_are_not_names() {
+        let departements = ATLASES
+            .iter()
+            .position(|a| a.info.id == "fr-departements")
+            .unwrap();
+        let matcher = name_matcher(&ATLASES[departements]);
+        assert!(matcher.lookup("30").is_none());
+        assert!(matcher.lookup("2A").is_none());
+        assert!(matcher.lookup("971").is_none());
+        let gard = matcher.lookup("Gard").unwrap();
+        assert_eq!(ATLASES[departements].countries[gard].code, "FR-30");
+    }
 
     /// Durée de construction de l'aperçu (refait à chaque changement de zone).
     #[test]

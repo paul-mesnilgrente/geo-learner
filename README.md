@@ -64,9 +64,10 @@ la même zone. Une carte ouvre la **page du quiz** (mode, zone, lancement, progr
 Les départements et régions d'outre-mer, l'Alaska et Hawaï sont déplacés en **encarts** près de
 la carte principale, dans un cadre. La pastille « globe » au coin de chaque cadre ouvre une carte
 du monde qui part de la vue d'ensemble et zoome sur ces terres, dessinées à leur vraie place et
-sans les nommer ; on peut ensuite la déplacer et zoomer à la molette. Les numéros de département
-sont acceptés au clavier
-(« 75 », « 2A », « 971 »), et les noms anglais des États (« California »).
+sans les nommer ; on peut ensuite la déplacer et zoomer à la molette. Les noms anglais des États
+sont acceptés au clavier (« California »). Les numéros de département (« 75 », « 2A », « 971 »)
+ne le sont que dans le quiz des numéros, en « Nom → numéro » : ailleurs, taper 30, 31…
+suffirait à citer les départements de la zone 30–39.
 
 ### Ajouter un quiz
 
