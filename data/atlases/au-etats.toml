@@ -21,11 +21,17 @@ category = "Australie"
 levels = ["Statut", "Statut"]
 one = "État ou territoire"
 many = "États et territoires"
+title_en = "States and territories of Australia"
+category_en = "Australia"
+one_en = "state or territory"
+many_en = "states and territories"
+levels_en = ["Type", "Type"]
 country = "AUS"
 context = [95.0, -50.0, 180.0, 5.0]
 
 [world]
 name = "Australie"
+en = "Australia"
 # Marge au sud : la Tasmanie reste visible au-dessus du champ de réponse.
 view = [111.0, -50.0, 156.0, -9.0]
 center = 134
@@ -33,19 +39,23 @@ center = 134
 [[continent]]
 id = "etats"
 name = "États"
+en = "States"
 
 [[continent]]
 id = "territoires"
 name = "Territoires"
+en = "Territories"
 
 [[sub]]
 id = "etats"
 name = "États"
+en = "States"
 continent = "etats"
 hidden = true
 
 [[sub]]
 id = "territoires"
 name = "Territoires"
+en = "Territories"
 continent = "territoires"
 hidden = true

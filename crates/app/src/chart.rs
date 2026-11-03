@@ -19,6 +19,8 @@ pub enum Unit {
 
 pub struct Chart {
     pub unit: Unit,
+    /// Langue des valeurs affichées (« 88 % », « 88% »).
+    pub lang: crate::i18n::Lang,
     /// Une valeur par partie, de la plus ancienne à la plus récente.
     pub values: Vec<f32>,
     /// Étiquette courte de chaque partie sous l'axe (« 2 nov. »).
@@ -61,7 +63,10 @@ impl Chart {
 
     fn format(&self, value: f32) -> String {
         match self.unit {
-            Unit::Percent => format!("{} %", (value * 100.0).round() as i32),
+            Unit::Percent => {
+                let n = (value * 100.0).round() as i32;
+                crate::tr!(self.lang, "{n} %", "{n}%")
+            }
             Unit::Seconds => {
                 let s = value.round() as u32;
                 if s >= 3600 {
@@ -348,6 +353,7 @@ mod tests {
     fn chart(unit: Unit, values: &[f32]) -> Chart {
         Chart {
             unit,
+            lang: crate::i18n::Lang::Fr,
             values: values.to_vec(),
             ticks: vec![String::new(); values.len()],
             details: vec![String::new(); values.len()],

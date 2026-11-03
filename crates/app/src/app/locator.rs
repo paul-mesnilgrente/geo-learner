@@ -10,10 +10,11 @@ use iced::widget::{button, canvas, column, container, row, text};
 use iced::{Center, Element, Fill, Point, Rectangle, Size, Theme, Vector};
 
 use super::Message;
-use crate::ATLASES;
+use crate::i18n::Lang;
 use crate::icons::{Icon, icon};
 use crate::map::{self, Camera, MapEvent, MapView, Projection, Situation};
 use crate::style;
+use crate::{ATLASES, tr};
 
 /// Taille de la carte dans la vignette, en pixels.
 const MAP_SIZE: Size = Size::new(420.0, 270.0);
@@ -24,6 +25,7 @@ const FLIGHT: f32 = 1.6;
 pub struct Locator {
     /// Encart montré (index dans `info.insets`).
     pub inset: usize,
+    lang: Lang,
     projection: Projection,
     /// Le monde entier, centré sur ces terres (zoom 1).
     view: Rectangle,
@@ -44,7 +46,7 @@ struct Flight {
 }
 
 impl Locator {
-    pub fn new(atlas: &World, inset: usize) -> Option<Self> {
+    pub fn new(atlas: &World, inset: usize, lang: Lang) -> Option<Self> {
         let frame = atlas.info.insets.get(inset)?;
         let world = &ATLASES[0];
         let lon = (frame.origin[0] + frame.origin[2]) / 2.0;
@@ -63,6 +65,7 @@ impl Locator {
         let camera = Camera::fit(view);
         Some(Self {
             inset,
+            lang,
             projection: Projection::new(world, lon),
             view,
             camera,
@@ -141,6 +144,8 @@ impl Locator {
             situation: Some(&self.situation),
             explore: false,
             emphasis: &[],
+            // Aucun nom n'est affiché sur la carte de situation.
+            lang: geo_core::Lang::Fr,
             cache: &self.cache,
         };
         let map: Element<'_, MapEvent> = canvas(map_view)
@@ -158,7 +163,7 @@ impl Locator {
         let card = column![
             row![
                 icon(Icon::Globe, 16.0, style::TEXT),
-                text("Sur la carte du monde")
+                text(tr!(self.lang, "Sur la carte du monde", "On the world map"))
                     .size(14)
                     .font(style::FONT_SEMIBOLD)
                     .width(Fill),
@@ -178,9 +183,13 @@ impl Locator {
                     },
                     ..Default::default()
                 }),
-            text("Molette pour zoomer, glisser pour déplacer.")
-                .size(12)
-                .color(style::MUTED),
+            text(tr!(
+                self.lang,
+                "Molette pour zoomer, glisser pour déplacer.",
+                "Scroll to zoom, drag to move."
+            ))
+            .size(12)
+            .color(style::MUTED),
         ]
         .spacing(10);
         container(card)

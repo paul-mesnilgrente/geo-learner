@@ -6,6 +6,56 @@ use serde::{Deserialize, Serialize};
 /// Un anneau de polygone, en degrés (longitude, latitude).
 pub type Ring = Vec<[f32; 2]>;
 
+/// Langue de l'interface, des noms affichés et de la reconnaissance vocale.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Lang {
+    #[default]
+    Fr,
+    En,
+}
+
+impl Lang {
+    pub const ALL: [Lang; 2] = [Lang::Fr, Lang::En];
+
+    /// Rang dans [`Lang::ALL`], et donc dans un [`Text`].
+    pub fn index(self) -> usize {
+        self as usize
+    }
+
+    /// Code ISO 639-1 (« fr », « en »).
+    pub fn code(self) -> &'static str {
+        match self {
+            Lang::Fr => "fr",
+            Lang::En => "en",
+        }
+    }
+
+    /// Langue d'un code de locale (« fr_FR.UTF-8 », « en-US »…), si elle est prise en charge.
+    pub fn from_locale(locale: &str) -> Option<Lang> {
+        let code = locale.get(..2)?.to_ascii_lowercase();
+        Lang::ALL.into_iter().find(|l| l.code() == code)
+    }
+}
+
+/// Texte dans chaque langue, dans l'ordre de [`Lang::ALL`]. Une traduction manquante (vide)
+/// retombe sur le français.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct Text(pub Vec<String>);
+
+impl Text {
+    pub fn new(fr: impl Into<String>, en: impl Into<String>) -> Self {
+        Self(vec![fr.into(), en.into()])
+    }
+
+    pub fn get(&self, lang: Lang) -> &str {
+        self.0
+            .get(lang.index())
+            .filter(|s| !s.is_empty())
+            .or(self.0.first())
+            .map_or("", String::as_str)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Shape {
     /// Anneaux détaillés (extérieurs et trous mélangés : remplissage pair-impair).
@@ -21,11 +71,13 @@ pub struct Shape {
 pub struct Country {
     /// Code ADM0_A3 de Natural Earth.
     pub code: String,
-    pub name: String,
-    /// Noms acceptés, déjà normalisés (voir [`crate::normalize`]), nom principal compris.
+    pub name: Text,
+    /// Noms acceptés dans toutes les langues, déjà normalisés (voir [`crate::normalize`]),
+    /// noms principaux compris.
     pub answers: Vec<String>,
-    /// Formes orales (mots minuscules séparés par des espaces) proposées au module vocal.
-    pub spoken: Vec<String>,
+    /// Formes orales (mots minuscules séparés par des espaces) proposées au module vocal,
+    /// par langue (dans l'ordre de [`Lang::ALL`]).
+    pub spoken: Vec<Vec<String>>,
     /// Index de la sous-région dans [`World::regions`].
     pub sub: usize,
     /// Point d'ancrage de l'étiquette (lon, lat).
@@ -40,7 +92,7 @@ pub struct Country {
 /// Territoire dépendant d'un pays du quiz (ou sans souveraineté reconnue).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Territory {
-    pub name: String,
+    pub name: Text,
     /// Noms acceptés, normalisés : taper « Groenland » explique à qui il appartient.
     pub answers: Vec<String>,
     /// Pays souverain (index dans `countries`), s'il fait partie du quiz.
@@ -60,7 +112,7 @@ pub enum RegionKind {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Region {
     pub id: String,
-    pub name: String,
+    pub name: Text,
     pub kind: RegionKind,
     /// Continent de rattachement (index dans `regions`) pour l'affichage du menu.
     pub parent: Option<usize>,
@@ -78,19 +130,19 @@ pub struct Region {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Info {
     pub id: String,
-    pub title: String,
+    pub title: Text,
     /// Catégorie du catalogue (« Monde », « France »…).
-    pub category: String,
+    pub category: Text,
     /// Nom des lieux à trouver, au singulier et au pluriel (« pays », « départements »).
-    pub one: String,
-    pub many: String,
-    /// Accord au féminin (« 13 régions trouvées »).
+    pub one: Text,
+    pub many: Text,
+    /// Accord au féminin en français (« 13 régions trouvées »).
     pub feminine: bool,
     /// Mode Nommer : un lieu trop petit est montré dans sa sous-région plutôt que dans son
     /// continent (départements : leur région).
     pub zoom_sub: bool,
     /// Noms des deux niveaux de zones : continents et sous-régions pour le monde.
-    pub levels: [String; 2],
+    pub levels: [Text; 2],
     /// Encarts : terres rapprochées de la carte principale (outre-mer, Alaska…).
     pub insets: Vec<Inset>,
     /// Quiz sans carte, sur les numéros des lieux (départements) : « Numéro → nom » et

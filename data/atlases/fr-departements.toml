@@ -22,7 +22,7 @@ items = [
   { code = "FR-17", name = "Charente-Maritime", sub = "naq", aka = ["17"] },
   { code = "FR-18", name = "Cher", sub = "cvl", aka = ["18"] },
   { code = "FR-19", name = "Corrèze", sub = "naq", aka = ["19"] },
-  { code = "FR-21", name = "Côte-d'Or", sub = "bfc", aka = ["21"] },
+  { code = "FR-21", name = "Côte-d'Or", en = "Côte-d'Or", sub = "bfc", aka = ["21"] },
   { code = "FR-22", name = "Côtes-d'Armor", sub = "bre", aka = ["22"] },
   { code = "FR-23", name = "Creuse", sub = "naq", aka = ["23"] },
   { code = "FR-24", name = "Dordogne", sub = "naq", aka = ["24"] },
@@ -67,7 +67,7 @@ items = [
   { code = "FR-61", name = "Orne", sub = "nor", aka = ["61"] },
   { code = "FR-62", name = "Pas-de-Calais", sub = "hdf", aka = ["62"] },
   { code = "FR-63", name = "Puy-de-Dôme", sub = "ara", aka = ["63"] },
-  { code = "FR-64", name = "Pyrénées-Atlantiques", sub = "naq", aka = ["64"] },
+  { code = "FR-64", name = "Pyrénées-Atlantiques", en = "Pyrénées-Atlantiques", sub = "naq", aka = ["64"] },
   { code = "FR-65", name = "Hautes-Pyrénées", sub = "occ", aka = ["65"] },
   { code = "FR-66", name = "Pyrénées-Orientales", sub = "occ", aka = ["66"] },
   { code = "FR-67", name = "Bas-Rhin", sub = "ges", aka = ["67"] },
@@ -116,6 +116,11 @@ one = "département"
 many = "départements"
 # Mode Nommer : un département trop petit est montré dans sa région.
 zoom_sub = true
+title_en = "French departments"
+category_en = "France"
+one_en = "department"
+many_en = "departments"
+levels_en = ["Main areas", "Regions"]
 country = "FRA"
 context = [-16.0, 35.0, 20.0, 57.0]
 
@@ -147,110 +152,131 @@ scale = 2.2
 
 [world]
 name = "France entière"
+en = "All of France"
 view = [-12.6, 41.2, 9.8, 51.3]
 center = 0
 
 [[continent]]
 id = "metropole"
 name = "Métropole"
+en = "Metropolitan France"
 view = [-5.2, 41.2, 9.8, 51.3]
 
 [[continent]]
 id = "outre-mer"
 name = "Outre-mer"
+en = "Overseas"
 
 
 [[sub]]
 id = "ara"
 name = "Auvergne-Rhône-Alpes"
+en = "Auvergne-Rhône-Alpes"
 continent = "metropole"
 
 [[sub]]
 id = "bfc"
 name = "Bourgogne-Franche-Comté"
+en = "Bourgogne-Franche-Comté"
 continent = "metropole"
 
 [[sub]]
 id = "bre"
 name = "Bretagne"
+en = "Brittany"
 continent = "metropole"
 
 [[sub]]
 id = "cvl"
 name = "Centre-Val de Loire"
+en = "Centre-Val de Loire"
 continent = "metropole"
 
 [[sub]]
 id = "cor"
 name = "Corse"
+en = "Corsica"
 continent = "metropole"
 
 [[sub]]
 id = "ges"
 name = "Grand Est"
+en = "Grand Est"
 continent = "metropole"
 
 [[sub]]
 id = "hdf"
 name = "Hauts-de-France"
+en = "Hauts-de-France"
 continent = "metropole"
 
 [[sub]]
 id = "idf"
 name = "Île-de-France"
+en = "Île-de-France"
 continent = "metropole"
 
 [[sub]]
 id = "nor"
 name = "Normandie"
+en = "Normandy"
 continent = "metropole"
 
 [[sub]]
 id = "naq"
 name = "Nouvelle-Aquitaine"
+en = "Nouvelle-Aquitaine"
 continent = "metropole"
 
 [[sub]]
 id = "occ"
 name = "Occitanie"
+en = "Occitania"
 continent = "metropole"
 
 [[sub]]
 id = "pdl"
 name = "Pays de la Loire"
+en = "Pays de la Loire"
 continent = "metropole"
 
 [[sub]]
 id = "pac"
 name = "Provence-Alpes-Côte d'Azur"
+en = "Provence-Alpes-Côte d'Azur"
 continent = "metropole"
 
 [[sub]]
 id = "gua"
 name = "Guadeloupe"
+en = "Guadeloupe"
 continent = "outre-mer"
 hidden = true
 
 [[sub]]
 id = "mtq"
 name = "Martinique"
+en = "Martinique"
 continent = "outre-mer"
 hidden = true
 
 [[sub]]
 id = "guy"
 name = "Guyane"
+en = "French Guiana"
 continent = "outre-mer"
 hidden = true
 
 [[sub]]
 id = "lre"
 name = "La Réunion"
+en = "Réunion"
 continent = "outre-mer"
 hidden = true
 
 [[sub]]
 id = "may"
 name = "Mayotte"
+en = "Mayotte"
 continent = "outre-mer"
 hidden = true

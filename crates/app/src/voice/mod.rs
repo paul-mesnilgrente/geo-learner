@@ -17,7 +17,10 @@ use iced::Subscription;
 use iced::futures::channel::mpsc::{self, Sender};
 use iced::futures::{SinkExt, Stream, StreamExt};
 
-pub use models::{MODEL_SIZE_MB, installed};
+pub use models::{installed, size_mb};
+
+use crate::i18n::Lang;
+use crate::tr;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum State {
@@ -49,10 +52,11 @@ pub enum Event {
 
 #[derive(Debug, Clone, Copy)]
 pub enum Command {
-    /// Écoute, pour l'atlas (index dans `ATLASES`) de la partie en cours.
-    Start(usize),
+    /// Écoute, pour l'atlas (index dans `ATLASES`) de la partie en cours, dans cette langue.
+    Start(usize, Lang),
     Stop,
-    Download,
+    /// Télécharge le modèle de cette langue.
+    Download(Lang),
 }
 
 pub fn subscription() -> Subscription<Event> {
@@ -70,7 +74,7 @@ fn worker() -> impl Stream<Item = Event> {
 
         while let Some(command) = inbox.next().await {
             match command {
-                Command::Start(atlas) => {
+                Command::Start(atlas, lang) => {
                     if session
                         .as_ref()
                         .is_some_and(|stop| !stop.load(Ordering::Relaxed))
@@ -81,7 +85,7 @@ fn worker() -> impl Stream<Item = Event> {
                     session = Some(stop.clone());
                     let mut tx = output.clone();
                     std::thread::spawn(move || {
-                        let state = match listen(atlas, &mut tx, &stop) {
+                        let state = match listen(atlas, lang, &mut tx, &stop) {
                             Ok(()) => State::Idle,
                             Err(e) => State::Error(e),
                         };
@@ -96,21 +100,25 @@ fn worker() -> impl Stream<Item = Event> {
                         stop.store(true, Ordering::Relaxed);
                     }
                 }
-                Command::Download => {
-                    if models::installed() || downloading.swap(true, Ordering::Relaxed) {
+                Command::Download(lang) => {
+                    if models::installed(lang) || downloading.swap(true, Ordering::Relaxed) {
                         continue;
                     }
                     let mut tx = output.clone();
                     let downloading = downloading.clone();
                     std::thread::spawn(move || {
                         let mut progress = tx.clone();
-                        let result = models::download(|p| {
+                        let result = models::download(lang, |p| {
                             let _ = progress.try_send(Event::State(State::Downloading(p)));
                         });
                         downloading.store(false, Ordering::Relaxed);
                         let state = match result {
                             Ok(()) => State::Idle,
-                            Err(e) => State::Error(format!("Téléchargement impossible : {e}")),
+                            Err(e) => State::Error(tr!(
+                                lang,
+                                "Téléchargement impossible : {e}",
+                                "Download failed: {e}"
+                            )),
                         };
                         let _ = tx.try_send(Event::State(state));
                     });
@@ -120,10 +128,15 @@ fn worker() -> impl Stream<Item = Event> {
     })
 }
 
-fn listen(atlas: usize, tx: &mut Sender<Event>, stop: &AtomicBool) -> Result<(), String> {
+fn listen(
+    atlas: usize,
+    lang: Lang,
+    tx: &mut Sender<Event>,
+    stop: &AtomicBool,
+) -> Result<(), String> {
     let world = &crate::ATLASES[atlas];
     let _ = tx.try_send(Event::State(State::Loading));
-    let mut transcriber = engine::Vosk::load(world)?;
+    let mut transcriber = engine::Vosk::load(world, lang)?;
 
     // La transcription tourne à part pour ne jamais bloquer la capture.
     let (jobs, inbox) = std_mpsc::channel::<Job>();
@@ -136,10 +149,14 @@ fn listen(atlas: usize, tx: &mut Sender<Event>, stop: &AtomicBool) -> Result<(),
 
     let device = cpal::default_host()
         .default_input_device()
-        .ok_or("Aucun micro détecté.")?;
-    let config = device
-        .default_input_config()
-        .map_err(|e| format!("Micro indisponible : {e}"))?;
+        .ok_or_else(|| tr!(lang, "Aucun micro détecté.", "No microphone found."))?;
+    let config = device.default_input_config().map_err(|e| {
+        tr!(
+            lang,
+            "Micro indisponible : {e}",
+            "Microphone unavailable: {e}"
+        )
+    })?;
     let channels = usize::from(config.channels()).max(1);
 
     let (audio_tx, audio_rx) = std_mpsc::channel::<Vec<f32>>();
@@ -182,12 +199,28 @@ fn listen(atlas: usize, tx: &mut Sender<Event>, stop: &AtomicBool) -> Result<(),
             on_error,
             None,
         ),
-        other => return Err(format!("Format audio non géré : {other:?}")),
+        other => {
+            return Err(tr!(
+                lang,
+                "Format audio non géré : {other:?}",
+                "Unsupported audio format: {other:?}"
+            ));
+        }
     }
-    .map_err(|e| format!("Impossible d'ouvrir le micro : {e}"))?;
-    stream
-        .play()
-        .map_err(|e| format!("Impossible de démarrer le micro : {e}"))?;
+    .map_err(|e| {
+        tr!(
+            lang,
+            "Impossible d'ouvrir le micro : {e}",
+            "Could not open the microphone: {e}"
+        )
+    })?;
+    stream.play().map_err(|e| {
+        tr!(
+            lang,
+            "Impossible de démarrer le micro : {e}",
+            "Could not start the microphone: {e}"
+        )
+    })?;
     let _ = tx.try_send(Event::State(State::Listening));
 
     let mut pipeline = Pipeline::new(config.sample_rate(), jobs, busy);
@@ -389,7 +422,7 @@ mod tests {
         let (mut tx, mut rx) = mpsc::channel(4096);
         let stop = Arc::new(AtomicBool::new(false));
         let flag = stop.clone();
-        let worker = std::thread::spawn(move || listen(0, &mut tx, &flag));
+        let worker = std::thread::spawn(move || listen(0, Lang::Fr, &mut tx, &flag));
         std::thread::sleep(Duration::from_secs(3));
         stop.store(true, Ordering::Relaxed);
         worker.join().unwrap().unwrap();
@@ -447,7 +480,11 @@ mod tests {
             .map(|c| f32::from(i16::from_le_bytes([c[0], c[1]])) / 32768.0)
             .collect();
         let world = &crate::ATLASES[0];
-        let mut transcriber = engine::Vosk::load(world).unwrap();
+        let lang = std::env::var("GEO_VOICE_LANG")
+            .ok()
+            .and_then(|l| Lang::from_locale(&l))
+            .unwrap_or(Lang::Fr);
+        let mut transcriber = engine::Vosk::load(world, lang).unwrap();
         let (jobs, inbox) = std_mpsc::channel();
         let busy = Arc::new(AtomicBool::new(false));
         let (mut tx, mut rx) = mpsc::channel(4096);
@@ -466,7 +503,7 @@ mod tests {
             {
                 let names: Vec<&str> = countries
                     .iter()
-                    .map(|&c| crate::ATLASES[0].countries[c].name.as_str())
+                    .map(|&c| crate::ATLASES[0].countries[c].name.get(lang))
                     .collect();
                 println!(
                     "{:5.2} s {names:?}{}",

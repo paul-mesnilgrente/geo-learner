@@ -62,6 +62,11 @@ category = "États-Unis"
 levels = ["Régions", "Divisions"]
 one = "État"
 many = "États"
+title_en = "U.S. states"
+category_en = "United States"
+one_en = "state"
+many_en = "states"
+levels_en = ["Regions", "Divisions"]
 country = "USA"
 context = [-140.0, 12.0, -50.0, 60.0]
 
@@ -80,67 +85,81 @@ crop = [-161.0, 18.5, -154.5, 22.5]
 
 [world]
 name = "États-Unis"
+en = "United States"
 view = [-135.0, 21.5, -66.0, 50.0]
 center = -98
 
 [[continent]]
 id = "nord-est"
 name = "Nord-Est"
+en = "Northeast"
 
 [[continent]]
 id = "midwest"
 name = "Midwest"
+en = "Midwest"
 
 [[continent]]
 id = "sud"
 name = "Sud"
+en = "South"
 
 [[continent]]
 id = "ouest"
 name = "Ouest"
+en = "West"
 view = [-135.0, 21.5, -101.0, 50.0]
 
 [[sub]]
 id = "nouvelle-angleterre"
 name = "Nouvelle-Angleterre"
+en = "New England"
 continent = "nord-est"
 
 [[sub]]
 id = "centre-atlantique"
 name = "Centre-Atlantique"
+en = "Mid-Atlantic"
 continent = "nord-est"
 
 [[sub]]
 id = "centre-nord-est"
 name = "Centre-Nord-Est"
+en = "East North Central"
 continent = "midwest"
 
 [[sub]]
 id = "centre-nord-ouest"
 name = "Centre-Nord-Ouest"
+en = "West North Central"
 continent = "midwest"
 
 [[sub]]
 id = "atlantique-sud"
 name = "Atlantique Sud"
+en = "South Atlantic"
 continent = "sud"
 
 [[sub]]
 id = "centre-sud-est"
 name = "Centre-Sud-Est"
+en = "East South Central"
 continent = "sud"
 
 [[sub]]
 id = "centre-sud-ouest"
 name = "Centre-Sud-Ouest"
+en = "West South Central"
 continent = "sud"
 
 [[sub]]
 id = "montagnes"
 name = "Montagnes"
+en = "Mountain"
 continent = "ouest"
 
 [[sub]]
 id = "pacifique"
 name = "Pacifique"
+en = "Pacific"
 continent = "ouest"

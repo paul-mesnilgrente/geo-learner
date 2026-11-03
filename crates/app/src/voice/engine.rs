@@ -4,36 +4,51 @@ use std::sync::OnceLock;
 
 use super::audio::RATE;
 use super::models;
+use crate::i18n::Lang;
+use crate::tr;
 use geo_core::World;
 
 /// Coût du chemin « mot inconnu » : plus il est bas, plus les paroles hors liste sont rejetées
 /// (au risque de manquer de vrais noms de pays). -3 a donné le meilleur compromis aux essais.
 const UNKNOWN_COST: f32 = -3.0;
 
-static MODEL: OnceLock<Result<utter::Model, String>> = OnceLock::new();
+/// Modèles chargés, un par langue (dans l'ordre de `Lang::ALL`).
+static MODELS: [OnceLock<Result<utter::Model, String>>; 2] = [OnceLock::new(), OnceLock::new()];
 
 pub struct Vosk {
+    lang: Lang,
     model: &'static utter::Model,
     grammar: Vec<String>,
 }
 
 impl Vosk {
-    /// Modèle chargé, avec une grammaire limitée aux noms des lieux de l'atlas.
-    pub fn load(world: &World) -> Result<Self, String> {
-        if !models::installed() {
-            return Err("Le modèle vocal n'est pas installé.".into());
+    /// Modèle de la langue chargé, avec une grammaire limitée aux noms des lieux de l'atlas
+    /// dans cette langue.
+    pub fn load(world: &World, lang: Lang) -> Result<Self, String> {
+        if !models::installed(lang) {
+            return Err(tr!(
+                lang,
+                "Le modèle vocal n'est pas installé.",
+                "The voice model is not installed."
+            ));
         }
-        let model = MODEL
+        let model = MODELS[lang.index()]
             .get_or_init(|| {
-                utter::Model::open(&models::path())
-                    .map_err(|e| format!("Modèle vocal illisible : {e}"))
+                utter::Model::open(&models::path(lang)).map_err(|e| {
+                    tr!(
+                        lang,
+                        "Modèle vocal illisible : {e}",
+                        "Unreadable voice model: {e}"
+                    )
+                })
             })
             .as_ref()
             .map_err(Clone::clone)?;
         // Formes orales des pays dont tous les mots sont connus du modèle.
         let mut grammar: Vec<String> = Vec::new();
+        let none = Vec::new();
         for country in &world.countries {
-            for form in &country.spoken {
+            for form in country.spoken.get(lang.index()).unwrap_or(&none) {
                 if form.split(' ').all(|w| model.word_ids.contains_key(w))
                     && !grammar.contains(form)
                 {
@@ -41,7 +56,11 @@ impl Vosk {
                 }
             }
         }
-        Ok(Self { model, grammar })
+        Ok(Self {
+            lang,
+            model,
+            grammar,
+        })
     }
 
     pub fn transcribe(&mut self, audio: &[f32]) -> Result<String, String> {
@@ -51,7 +70,13 @@ impl Vosk {
         };
         let mut recognizer =
             utter::Recognizer::with_options(self.model, RATE as f32, &self.grammar, &options)
-                .map_err(|e| format!("Reconnaissance vocale indisponible : {e}"))?;
+                .map_err(|e| {
+                    tr!(
+                        self.lang,
+                        "Reconnaissance vocale indisponible : {e}",
+                        "Speech recognition unavailable: {e}"
+                    )
+                })?;
         recognizer.accept_f32(audio).map_err(|e| format!("{e:?}"))?;
         Ok(field(recognizer.final_result(), "text"))
     }
@@ -83,6 +108,38 @@ mod tests {
         assert_eq!(field("pas du json", "text"), "");
     }
 
+    /// Part des noms de chaque quiz que le modèle de la langue sait reconnaître (tous leurs
+    /// mots dans son vocabulaire) :
+    /// `GEO_VOICE_LANG=en cargo test -p geo-learner --release -- --ignored coverage --nocapture`
+    #[test]
+    #[ignore]
+    fn coverage() {
+        let lang = std::env::var("GEO_VOICE_LANG")
+            .ok()
+            .and_then(|l| Lang::from_locale(&l))
+            .unwrap_or(Lang::Fr);
+        for world in crate::ATLASES.iter() {
+            let vosk = Vosk::load(world, lang).unwrap();
+            let heard = |c: &geo_core::Country| {
+                c.spoken[lang.index()]
+                    .iter()
+                    .any(|f| vosk.grammar.contains(f))
+            };
+            let missing: Vec<&str> = world
+                .countries
+                .iter()
+                .filter(|c| !heard(c))
+                .map(|c| c.name.get(lang))
+                .collect();
+            println!(
+                "{} : {}/{} ; absents : {missing:?}",
+                world.info.title.get(lang),
+                world.countries.len() - missing.len(),
+                world.countries.len()
+            );
+        }
+    }
+
     /// Transcrit les fichiers WAV 16 kHz d'un dossier :
     /// `GEO_VOICE_SAMPLES=dossier cargo test -p geo-learner --release -- --ignored samples --nocapture`
     #[test]
@@ -97,7 +154,11 @@ mod tests {
             .filter(|p| p.extension().is_some_and(|x| x == "wav"))
             .collect();
         files.sort();
-        let mut vosk = Vosk::load(world).unwrap();
+        let lang = std::env::var("GEO_VOICE_LANG")
+            .ok()
+            .and_then(|l| Lang::from_locale(&l))
+            .unwrap_or(Lang::Fr);
+        let mut vosk = Vosk::load(world, lang).unwrap();
         for file in &files {
             let bytes = std::fs::read(file).unwrap();
             let audio: Vec<f32> = bytes[44..]
@@ -109,7 +170,7 @@ mod tests {
             let names: Vec<&str> = matcher
                 .scan_fuzzy(&text)
                 .iter()
-                .map(|&c| world.countries[c].name.as_str())
+                .map(|&c| world.countries[c].name.get(lang))
                 .collect();
             println!(
                 "{:>24} {:>5} ms  {text:?} → {names:?}",

@@ -3,6 +3,28 @@
 Application de bureau pour apprendre les pays du monde sur une carte, au clavier ou à la voix.
 Écrite entièrement en Rust, avec un seul code pour Linux et Windows, et tout se passe hors ligne.
 
+## Langues
+
+L'interface, les noms des lieux et la reconnaissance vocale existent en **français** et en
+**anglais**. Au premier lancement, GeoLearner prend la langue du système (l'anglais si elle n'est
+pas prise en charge). Le choix fait sur l'accueil est enregistré dans `settings.json` et vaut
+pour les lancements suivants, même si la langue du système change.
+
+- Les textes sont écrits dans chaque langue là où ils servent, avec la macro `tr!`
+  (`crates/app/src/i18n.rs`) ; les accords et articles sont dans `words.rs`.
+- Les noms viennent des atlas : `Text` contient une traduction par langue. Les noms anglais
+  sont ceux de Natural Earth (`NAME_EN`, `name_en`), sauf `en = "..."` dans les fichiers de
+  données ; les zones et les titres des atlas ont leur `en` / `title_en`.
+- Toutes les langues sont acceptées au clavier, quelle que soit celle de l'interface.
+- La voix utilise le petit modèle Vosk de la langue (`vosk-model-small-en-us-0.15`, 41 Mo, pour
+  l'anglais), téléchargé à la demande et vérifié par SHA-256. Le modèle anglais reconnaît tous
+  les pays, États, provinces et territoires, mais pas tous les noms français des départements
+  (72 sur 101) : ceux-là se tapent.
+
+Ajouter une langue : une variante dans `Lang` (`geo-core`), un argument à chaque `tr!` (le
+compilateur signale les oublis), les noms dans les données, et le modèle Vosk dans
+`voice/models.rs`.
+
 ## Quiz
 
 | Catégorie | Quiz | Lieux | Zones |
@@ -222,6 +244,7 @@ Paramètres de `GEO_DEMO`, séparés par `;` :
   confirmation, `bottom` défile en bas de page ;
 - `globe=N` : carte de situation de l'encart n° N ouverte ;
 - `explore` : exploration ouverte, avec un lieu choisi (`explore=CA-PE`) ;
+- `lang=en` : langue imposée, sans l'enregistrer ;
 - `home` : accueil affiché, même avec `atlas`, `region` ou `progress` (sinon page du quiz) ;
 - `flight=0.5` : zoom de la carte de situation figé à cet instant (0 à 1).
 

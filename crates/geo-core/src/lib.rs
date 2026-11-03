@@ -10,7 +10,7 @@ pub mod world;
 pub use matcher::Matcher;
 pub use normalize::normalize;
 pub use quiz::{Mark, Mode, Outcome, Quiz};
-pub use world::{Country, Info, Inset, Region, RegionKind, Shape, Territory, World};
+pub use world::{Country, Info, Inset, Lang, Region, RegionKind, Shape, Territory, Text, World};
 
 #[cfg(test)]
 mod testing {
@@ -23,7 +23,7 @@ mod testing {
                 .iter()
                 .map(|(code, answers)| Country {
                     code: code.to_string(),
-                    name: code.to_string(),
+                    name: crate::Text::new(*code, *code),
                     answers: answers.iter().map(|a| a.to_string()).collect(),
                     spoken: vec![],
                     sub: 0,

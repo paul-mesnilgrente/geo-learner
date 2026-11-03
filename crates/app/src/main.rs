@@ -6,6 +6,7 @@ mod chart;
 mod dates;
 #[cfg(debug_assertions)]
 mod dev;
+mod i18n;
 mod icons;
 mod map;
 mod progress;
@@ -40,7 +41,7 @@ pub static ATLASES: LazyLock<Vec<World>> = LazyLock::new(|| {
 fn numbers_quiz(departements: &World) -> World {
     let mut world = departements.clone();
     world.info.id = "fr-numeros".into();
-    world.info.title = "Numéros des départements".into();
+    world.info.title = geo_core::Text::new("Numéros des départements", "Department numbers");
     world.info.numbers = true;
 
     // Dizaine d'un département : la Corse (2A, 2B) reste dans les 20, l'outre-mer à part.
@@ -66,7 +67,7 @@ fn numbers_quiz(departements: &World) -> World {
     let parent = world.regions.len();
     let continent = geo_core::Region {
         id: "par-numero".into(),
-        name: "Par numéro".into(),
+        name: geo_core::Text::new("Par numéro", "By number"),
         kind: geo_core::RegionKind::Continent,
         parent: None,
         members: all.members.clone(),
@@ -85,7 +86,7 @@ fn numbers_quiz(departements: &World) -> World {
         let view = members_view(&world, &members);
         world.regions.push(geo_core::Region {
             id: format!("numeros-{t}"),
-            name,
+            name: geo_core::Text::new(&name, &name),
             kind: geo_core::RegionKind::Group,
             parent: Some(parent),
             members,
@@ -162,9 +163,10 @@ mod tests {
         let t = world
             .territories
             .iter()
-            .find(|t| t.name == territory)
+            .find(|t| t.name.get(geo_core::Lang::Fr) == territory)
             .expect(territory);
-        t.owner.map(|o| world.countries[o].name.as_str())
+        t.owner
+            .map(|o| world.countries[o].name.get(geo_core::Lang::Fr))
     }
 
     #[test]
@@ -221,13 +223,17 @@ mod tests {
         let list: Vec<String> = numbers
             .countries
             .iter()
-            .map(|c| super::number_of(c).unwrap_or_else(|| panic!("{} sans numéro", c.name)))
+            .map(|c| super::number_of(c).unwrap_or_else(|| panic!("{} sans numéro", c.code)))
             .collect();
         let mut unique = list.clone();
         unique.sort();
         unique.dedup();
         assert_eq!(unique.len(), 101);
-        let name = |n: &str| &numbers.countries[list.iter().position(|x| x == n).unwrap()].name;
+        let name = |n: &str| {
+            numbers.countries[list.iter().position(|x| x == n).unwrap()]
+                .name
+                .get(geo_core::Lang::Fr)
+        };
         assert_eq!(name("01"), "Ain");
         assert_eq!(name("2A"), "Corse-du-Sud");
         assert_eq!(name("75"), "Paris");
@@ -243,7 +249,10 @@ mod tests {
             .iter()
             .filter(|r| r.id.starts_with("numeros-"))
             .collect();
-        let names: Vec<&str> = tens.iter().map(|r| r.name.as_str()).collect();
+        let names: Vec<&str> = tens
+            .iter()
+            .map(|r| r.name.get(geo_core::Lang::Fr))
+            .collect();
         assert_eq!(
             names,
             [

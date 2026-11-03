@@ -1,4 +1,6 @@
-//! Dates des parties, à l'heure locale : « 2 nov. », « 2 nov. 2025, 14:32 ».
+//! Dates des parties, à l'heure locale : « 2 nov. », « 2 nov. 2025, 14:32 » ; « Nov 2 ».
+
+use crate::i18n::Lang;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DateTime {
@@ -12,6 +14,9 @@ pub struct DateTime {
 const MONTHS: [&str; 12] = [
     "janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.",
     "déc.",
+];
+const MONTHS_EN: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
 
 impl DateTime {
@@ -33,21 +38,28 @@ impl DateTime {
         }
     }
 
-    /// « 2 nov. »
-    pub fn short(&self) -> String {
-        format!("{} {}", self.day, MONTHS[(self.month - 1) as usize])
+    /// « 2 nov. » ; « Nov 2 ».
+    pub fn short(&self, lang: Lang) -> String {
+        let month = (self.month - 1) as usize;
+        match lang {
+            Lang::Fr => format!("{} {}", self.day, MONTHS[month]),
+            Lang::En => format!("{} {}", MONTHS_EN[month], self.day),
+        }
     }
 
-    /// « 2 nov., 14:32 », avec l'année si ce n'est pas celle de `now`.
-    pub fn long(&self, now: &DateTime) -> String {
+    /// « 2 nov., 14:32 », avec l'année si ce n'est pas celle de `now` ; « Nov 2, 14:32 ».
+    pub fn long(&self, now: &DateTime, lang: Lang) -> String {
         let year = if self.year == now.year {
             String::new()
         } else {
-            format!(" {}", self.year)
+            match lang {
+                Lang::Fr => format!(" {}", self.year),
+                Lang::En => format!(", {}", self.year),
+            }
         };
         format!(
             "{}{year}, {:02}:{:02}",
-            self.short(),
+            self.short(lang),
             self.hour,
             self.minute
         )
@@ -141,9 +153,10 @@ mod tests {
             (d.year, d.month, d.day, d.hour, d.minute),
             (2024, 2, 29, 13, 5)
         );
-        assert_eq!(d.short(), "29 févr.");
+        assert_eq!(d.short(Lang::Fr), "29 févr.");
         let now = DateTime::utc(1_735_689_600); // 1er janvier 2025
-        assert_eq!(d.long(&now), "29 févr. 2024, 13:05");
-        assert_eq!(now.long(&now), "1 janv., 00:00");
+        assert_eq!(d.long(&now, Lang::Fr), "29 févr. 2024, 13:05");
+        assert_eq!(now.long(&now, Lang::Fr), "1 janv., 00:00");
+        assert_eq!(d.long(&now, Lang::En), "Feb 29, 2024, 13:05");
     }
 }

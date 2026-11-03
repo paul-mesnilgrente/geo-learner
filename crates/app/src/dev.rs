@@ -50,6 +50,8 @@ pub struct Demo {
     pub flight: Option<f32>,
     /// Exploration de la carte ouverte (`explore`), avec ce lieu choisi (`explore=FR-75`).
     pub explore: Option<String>,
+    /// Langue imposée, en mémoire seulement (`lang=en`).
+    pub lang: Option<geo_core::Lang>,
 }
 
 /// Parties fictives d'une série : scores en progrès, temps en baisse, un minuteur dépassé.
@@ -126,6 +128,7 @@ pub fn demo() -> Option<Demo> {
             "home" => demo.home = true,
             "flight" => demo.flight = value.parse().ok(),
             "explore" => demo.explore = Some(value.to_owned()),
+            "lang" => demo.lang = geo_core::Lang::from_locale(value),
             "type" => demo.typed = value.split('|').map(str::to_owned).collect(),
             _ => {}
         }

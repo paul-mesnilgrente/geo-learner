@@ -26,6 +26,11 @@ levels = ["Régions", "Régions"]
 one = "province ou territoire"
 many = "provinces et territoires"
 feminine = true
+title_en = "Provinces and territories of Canada"
+category_en = "Canada"
+one_en = "province or territory"
+many_en = "provinces and territories"
+levels_en = ["Regions", "Regions"]
 country = "CAN"
 context = [-175.0, 25.0, -10.0, 85.0]
 # Le pays est immense et les îles de l'Arctique très découpées : contours plus simplifiés
@@ -34,55 +39,66 @@ tolerance = { hi = 0.02, lo = 0.08 }
 
 [world]
 name = "Canada"
+en = "Canada"
 view = [-141.0, 41.5, -52.0, 83.5]
 center = -96
 
 [[continent]]
 id = "atlantique"
 name = "Provinces de l'Atlantique"
+en = "Atlantic provinces"
 
 [[continent]]
 id = "centre"
 name = "Centre"
+en = "Central Canada"
 
 [[continent]]
 id = "prairies"
 name = "Prairies"
+en = "Prairies"
 
 [[continent]]
 id = "ouest"
 name = "Côte Ouest"
+en = "West Coast"
 
 [[continent]]
 id = "nord"
 name = "Nord"
+en = "North"
 
 [[sub]]
 id = "atlantique"
 name = "Provinces de l'Atlantique"
+en = "Atlantic provinces"
 continent = "atlantique"
 hidden = true
 
 [[sub]]
 id = "centre"
 name = "Centre"
+en = "Central Canada"
 continent = "centre"
 hidden = true
 
 [[sub]]
 id = "prairies"
 name = "Prairies"
+en = "Prairies"
 continent = "prairies"
 hidden = true
 
 [[sub]]
 id = "ouest"
 name = "Côte Ouest"
+en = "West Coast"
 continent = "ouest"
 hidden = true
 
 [[sub]]
 id = "nord"
 name = "Nord"
+en = "North"
 continent = "nord"
 hidden = true

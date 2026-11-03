@@ -14,10 +14,11 @@ use iced::{Center, Element, Fill, Point, Rectangle, Size, Theme};
 
 use super::locator::{Locator, fly};
 use super::{Message, section_title};
-use crate::ATLASES;
+use crate::i18n::Lang;
 use crate::icons::{Icon, icon};
 use crate::map::{self, Camera, MapEvent, MapView, Place, Projection};
 use crate::style;
+use crate::{ATLASES, tr};
 
 /// Durée du déplacement vers un lieu choisi dans la liste.
 const FLIGHT: f32 = 0.6;
@@ -26,6 +27,7 @@ const FLIGHT: f32 = 0.6;
 const ANCHORS: [&str; 10] = ["01", "10", "21", "30", "40", "50", "60", "70", "80", "90"];
 
 pub struct Explorer {
+    lang: Lang,
     world: &'static World,
     region: usize,
     projection: Projection,
@@ -52,11 +54,12 @@ struct Flight {
 }
 
 impl Explorer {
-    pub fn new(atlas: usize, region: usize) -> Self {
+    pub fn new(atlas: usize, region: usize, lang: Lang) -> Self {
         let world = &ATLASES[atlas];
         let zone = &world.regions[region];
         let view = map::view_rect(zone.view, zone.center);
         Self {
+            lang,
             world,
             region,
             projection: Projection::new(world, zone.center),
@@ -128,7 +131,7 @@ impl Explorer {
             MapEvent::Globe(inset) => {
                 self.locator = match &self.locator {
                     Some(l) if l.inset == inset => None,
-                    _ => Locator::new(self.world, inset),
+                    _ => Locator::new(self.world, inset, self.lang),
                 };
             }
             MapEvent::DragEnded => {}
@@ -190,8 +193,8 @@ impl Explorer {
     fn label(&self, country: usize) -> String {
         let c = &self.world.countries[country];
         match crate::number_of(c) {
-            Some(number) => format!("{number} · {}", c.name),
-            None => c.name.clone(),
+            Some(number) => format!("{number} · {}", c.name.get(self.lang)),
+            None => c.name.get(self.lang).to_owned(),
         }
     }
 
@@ -213,7 +216,7 @@ impl Explorer {
                 button(
                     row![
                         icon(Icon::Back, 16.0, style::TEXT),
-                        text(info.title.clone()).size(14)
+                        text(info.title.get(self.lang)).size(14)
                     ]
                     .spacing(8)
                     .align_y(Center)
@@ -222,18 +225,27 @@ impl Explorer {
                 .style(style::ghost)
                 .on_press(Message::CloseExplore),
                 column![
-                    text(format!("Explorer · {}", zone.name))
-                        .size(16)
-                        .font(style::FONT_SEMIBOLD),
-                    text(format!("{} {}", zone.members.len(), info.many))
-                        .size(12)
-                        .color(style::MUTED),
+                    text(tr!(
+                        self.lang,
+                        "Explorer · {}",
+                        "Explore · {}",
+                        zone.name.get(self.lang)
+                    ))
+                    .size(16)
+                    .font(style::FONT_SEMIBOLD),
+                    text(format!(
+                        "{} {}",
+                        zone.members.len(),
+                        info.many.get(self.lang)
+                    ))
+                    .size(12)
+                    .color(style::MUTED),
                 ]
                 .width(Fill),
                 button(
                     row![
                         icon(Icon::Play, 14.0, iced::Color::WHITE),
-                        text("Commencer le quiz")
+                        text(tr!(self.lang, "Commencer le quiz", "Start the quiz"))
                             .size(14)
                             .font(style::FONT_SEMIBOLD)
                     ]
@@ -273,6 +285,7 @@ impl Explorer {
             } else {
                 &[]
             },
+            lang: self.lang,
             cache: &self.cache,
         };
         let map: Element<'_, MapEvent> = canvas(map_view).width(Fill).height(Fill).into();
@@ -322,9 +335,13 @@ impl Explorer {
         let zone = &self.world.regions[self.region];
         let mut body = Column::new().spacing(16);
         body = body.push(
-            text("Survolez la carte ou cliquez un nom pour le situer.")
-                .size(13)
-                .color(style::MUTED),
+            text(tr!(
+                self.lang,
+                "Survolez la carte ou cliquez un nom pour le situer.",
+                "Hover over the map, or click a name to find it."
+            ))
+            .size(13)
+            .color(style::MUTED),
         );
         if let Some(c) = self.selected {
             let group = &self.world.regions[self.group_of(c)];
@@ -332,7 +349,7 @@ impl Explorer {
                 container(
                     column![
                         text(self.label(c)).size(20).font(style::FONT_BOLD),
-                        text(group.name.clone()).size(13).color(style::MUTED),
+                        text(group.name.get(self.lang)).size(13).color(style::MUTED),
                     ]
                     .spacing(4),
                 )
@@ -378,11 +395,13 @@ impl Explorer {
         }
         for (g, mut list) in groups {
             if !numbered {
-                list.sort_by_key(|&c| geo_core::normalize(&self.world.countries[c].name));
+                list.sort_by_key(|&c| {
+                    geo_core::normalize(self.world.countries[c].name.get(self.lang))
+                });
             }
             let mut group = Column::new().spacing(2);
             if !single {
-                group = group.push(section_title(&self.world.regions[g].name));
+                group = group.push(section_title(self.world.regions[g].name.get(self.lang)));
             }
             for c in list {
                 let selected = self.selected == Some(c);
@@ -441,15 +460,19 @@ impl Explorer {
         container(
             column![
                 row![
-                    text("Astuce : l'ordre alphabétique")
-                        .size(14)
-                        .font(style::FONT_SEMIBOLD)
-                        .width(Fill),
+                    text(tr!(
+                        self.lang,
+                        "Astuce : l'ordre alphabétique",
+                        "Tip: alphabetical order"
+                    ))
+                    .size(14)
+                    .font(style::FONT_SEMIBOLD)
+                    .width(Fill),
                     button(
                         text(if self.show_anchors {
-                            "Masquer"
+                            tr!(self.lang, "Masquer", "Hide")
                         } else {
-                            "Montrer"
+                            tr!(self.lang, "Montrer", "Show")
                         })
                         .size(12)
                     )
@@ -458,24 +481,35 @@ impl Explorer {
                     .on_press(Message::ExploreAnchors),
                 ]
                 .align_y(Center),
-                text(
+                text(tr!(
+                    self.lang,
                     "Les numéros suivent l'ordre alphabétique des noms d'origine : 01 Ain, \
                      02 Aisne, 03 Allier… Retenez un repère par dizaine (en jaune sur la \
-                     carte) : le reste se déduit à quelques unités près."
-                )
+                     carte) : le reste se déduit à quelques unités près.",
+                    "Numbers follow the alphabetical order of the original French names: \
+                     01 Ain, 02 Aisne, 03 Allier… Remember one landmark per ten (in yellow on \
+                     the map) and work out the rest to within a few."
+                ))
                 .size(13),
                 Row::with_children(chips)
                     .spacing(6)
                     .wrap()
                     .vertical_spacing(6),
-                text(
+                text(tr!(
+                    self.lang,
                     "Exceptions : « Haute- » se classe au nom principal (42 Loire, \
                      43 Haute-Loire). Noms changés depuis : 22 Côtes-d'Armor (Côtes-du-Nord), \
                      64 Pyrénées-Atlantiques (Basses-Pyrénées), 76 Seine-Maritime \
                      (Seine-Inférieure), 78 Yvelines (Seine-et-Oise). Les 91 à 95, autour de \
                      Paris, datent de 1968. La Corse (20) est devenue 2A et 2B en 1976, et \
-                     l'outre-mer va de 971 à 976."
-                )
+                     l'outre-mer va de 971 à 976.",
+                    "Exceptions: « Haute- » (upper) sorts under the main name (42 Loire, \
+                     43 Haute-Loire). Renamed since: 22 Côtes-d'Armor (Côtes-du-Nord), \
+                     64 Pyrénées-Atlantiques (Basses-Pyrénées), 76 Seine-Maritime \
+                     (Seine-Inférieure), 78 Yvelines (Seine-et-Oise). 91 to 95, around Paris, \
+                     date from 1968. Corsica (20) became 2A and 2B in 1976, and the overseas \
+                     departments run from 971 to 976."
+                ))
                 .size(12)
                 .color(style::MUTED),
             ]

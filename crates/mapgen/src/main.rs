@@ -10,7 +10,9 @@
 use std::collections::HashMap;
 use std::error::Error;
 
-use geo_core::world::{Country, Info, Inset, Region, RegionKind, Ring, Shape, Territory, World};
+use geo_core::world::{
+    Country, Info, Inset, Lang, Region, RegionKind, Ring, Shape, Territory, Text, World,
+};
 use geo_core::{Matcher, normalize};
 use serde::Deserialize;
 use serde_json::Value;
@@ -49,6 +51,11 @@ struct CountryDef {
     aka: Vec<String>,
     #[serde(default)]
     say: Vec<String>,
+    /// Nom anglais, s'il diffère de celui de Natural Earth (ou s'il en manque un).
+    en: Option<String>,
+    /// Formes orales anglaises supplémentaires.
+    #[serde(default)]
+    say_en: Vec<String>,
     label: Option<[f32; 2]>,
     #[serde(default)]
     bubble: bool,
@@ -81,6 +88,8 @@ struct ZoneDef {
     #[serde(default)]
     id: String,
     name: String,
+    /// Nom anglais.
+    en: Option<String>,
     continent: Option<String>,
     view: Option<[f32; 4]>,
     center: Option<f32>,
@@ -114,6 +123,13 @@ struct AtlasDef {
     zoom_sub: bool,
     #[serde(default = "default_levels")]
     levels: [String; 2],
+    /// Textes anglais : titre, catégorie, noms des lieux (singulier, pluriel), niveaux de zones.
+    title_en: String,
+    category_en: String,
+    one_en: String,
+    many_en: String,
+    #[serde(default = "default_levels_en")]
+    levels_en: [String; 2],
     /// Pays (code ADM0_A3) dont les subdivisions sont lues dans Natural Earth admin-1.
     country: String,
     /// Les terres des autres pays dans ce cadre [lon_min, lat_min, lon_max, lat_max] sont
@@ -126,6 +142,14 @@ struct AtlasDef {
 
 fn default_levels() -> [String; 2] {
     ["Continents".into(), "Régions".into()]
+}
+
+fn default_levels_en() -> [String; 2] {
+    ["Continents".into(), "Regions".into()]
+}
+
+fn levels(fr: &[String; 2], en: &[String; 2]) -> [Text; 2] {
+    [Text::new(&fr[0], &en[0]), Text::new(&fr[1], &en[1])]
 }
 
 /// Encart : entités déplacées (et mises à l'échelle) près de la carte principale.
@@ -193,9 +217,9 @@ fn main() -> Result<()> {
     };
     println!(
         "{} : {} {}, {} terres voisines, {} zones, {} points (détaillé) / {} (simplifié) → {} ({} Ko)",
-        world.info.title,
+        world.info.title.get(Lang::Fr),
         world.countries.len(),
-        world.info.many,
+        world.info.many.get(Lang::Fr),
         world.territories.len(),
         world.regions.len(),
         points(false),
@@ -272,13 +296,16 @@ fn build_world(defs: &CountriesFile, zones: &RegionsFile, features: &Value) -> R
 
     let info = Info {
         id: "monde".into(),
-        title: "Pays du monde".into(),
-        category: "Monde".into(),
-        one: "pays".into(),
-        many: "pays".into(),
+        title: Text::new("Pays du monde", "Countries of the world"),
+        category: Text::new("Monde", "World"),
+        one: Text::new("pays", "country"),
+        many: Text::new("pays", "countries"),
         feminine: false,
         zoom_sub: false,
-        levels: default_levels(),
+        levels: levels(
+            &default_levels(),
+            &["Continents".into(), "Subregions".into()],
+        ),
         insets: Vec::new(),
         numbers: false,
     };
@@ -294,17 +321,17 @@ fn territory(
     tolerance: Tolerance,
 ) -> Territory {
     let mut name = props["NAME_FR"].as_str().unwrap_or(code).to_owned();
+    let mut en = props["NAME_EN"].as_str().unwrap_or(&name).to_owned();
     if code == "SXM" {
         // Natural Earth nomme aussi « Saint-Martin » la partie néerlandaise.
         name = "Sint Maarten".into();
+        en = "Sint Maarten".into();
     }
     let name = capitalize(&name);
     let mut answers = vec![normalize(&name)];
-    if let Some(en) = props["NAME_EN"].as_str() {
-        push_unique(&mut answers, normalize(en));
-    }
+    push_unique(&mut answers, normalize(&en));
     Territory {
-        name,
+        name: Text::new(name, en),
         answers,
         owner,
         label: [
@@ -470,13 +497,13 @@ fn build_atlas(file: &AtlasFile, admin0: &Value, admin1: &Value) -> Result<World
 
     let info = Info {
         id: def.id.clone(),
-        title: def.title.clone(),
-        category: def.category.clone(),
-        one: def.one.clone(),
-        many: def.many.clone(),
+        title: Text::new(&def.title, &def.title_en),
+        category: Text::new(&def.category, &def.category_en),
+        one: Text::new(&def.one, &def.one_en),
+        many: Text::new(&def.many, &def.many_en),
         feminine: def.feminine,
         zoom_sub: def.zoom_sub,
-        levels: def.levels.clone(),
+        levels: levels(&def.levels, &def.levels_en),
         insets,
         numbers: false,
     };
@@ -654,6 +681,11 @@ fn assemble(
         if source.rings[i].is_empty() {
             return Err(format!("aucun contour pour {} ({})", def.name, def.code).into());
         }
+        let en = def
+            .en
+            .clone()
+            .or_else(|| source.english[i].clone())
+            .ok_or_else(|| format!("{} ({}) : nom anglais manquant", def.name, def.code))?;
         let mut answers: Vec<String> = Vec::new();
         let mut spoken: Vec<String> = Vec::new();
         for name in std::iter::once(&def.name).chain(&def.aka) {
@@ -671,14 +703,29 @@ fn assemble(
         for form in &spoken {
             push_unique(&mut answers, normalize(form));
         }
-        if let Some(en) = &source.english[i] {
-            push_unique(&mut answers, normalize(en));
+        // Anglais : nom (et celui de Natural Earth s'il diffère), formes orales.
+        let mut spoken_en: Vec<String> = spoken_forms(&en);
+        // Variante sans accents ni apostrophes, plus souvent dans le vocabulaire anglais
+        // (« sao tome and principe », « reunion »).
+        push_unique(&mut spoken_en, normalize(&en));
+        for form in &def.say_en {
+            push_unique(&mut spoken_en, form.to_lowercase());
         }
+        push_unique(&mut answers, normalize(&en));
+        if let Some(ne) = &source.english[i] {
+            push_unique(&mut answers, normalize(ne));
+        }
+        for form in &spoken_en {
+            push_unique(&mut answers, normalize(form));
+        }
+        let mut spoken_by_lang = vec![Vec::new(); Lang::ALL.len()];
+        spoken_by_lang[Lang::Fr.index()] = spoken;
+        spoken_by_lang[Lang::En.index()] = spoken_en;
         countries.push(Country {
             code: def.code.clone(),
-            name: def.name.clone(),
+            name: Text::new(&def.name, &en),
             answers,
-            spoken,
+            spoken: spoken_by_lang,
             sub: sub_index(&def.sub)?,
             label: def.label.or(source.labels[i]).unwrap_or([0.0, 0.0]),
             bubble: def.bubble,
@@ -808,10 +855,11 @@ fn check_answers(countries: &[Country]) -> Result<()> {
     let mut seen: HashMap<&str, &str> = HashMap::new();
     for c in countries {
         for a in &c.answers {
-            if let Some(other) = seen.insert(a, &c.name)
-                && other != c.name
+            let name = c.name.get(Lang::Fr);
+            if let Some(other) = seen.insert(a, name)
+                && other != name
             {
-                return Err(format!("réponse « {a} » partagée par {other} et {}", c.name).into());
+                return Err(format!("réponse « {a} » partagée par {other} et {name}").into());
             }
         }
     }
@@ -824,7 +872,12 @@ fn check_answers(countries: &[Country]) -> Result<()> {
     };
     let matcher = Matcher::new(&world);
     for (i, c) in countries.iter().enumerate() {
-        assert_eq!(matcher.lookup(&c.name), Some(i), "{}", c.name);
+        for lang in Lang::ALL {
+            let name = c.name.get(lang);
+            if matcher.lookup(name) != Some(i) {
+                return Err(format!("{name} ne désigne pas {}", c.code).into());
+            }
+        }
     }
     Ok(())
 }
@@ -841,7 +894,13 @@ fn zone(
     let center = def.center.unwrap_or((view[0] + view[2]) / 2.0);
     Region {
         id: id.to_owned(),
-        name: def.name.clone(),
+        name: Text::new(
+            &def.name,
+            def.en.as_deref().unwrap_or_else(|| {
+                eprintln!("zone « {} » sans nom anglais", def.name);
+                &def.name
+            }),
+        ),
         kind,
         parent,
         members,

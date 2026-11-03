@@ -7,9 +7,10 @@ use iced::widget::{Column, Row, button, column, container, row, scrollable, spac
 use iced::{Center, Element, Fill};
 
 use super::{App, HOME_SCROLL, Message, clock, mode_title, percent, plural, score_color};
-use crate::ATLASES;
 use crate::dates::DateTime;
+use crate::i18n::{self, Lang};
 use crate::style;
+use crate::{ATLASES, tr};
 
 /// Largeur d'une carte de quiz : trois par ligne sur une fenêtre normale.
 const CARD_WIDTH: f32 = 272.0;
@@ -17,13 +18,22 @@ const CARD_WIDTH: f32 = 272.0;
 impl App {
     pub(super) fn home_page(&self) -> Element<'_, Message> {
         let mut main = column![
-            column![
-                text("GeoLearner").size(32).font(style::FONT_BOLD),
-                text("La géographie, carte en main. Choisissez un quiz.")
+            row![
+                column![
+                    text("GeoLearner").size(32).font(style::FONT_BOLD),
+                    text(tr!(
+                        self.lang,
+                        "La géographie, carte en main. Choisissez un quiz.",
+                        "Geography, map in hand. Pick a quiz."
+                    ))
                     .size(15)
                     .color(style::MUTED),
+                ]
+                .spacing(4)
+                .width(Fill),
+                self.language_picker(),
             ]
-            .spacing(4)
+            .align_y(Center)
         ]
         .spacing(28)
         .width(Fill);
@@ -51,6 +61,29 @@ impl App {
         .into()
     }
 
+    /// Choix de la langue (gardé pour les lancements suivants).
+    fn language_picker(&self) -> Element<'_, Message> {
+        let choices = Lang::ALL.into_iter().map(|lang| {
+            button(text(i18n::native_name(lang)).size(13))
+                .padding([6, 14])
+                .style(style::pill(self.lang == lang))
+                .on_press(Message::SetLanguage(lang))
+                .into()
+        });
+        container(Row::with_children(choices).spacing(4))
+            .padding(4)
+            .style(|_: &iced::Theme| container::Style {
+                background: Some(style::SURFACE.into()),
+                border: iced::Border {
+                    color: style::BORDER,
+                    width: 1.0,
+                    radius: 999.0.into(),
+                },
+                ..Default::default()
+            })
+            .into()
+    }
+
     /// Carte d'un quiz : miniature, nom, nombre de lieux et dernière partie.
     fn quiz_card(&self, index: usize) -> Element<'_, Message> {
         let atlas = &ATLASES[index];
@@ -61,12 +94,14 @@ impl App {
             .filter(|s| s.atlas == atlas.info.id)
             .collect();
         let summary = match played.iter().max_by_key(|s| s.when) {
-            None => "Pas encore joué".to_owned(),
-            Some(last) => format!(
+            None => tr!(self.lang, "Pas encore joué", "Not played yet"),
+            Some(last) => tr!(
+                self.lang,
                 "{} partie{} · dernière le {}",
+                "{} game{} · last on {}",
                 played.len(),
-                plural(played.len()),
-                DateTime::local(last.when).short()
+                plural(self.lang, played.len()),
+                DateTime::local(last.when).short(self.lang)
             ),
         };
         button(
@@ -74,19 +109,23 @@ impl App {
                 if atlas.info.numbers {
                     numbers_thumbnail()
                 } else {
-                    self.thumbnails[index].view(130.0)
+                    self.thumbnails[index].view(130.0, self.lang)
                 },
                 column![
-                    text(atlas.info.category.to_uppercase())
+                    text(atlas.info.category.get(self.lang).to_uppercase())
                         .size(11)
                         .font(style::FONT_SEMIBOLD)
                         .color(style::MUTED),
-                    text(atlas.info.title.clone())
+                    text(atlas.info.title.get(self.lang))
                         .size(16)
                         .font(style::FONT_SEMIBOLD),
-                    text(format!("{} {}", atlas.countries.len(), atlas.info.many))
-                        .size(13)
-                        .color(style::MUTED),
+                    text(format!(
+                        "{} {}",
+                        atlas.countries.len(),
+                        atlas.info.many.get(self.lang)
+                    ))
+                    .size(13)
+                    .color(style::MUTED),
                     text(summary).size(12).color(style::MUTED),
                 ]
                 .spacing(3)
@@ -120,18 +159,18 @@ impl App {
                     .height(8)
                     .style(style::dot(score_color(session.score))),
                 column![
-                    text(atlas.regions[region].name.clone()).size(14),
+                    text(atlas.regions[region].name.get(self.lang)).size(14),
                     text(format!(
                         "{} · {}",
-                        atlas.info.title,
-                        mode_title(session.mode, &atlas.info)
+                        atlas.info.title.get(self.lang),
+                        mode_title(session.mode, &atlas.info, self.lang)
                     ))
                     .size(12)
                     .color(style::MUTED),
                 ]
                 .width(Fill),
                 column![
-                    text(percent(session.score))
+                    text(percent(self.lang, session.score))
                         .size(14)
                         .font(style::FONT_SEMIBOLD),
                     text(clock(Duration::from_secs(u64::from(session.seconds))))
@@ -152,14 +191,18 @@ impl App {
         }
         if empty {
             list = list.push(
-                text("Aucune partie pour l'instant.")
-                    .size(13)
-                    .color(style::MUTED),
+                text(tr!(
+                    self.lang,
+                    "Aucune partie pour l'instant.",
+                    "No games yet."
+                ))
+                .size(13)
+                .color(style::MUTED),
             );
         }
         container(
             column![
-                text("Dernières parties")
+                text(tr!(self.lang, "Dernières parties", "Recent games"))
                     .size(16)
                     .font(style::FONT_SEMIBOLD),
                 list

@@ -19,182 +19,216 @@
 # et laisse Samoa, Tonga ou Niue à l'est avec leurs voisins.
 [world]
 name = "Monde entier"
+en = "Whole world"
 view = [-169, -57, 191, 84]
 center = 11
 
 [[continent]]
 id = "afrique"
 name = "Afrique"
+en = "Africa"
 view = [-26, -36, 60, 38]
 
 [[continent]]
 id = "am-nord"
 name = "Amérique du Nord"
+en = "North America"
 view = [-170, 5, -52, 75]
 
 [[continent]]
 id = "am-sud"
 name = "Amérique du Sud"
+en = "South America"
 view = [-84, -56, -32, 13]
 
 [[continent]]
 id = "asie"
 name = "Asie"
+en = "Asia"
 view = [25, -11, 150, 56]
 
 [[continent]]
 id = "europe"
 name = "Europe"
+en = "Europe"
 view = [-25, 34, 45, 71]
 
 [[continent]]
 id = "oceanie"
 name = "Océanie"
+en = "Oceania"
 view = [110, -48, 205, 16]
 
 [[sub]]
 id = "afr-nord"
 name = "Afrique du Nord"
+en = "North Africa"
 continent = "afrique"
 
 [[sub]]
 id = "afr-ouest"
 name = "Afrique de l'Ouest"
+en = "West Africa"
 continent = "afrique"
 
 [[sub]]
 id = "afr-centre"
 name = "Afrique centrale"
+en = "Central Africa"
 continent = "afrique"
 
 [[sub]]
 id = "afr-est"
 name = "Afrique de l'Est"
+en = "East Africa"
 continent = "afrique"
 view = [21, -27, 60, 19]
 
 [[sub]]
 id = "afr-australe"
 name = "Afrique australe"
+en = "Southern Africa"
 continent = "afrique"
 
 [[sub]]
 id = "am-nord"
 name = "Canada, États-Unis, Mexique"
+en = "Canada, United States, Mexico"
 continent = "am-nord"
 view = [-170, 13, -52, 75]
 
 [[sub]]
 id = "am-centrale"
 name = "Amérique centrale"
+en = "Central America"
 continent = "am-nord"
 
 [[sub]]
 id = "caraibes"
 name = "Caraïbes"
+en = "Caribbean"
 continent = "am-nord"
 
 [[sub]]
 id = "am-sud"
 name = "Amérique du Sud"
+en = "South America"
 continent = "am-sud"
 hidden = true
 
 [[sub]]
 id = "asie-est"
 name = "Asie de l'Est"
+en = "East Asia"
 continent = "asie"
 
 [[sub]]
 id = "asie-se"
 name = "Asie du Sud-Est"
+en = "Southeast Asia"
 continent = "asie"
 
 [[sub]]
 id = "asie-sud"
 name = "Asie du Sud"
+en = "South Asia"
 continent = "asie"
 
 [[sub]]
 id = "asie-centrale"
 name = "Asie centrale"
+en = "Central Asia"
 continent = "asie"
 
 [[sub]]
 id = "moyen-orient"
 name = "Moyen-Orient"
+en = "Middle East"
 continent = "asie"
 
 [[sub]]
 id = "caucase"
 name = "Caucase"
+en = "Caucasus"
 continent = "asie"
 
 [[sub]]
 id = "eur-nord"
 name = "Europe du Nord"
+en = "Northern Europe"
 continent = "europe"
 
 [[sub]]
 id = "eur-ouest"
 name = "Europe de l'Ouest"
+en = "Western Europe"
 continent = "europe"
 
 [[sub]]
 id = "eur-sud"
 name = "Europe du Sud"
+en = "Southern Europe"
 continent = "europe"
 
 [[sub]]
 id = "balkans"
 name = "Balkans"
+en = "Balkans"
 continent = "europe"
 
 [[sub]]
 id = "eur-est"
 name = "Europe de l'Est"
+en = "Eastern Europe"
 continent = "europe"
 view = [12, 41, 60, 66]
 
 [[sub]]
 id = "oc-ausnz"
 name = "Australie et Nouvelle-Zélande"
+en = "Australia and New Zealand"
 continent = "oceanie"
 view = [110, -48, 180, -9]
 
 [[sub]]
 id = "melanesie"
 name = "Mélanésie"
+en = "Melanesia"
 continent = "oceanie"
 view = [138, -24, 184, 0]
 
 [[sub]]
 id = "micronesie"
 name = "Micronésie"
+en = "Micronesia"
 continent = "oceanie"
 view = [128, -12, 212, 16]
 
 [[sub]]
 id = "polynesie"
 name = "Polynésie"
+en = "Polynesia"
 continent = "oceanie"
 view = [168, -25, 196, -4]
 
 [[group]]
 id = "petites-antilles"
 name = "Petites Antilles"
+en = "Lesser Antilles"
 continent = "am-nord"
 members = ["ATG", "KNA", "DMA", "LCA", "VCT", "BRB", "GRD", "TTO"]
 
 [[group]]
 id = "grandes-antilles"
 name = "Grandes Antilles et Bahamas"
+en = "Greater Antilles and Bahamas"
 continent = "am-nord"
 members = ["CUB", "JAM", "HTI", "DOM", "BHS"]
 
 [[group]]
 id = "ue"
 name = "Union européenne"
+en = "European Union"
 continent = "europe"
 view = [-25, 34, 35, 71]
 members = [
@@ -205,6 +239,7 @@ members = [
 [[group]]
 id = "iles-afrique"
 name = "Îles africaines"
+en = "African islands"
 continent = "afrique"
 view = [-27, -26, 60, 18]
 members = ["CPV", "STP", "COM", "MDG", "MUS", "SYC"]

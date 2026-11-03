@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use geo_core::Mode;
+use geo_core::{Lang, Mode};
 use serde::{Deserialize, Serialize};
 
 use crate::progress::data_dir;
@@ -14,6 +14,9 @@ const MAX_DURATION: u32 = 2 * 3600;
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Settings {
+    /// Langue choisie par l'utilisateur ; sans choix, celle du système.
+    #[serde(default)]
+    pub language: Option<Lang>,
     /// Minuteur activé.
     #[serde(default)]
     pub timer: bool,
@@ -86,6 +89,17 @@ impl Settings {
         self.durations.contains_key(&key(atlas, mode, region))
     }
 
+    /// Langue en vigueur : celle choisie, sinon celle du système.
+    pub fn lang(&self) -> Lang {
+        self.language.unwrap_or_else(crate::i18n::system)
+    }
+
+    /// Le choix est enregistré : il vaut pour les lancements suivants.
+    pub fn set_language(&mut self, lang: Lang) {
+        self.language = Some(lang);
+        self.save();
+    }
+
     pub fn set_by_continent(&mut self, by_continent: bool) {
         self.by_continent = by_continent;
         self.save();
@@ -137,6 +151,21 @@ mod tests {
         assert_eq!(default_duration(Mode::Free, 9), 60); // minimum 1 min
         assert_eq!(default_duration(Mode::Identify, 46), 330);
         assert_eq!(default_duration(Mode::Locate, 197), 1800);
+    }
+
+    /// Sans choix, la langue suit celle du système ; un choix est gardé et enregistré.
+    #[test]
+    fn chosen_language_is_kept() {
+        let mut s = Settings::default();
+        assert_eq!(s.lang(), crate::i18n::system());
+        s.set_language(Lang::En);
+        assert_eq!(s.lang(), Lang::En);
+        let json = serde_json::to_string(&s).unwrap();
+        let back: Settings = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.lang(), Lang::En);
+        // Les anciens réglages, sans langue, restent lisibles.
+        let old: Settings = serde_json::from_str(r#"{"timer": true}"#).unwrap();
+        assert_eq!(old.language, None);
     }
 
     #[test]

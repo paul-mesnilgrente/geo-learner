@@ -9,9 +9,11 @@ use iced::{Center, Element, Fill, Theme};
 use super::{App, Message, clock, mode_title, percent, plural, score_color, section_title};
 use crate::chart::{Chart, Unit};
 use crate::dates::DateTime;
+use crate::i18n::Lang;
 use crate::icons::{Icon, icon};
 use crate::progress::Session;
 use crate::style;
+use crate::tr;
 use crate::words::{Words, capitalize};
 
 /// Nombre de parties prises en compte dans la moyenne récente.
@@ -25,15 +27,15 @@ impl App {
         let world = self.world();
         let id = &world.info.id;
         let zone = &world.regions[self.region];
-        let words = Words::of(&world.info);
+        let words = Words::of(&world.info, self.lang);
         let runs = self.progress.runs(id, self.mode, &zone.id);
 
         let title = row![
-            section_title("Progression"),
+            section_title(&tr!(self.lang, "Progression", "Progress")),
             text(format!(
                 "{} · {}",
-                zone.name,
-                mode_title(self.mode, &self.world().info)
+                zone.name.get(self.lang),
+                mode_title(self.mode, &self.world().info, self.lang)
             ))
             .size(12)
             .color(style::MUTED),
@@ -47,10 +49,13 @@ impl App {
                     container(
                         row![
                             icon(Icon::Chart, 22.0, style::MUTED),
-                            text(
+                            text(tr!(
+                                self.lang,
                                 "Pas encore de partie pour ce mode et cette zone. Chaque partie \
-                                 terminée s'ajoutera ici, avec son score et son temps."
-                            )
+                                 terminée s'ajoutera ici, avec son score et son temps.",
+                                "No games yet for this mode and area. Each finished game will \
+                                 show up here, with its score and time."
+                            ))
                             .size(13)
                             .color(style::MUTED),
                         ]
@@ -66,34 +71,42 @@ impl App {
 
         let now = DateTime::local(crate::progress::now());
         let dates: Vec<DateTime> = runs.iter().map(|(_, s)| DateTime::local(s.when)).collect();
-        let ticks: Vec<String> = dates.iter().map(DateTime::short).collect();
-        let details: Vec<String> = dates.iter().map(|d| d.long(&now)).collect();
+        let ticks: Vec<String> = dates.iter().map(|d| d.short(self.lang)).collect();
+        let details: Vec<String> = dates.iter().map(|d| d.long(&now, self.lang)).collect();
         let score = Chart {
             unit: Unit::Percent,
+            lang: self.lang,
             values: runs.iter().map(|(_, s)| s.score).collect(),
             ticks: ticks.clone(),
             details: details.clone(),
         };
         let time = Chart {
             unit: Unit::Seconds,
+            lang: self.lang,
             values: runs.iter().map(|(_, s)| s.seconds as f32).collect(),
             ticks,
             details,
         };
         content = content
-            .push(stats(&runs))
+            .push(stats(&runs, self.lang))
             .push(
                 row![
                     chart_card(
                         "Score",
-                        format!(
+                        tr!(
+                            self.lang,
                             "{} {}, moins les erreurs",
+                            "{} {}, minus mistakes",
                             capitalize(words.many()),
-                            words.agree("trouvés")
+                            words.agree("trouvés", "found")
                         ),
                         score,
                     ),
-                    chart_card("Temps", "Durée de chaque partie".into(), time),
+                    chart_card(
+                        tr!(self.lang, "Temps", "Time"),
+                        tr!(self.lang, "Durée de chaque partie", "Length of each game"),
+                        time
+                    ),
                 ]
                 .spacing(12),
             )
@@ -108,17 +121,21 @@ impl App {
         now: &DateTime,
     ) -> Element<'a, Message> {
         let world = self.world();
-        let words = Words::of(&world.info);
+        let words = Words::of(&world.info, self.lang);
         let zone = &world.regions[self.region];
         let mut body = column![
             row![
-                text("Parties")
+                text(tr!(self.lang, "Parties", "Games"))
                     .size(16)
                     .font(style::FONT_SEMIBOLD)
                     .width(Fill),
-                text("Écartez celles qui ne reflètent pas votre niveau.")
-                    .size(12)
-                    .color(style::MUTED),
+                text(tr!(
+                    self.lang,
+                    "Écartez celles qui ne reflètent pas votre niveau.",
+                    "Remove the ones that don't reflect your level."
+                ))
+                .size(12)
+                .color(style::MUTED),
             ]
             .align_y(Center)
         ]
@@ -133,16 +150,22 @@ impl App {
             body = body.push(
                 container(
                     row![
-                        text(format!(
+                        text(tr!(
+                            self.lang,
                             "Partie du {} supprimée.",
-                            DateTime::local(session.when).long(now)
+                            "Game of {} deleted.",
+                            DateTime::local(session.when).long(now, self.lang)
                         ))
                         .size(13)
                         .width(Fill),
-                        button(text("Annuler").size(13).font(style::FONT_SEMIBOLD))
-                            .padding([5, 12])
-                            .style(style::secondary)
-                            .on_press(Message::UndoDelete),
+                        button(
+                            text(tr!(self.lang, "Annuler", "Undo"))
+                                .size(13)
+                                .font(style::FONT_SEMIBOLD)
+                        )
+                        .padding([5, 12])
+                        .style(style::secondary)
+                        .on_press(Message::UndoDelete),
                     ]
                     .spacing(12)
                     .align_y(Center),
@@ -159,7 +182,7 @@ impl App {
             );
         }
 
-        let found = capitalize(&words.agree("trouvés"));
+        let found = capitalize(&words.agree("trouvés", "found"));
         let head =
             |label: String, width: f32| text(label).size(12).color(style::MUTED).width(width);
         body = body.push(
@@ -167,7 +190,7 @@ impl App {
                 text("Date").size(12).color(style::MUTED).width(Fill),
                 head("Score".into(), 80.0),
                 head(found, 90.0),
-                head("Temps".into(), 90.0),
+                head(tr!(self.lang, "Temps", "Time"), 90.0),
                 space().width(30),
             ]
             .spacing(8)
@@ -196,28 +219,34 @@ impl App {
             if session.timed_out() {
                 time = time.push(icon(Icon::Timer, 13.0, style::ORANGE));
             }
-            let date = text(DateTime::local(session.when).long(now))
+            let date = text(DateTime::local(session.when).long(now, self.lang))
                 .size(14)
                 .width(Fill);
             let confirming = self.confirm_delete == Some(index);
             let content = if confirming {
                 row![
                     date,
-                    text(format!(
+                    text(tr!(
+                        self.lang,
                         "Supprimer cette partie ({}, {}) ?",
-                        percent(session.score),
+                        "Delete this game ({}, {})?",
+                        percent(self.lang, session.score),
                         clock(Duration::from_secs(u64::from(session.seconds)))
                     ))
                     .size(13)
                     .color(style::lighten(style::DANGER, 0.3)),
-                    button(text("Annuler").size(13))
+                    button(text(tr!(self.lang, "Annuler", "Cancel")).size(13))
                         .padding([5, 12])
                         .style(style::secondary)
                         .on_press(Message::CancelDelete),
-                    button(text("Supprimer").size(13).font(style::FONT_SEMIBOLD))
-                        .padding([5, 12])
-                        .style(style::danger_soft)
-                        .on_press(Message::DeleteRun(index)),
+                    button(
+                        text(tr!(self.lang, "Supprimer", "Delete"))
+                            .size(13)
+                            .font(style::FONT_SEMIBOLD)
+                    )
+                    .padding([5, 12])
+                    .style(style::danger_soft)
+                    .on_press(Message::DeleteRun(index)),
                 ]
             } else {
                 row![
@@ -227,7 +256,7 @@ impl App {
                             .width(8)
                             .height(8)
                             .style(style::dot(score_color(session.score))),
-                        text(percent(session.score))
+                        text(percent(self.lang, session.score))
                             .size(14)
                             .font(style::FONT_SEMIBOLD),
                     ]
@@ -266,9 +295,14 @@ impl App {
         }
         if runs.len() > RECENT_RUNS {
             let label = if self.all_runs {
-                "Afficher moins".to_owned()
+                tr!(self.lang, "Afficher moins", "Show fewer")
             } else {
-                format!("Afficher les {} parties", runs.len())
+                tr!(
+                    self.lang,
+                    "Afficher les {} parties",
+                    "Show all {} games",
+                    runs.len()
+                )
             };
             body = body.push(
                 button(text(label).size(13))
@@ -281,9 +315,13 @@ impl App {
             body = body.push(
                 row![
                     icon(Icon::Timer, 12.0, style::ORANGE),
-                    text("Partie arrêtée par le minuteur.")
-                        .size(12)
-                        .color(style::MUTED),
+                    text(tr!(
+                        self.lang,
+                        "Partie arrêtée par le minuteur.",
+                        "Game stopped by the timer."
+                    ))
+                    .size(12)
+                    .color(style::MUTED),
                 ]
                 .spacing(6)
                 .align_y(Center),
@@ -308,23 +346,33 @@ impl App {
             .into_iter()
             .filter_map(|(code, n)| {
                 let place = world.countries.iter().find(|c| c.code == code)?;
-                Some((place.name.as_str(), n))
+                Some((place.name.get(self.lang), n))
             })
             .collect();
         let mut body = column![
-            text("À revoir").size(16).font(style::FONT_SEMIBOLD),
-            text("Les plus souvent ratés dans cette série.")
-                .size(12)
-                .color(style::MUTED),
+            text(tr!(self.lang, "À revoir", "To review"))
+                .size(16)
+                .font(style::FONT_SEMIBOLD),
+            text(tr!(
+                self.lang,
+                "Les plus souvent ratés dans cette série.",
+                "Most often missed in this series."
+            ))
+            .size(12)
+            .color(style::MUTED),
         ]
         .spacing(4);
         if missed.is_empty() {
             body = body.push(
                 container(
                     text(if self.progress.runs(id, self.mode, &zone.id).is_empty() {
-                        "Rien pour l'instant."
+                        tr!(self.lang, "Rien pour l'instant.", "Nothing yet.")
                     } else {
-                        "Aucune erreur, bravo !"
+                        tr!(
+                            self.lang,
+                            "Aucune erreur, bravo !",
+                            "No mistakes, well done!"
+                        )
                     })
                     .size(13)
                     .color(style::MUTED),
@@ -363,7 +411,7 @@ impl App {
 }
 
 /// Chiffres clés de la série : nombre de parties, record, dernière partie, moyenne récente.
-fn stats<'a>(runs: &[(usize, &Session)]) -> Element<'a, Message> {
+fn stats<'a>(runs: &[(usize, &Session)], lang: Lang) -> Element<'a, Message> {
     let tile = |value: String, label: String| {
         container(
             column![
@@ -379,7 +427,7 @@ fn stats<'a>(runs: &[(usize, &Session)]) -> Element<'a, Message> {
     let with_time = |s: &Session| {
         format!(
             "{} · {}",
-            percent(s.score),
+            percent(lang, s.score),
             clock(Duration::from_secs(u64::from(s.seconds)))
         )
     };
@@ -398,19 +446,27 @@ fn stats<'a>(runs: &[(usize, &Session)]) -> Element<'a, Message> {
     row![
         tile(
             runs.len().to_string(),
-            format!("partie{}", plural(runs.len()))
+            tr!(lang, "partie{}", "game{}", plural(lang, runs.len()))
         ),
-        tile(best.map(with_time).unwrap_or_default(), "record".into()),
+        tile(
+            best.map(with_time).unwrap_or_default(),
+            tr!(lang, "record", "best")
+        ),
         tile(
             last.map(with_time).unwrap_or_default(),
-            "dernière partie".into()
+            tr!(lang, "dernière partie", "last game")
         ),
         tile(
-            percent(average),
+            percent(lang, average),
             if recent.len() > 1 {
-                format!("moyenne récente ({})", recent.len())
+                tr!(
+                    lang,
+                    "moyenne récente ({})",
+                    "recent average ({})",
+                    recent.len()
+                )
             } else {
-                "moyenne".into()
+                tr!(lang, "moyenne", "average")
             }
         ),
     ]
@@ -418,11 +474,15 @@ fn stats<'a>(runs: &[(usize, &Session)]) -> Element<'a, Message> {
     .into()
 }
 
-fn chart_card<'a>(title: &'a str, subtitle: String, chart: Chart) -> Element<'a, Message> {
+fn chart_card<'a>(
+    title: impl Into<String>,
+    subtitle: String,
+    chart: Chart,
+) -> Element<'a, Message> {
     container(
         column![
             row![
-                text(title).size(16).font(style::FONT_SEMIBOLD),
+                text(title.into()).size(16).font(style::FONT_SEMIBOLD),
                 text(subtitle).size(12).color(style::MUTED),
             ]
             .spacing(10)

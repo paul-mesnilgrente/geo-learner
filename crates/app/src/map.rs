@@ -1,7 +1,7 @@
 //! Carte interactive : projection des contours, caméra (zoom / déplacement), rendu et clics.
 
 use geo_core::projection::{project, project_ring, project_view};
-use geo_core::{Mark, Quiz, Shape, World};
+use geo_core::{Lang, Mark, Quiz, Shape, World};
 use iced::alignment::Vertical;
 use iced::mouse::{self, ScrollDelta};
 use iced::widget::canvas::fill::{Fill, Rule};
@@ -581,6 +581,8 @@ pub struct MapView<'a> {
     pub situation: Option<&'a Situation>,
     /// Exploration, sans quiz : lieux de la zone en évidence, tous nommés (ou numérotés).
     pub explore: bool,
+    /// Langue des noms affichés.
+    pub lang: Lang,
     /// Lieux mis en avant (repères), d'une autre couleur.
     pub emphasis: &'a [usize],
     pub cache: &'a Cache,
@@ -779,17 +781,21 @@ impl MapView<'_> {
                     .then(|| crate::number_of(country))
                     .flatten()
                 {
-                    Some(number) => format!("{number} · {}", country.name),
-                    None => country.name.clone(),
+                    Some(number) => format!("{number} · {}", country.name.get(self.lang)),
+                    None => country.name.get(self.lang).to_owned(),
                 }
             }),
             Place::Territory(i) => {
                 let territory = &self.world.territories[i];
                 Some(match territory.owner {
                     Some(owner) if self.reveals(owner) => {
-                        format!("{} · {}", territory.name, self.world.countries[owner].name)
+                        format!(
+                            "{} · {}",
+                            territory.name.get(self.lang),
+                            self.world.countries[owner].name.get(self.lang)
+                        )
                     }
-                    _ => territory.name.clone(),
+                    _ => territory.name.get(self.lang).to_owned(),
                 })
             }
         }
@@ -983,7 +989,7 @@ impl MapView<'_> {
             let country = &self.world.countries[c];
             let name = &match self.world.info.numbers.then(|| crate::number_of(country)) {
                 Some(Some(number)) => number,
-                _ => country.name.clone(),
+                _ => country.name.get(self.lang).to_owned(),
             };
             let size = if t.scale > 2000.0 { 13.0 } else { 11.0 };
             let width = name.chars().count() as f32 * size * 0.56;
@@ -1072,7 +1078,11 @@ impl MapView<'_> {
         if let (Some(_), Some(p)) = (hovered, cursor) {
             tag(
                 frame,
-                "Voir sur la carte du monde",
+                &crate::tr!(
+                    self.lang,
+                    "Voir sur la carte du monde",
+                    "Show on the world map"
+                ),
                 Point::new(p.x, p.y - 24.0),
                 style::SURFACE_3,
                 1.0,
@@ -1184,7 +1194,7 @@ impl MapView<'_> {
                         .with_width(3.0),
                 );
             }
-            let name = &self.world.countries[flash.country].name;
+            let name = self.world.countries[flash.country].name.get(self.lang);
             tag(
                 frame,
                 name,
@@ -1471,6 +1481,7 @@ mod tests {
             situation: None,
             explore: false,
             emphasis: &[],
+            lang: Lang::Fr,
             cache: &cache,
         };
         let bounds = rect(0.0, 0.0, 1000.0, 700.0);
