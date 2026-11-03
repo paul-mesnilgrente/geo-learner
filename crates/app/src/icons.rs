@@ -21,6 +21,8 @@ pub enum Icon {
     Chart,
     Globe,
     Close,
+    /// Chevron vers le bas : la zone s'ouvre sur des sous-zones.
+    Chevron,
 }
 
 struct Program {
@@ -76,6 +78,11 @@ impl<Message> canvas::Program<Message> for Program {
                 b.line_to(p(12.0, 19.0));
                 b.move_to(p(5.0, 12.0));
                 b.line_to(p(19.0, 12.0));
+            }
+            Icon::Chevron => {
+                b.move_to(p(6.0, 9.0));
+                b.line_to(p(12.0, 15.0));
+                b.line_to(p(18.0, 9.0));
             }
             Icon::Minus => {
                 b.move_to(p(5.0, 12.0));

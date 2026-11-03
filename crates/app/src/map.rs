@@ -12,6 +12,7 @@ use iced::widget::canvas::{
 use iced::widget::text::Alignment;
 use iced::{Color, Pixels, Point, Rectangle, Renderer, Size, Theme, Vector, color};
 
+use crate::progress::Level;
 use crate::style;
 
 /// En dessous de cette taille à l'écran (en pixels), un pays est signalé par une pastille.
@@ -585,6 +586,9 @@ pub struct MapView<'a> {
     pub lang: Lang,
     /// Lieux mis en avant (repères), d'une autre couleur.
     pub emphasis: &'a [usize],
+    /// Carte de maîtrise (aperçu, exploration) : niveau de chaque lieu (index dans
+    /// `countries`), `None` s'il n'a jamais été joué.
+    pub mastery: Option<&'a [Option<Level>]>,
     pub cache: &'a Cache,
 }
 
@@ -694,6 +698,15 @@ impl MapView<'_> {
     fn tint_of(&self, country: usize) -> Tint {
         match self.quiz.mark(country) {
             Some(Mark::Pending) if self.emphasis.contains(&country) => Tint::Emphasis,
+            // Mêmes couleurs que la carte « À revoir » ; gris si jamais joué.
+            Some(Mark::Pending) if let Some(levels) = self.mastery => {
+                match levels.get(country).copied().flatten() {
+                    Some(Level::Known) => Tint::Perfect,
+                    Some(Level::Learning) => Tint::Second,
+                    Some(Level::Weak) => Tint::Third,
+                    None => Tint::Pending,
+                }
+            }
             Some(Mark::Pending) if self.preview || self.explore => Tint::Highlight,
             // Carte de situation : toutes les terres en gris neutre, aucune n'est à trouver.
             None if self.situation.is_some() => Tint::Pending,
@@ -1481,6 +1494,7 @@ mod tests {
             situation: None,
             explore: false,
             emphasis: &[],
+            mastery: None,
             lang: Lang::Fr,
             cache: &cache,
         };

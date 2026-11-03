@@ -17,6 +17,7 @@ use super::{Message, section_title};
 use crate::i18n::Lang;
 use crate::icons::{Icon, icon};
 use crate::map::{self, Camera, MapEvent, MapView, Place, Projection};
+use crate::progress::Level;
 use crate::style;
 use crate::{ATLASES, tr};
 
@@ -41,6 +42,8 @@ pub struct Explorer {
     quiz: Quiz,
     cache: Cache,
     pub locator: Option<Locator>,
+    /// Carte de maîtrise reprise de l'aperçu : niveau de chaque lieu.
+    mastery: Option<Vec<Option<Level>>>,
     /// Départements repères (un par dizaine), s'il s'agit des départements.
     anchors: Vec<usize>,
     show_anchors: bool,
@@ -54,7 +57,12 @@ struct Flight {
 }
 
 impl Explorer {
-    pub fn new(atlas: usize, region: usize, lang: Lang) -> Self {
+    pub fn new(
+        atlas: usize,
+        region: usize,
+        lang: Lang,
+        mastery: Option<Vec<Option<Level>>>,
+    ) -> Self {
         let world = &ATLASES[atlas];
         let zone = &world.regions[region];
         let view = map::view_rect(zone.view, zone.center);
@@ -76,6 +84,7 @@ impl Explorer {
                 Vec::new(),
             ),
             cache: Cache::new(),
+            mastery,
             locator: None,
             anchors: ANCHORS
                 .iter()
@@ -285,6 +294,7 @@ impl Explorer {
             } else {
                 &[]
             },
+            mastery: self.mastery.as_deref(),
             lang: self.lang,
             cache: &self.cache,
         };
@@ -331,6 +341,37 @@ impl Explorer {
     }
 
     /// Liste des lieux de la zone, par sous-région ; le lieu choisi est détaillé en haut.
+    /// Légende de la carte de maîtrise (mêmes couleurs que la carte « À revoir »).
+    fn mastery_legend(&self) -> Element<'_, Message> {
+        let lang = self.lang;
+        let entry = |label: String, color: iced::Color| -> Element<'_, Message> {
+            row![
+                container(iced::widget::space())
+                    .width(8)
+                    .height(8)
+                    .style(move |_: &Theme| container::Style {
+                        background: Some(color.into()),
+                        border: iced::border::rounded(4),
+                        ..container::Style::default()
+                    }),
+                text(label).size(12).color(style::MUTED),
+            ]
+            .spacing(6)
+            .align_y(Center)
+            .into()
+        };
+        Row::with_children([
+            entry(tr!(lang, "acquis", "known"), style::SUCCESS),
+            entry(tr!(lang, "en cours", "learning"), style::WARNING),
+            entry(tr!(lang, "à revoir", "to review"), style::ORANGE),
+            entry(tr!(lang, "jamais joué", "not played yet"), style::LAND),
+        ])
+        .spacing(14)
+        .wrap()
+        .vertical_spacing(6)
+        .into()
+    }
+
     fn panel(&self) -> Element<'_, Message> {
         let zone = &self.world.regions[self.region];
         let mut body = Column::new().spacing(16);
@@ -343,6 +384,9 @@ impl Explorer {
             .size(13)
             .color(style::MUTED),
         );
+        if self.mastery.is_some() {
+            body = body.push(self.mastery_legend());
+        }
         if let Some(c) = self.selected {
             let group = &self.world.regions[self.group_of(c)];
             body = body.push(

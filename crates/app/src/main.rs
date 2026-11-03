@@ -23,7 +23,8 @@ use geo_core::World;
 /// les numéros des départements, dérivés des départements (sans carte, rien de plus à stocker).
 pub static ATLASES: LazyLock<Vec<World>> = LazyLock::new(|| {
     let load = |bytes: &[u8]| World::from_bytes(bytes).expect("atlas invalide");
-    let departements = load(include_bytes!("../../../assets/fr-departements.bin"));
+    let mut departements = load(include_bytes!("../../../assets/fr-departements.bin"));
+    add_number_zones(&mut departements);
     let numbers = numbers_quiz(&departements);
     vec![
         load(include_bytes!("../../../assets/world.bin")),
@@ -43,7 +44,12 @@ fn numbers_quiz(departements: &World) -> World {
     world.info.id = "fr-numeros".into();
     world.info.title = geo_core::Text::new("Numéros des départements", "Department numbers");
     world.info.numbers = true;
+    world
+}
 
+/// Zones « Par numéro » des départements : une par dizaine (01–09, 10–19…, 971–976), pour
+/// apprendre par petits paquets, avec ou sans carte.
+fn add_number_zones(world: &mut World) {
     // Dizaine d'un département : la Corse (2A, 2B) reste dans les 20, l'outre-mer à part.
     let tens = |c: &geo_core::Country| -> Option<u32> {
         let number = number_of(c)?;
@@ -83,7 +89,7 @@ fn numbers_quiz(departements: &World) -> World {
             97 => "971–976".to_owned(),
             t => format!("{t}0–{t}9"),
         };
-        let view = members_view(&world, &members);
+        let view = members_view(world, &members);
         world.regions.push(geo_core::Region {
             id: format!("numeros-{t}"),
             name: geo_core::Text::new(&name, &name),
@@ -95,7 +101,6 @@ fn numbers_quiz(departements: &World) -> World {
             hidden: false,
         });
     }
-    world
 }
 
 /// Cadrage (lon, lat) englobant le territoire principal de ces lieux, avec une marge.
@@ -272,6 +277,24 @@ mod tests {
         assert_eq!(tens.iter().map(|r| r.members.len()).sum::<usize>(), 101);
         // La Corse avec les 20 : 2A, 2B et 21 à 29.
         assert_eq!(tens[2].members.len(), 11);
+    }
+
+    #[test]
+    fn departements_can_be_played_by_number() {
+        let departements = ATLASES
+            .iter()
+            .find(|a| a.info.id == "fr-departements")
+            .unwrap();
+        let numbers = ATLASES.iter().find(|a| a.info.numbers).unwrap();
+        let ids = |w: &geo_core::World| -> Vec<String> {
+            w.regions
+                .iter()
+                .filter(|r| r.id.starts_with("numeros-") || r.id == "par-numero")
+                .map(|r| r.id.clone())
+                .collect()
+        };
+        assert_eq!(ids(departements).len(), 12);
+        assert_eq!(ids(departements), ids(numbers));
     }
 
     #[test]

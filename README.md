@@ -44,7 +44,9 @@ l'exécution de l'atlas des départements : il n'ajoute rien à l'exécutable. E
 toutes les paires numéro · nom s'affichent, les ratées en rouge.
 
 Pour apprendre les numéros par petits paquets, ce quiz a aussi une zone par dizaine
-(« Par numéro » : 01–09, 10–19, …, 90–95, 971–976). L'exploration des départements rappelle la
+(« Par numéro » : 01–09, 10–19, …, 90–95, 971–976). Les **Départements français** (avec carte)
+les ont aussi, en plus de « Métropole » (et ses 13 régions) et « Outre-mer ». Une zone qui
+s'ouvre sur des sous-zones porte un chevron. L'exploration des départements rappelle la
 logique des numéros (l'ordre alphabétique des noms d'origine), met en jaune un repère par
 dizaine (01 Ain, 10 Aube, 21 Côte-d'Or… 90 Territoire de Belfort) et liste les exceptions.
 
@@ -148,7 +150,11 @@ la zone nommés (numérotés pour les numéros des départements), et leur liste
 sous-région ; un nom cliqué y emmène la carte. De quoi faire connaissance avant de se tester.
 
 Sur la page du quiz, un **aperçu** montre la zone choisie, cadrée comme en partie, avec ses pays
-en bleu.
+en bleu. Dès qu'il y a des parties dans le mode choisi, il passe en **carte de maîtrise** : chaque
+lieu prend la couleur de son niveau (vert acquis, jaune en cours, orange à revoir, gris jamais
+joué), comme la carte « À revoir ». Le choix « Zone / Maîtrise » de l'aperçu permet de revenir à
+la zone seule ; l'exploration ouverte depuis l'aperçu reprend la carte de maîtrise, avec sa
+légende.
 
 La liste compte 197 pays : les 193 membres de l'ONU, plus le Vatican, la Palestine, le Kosovo
 et Taïwan. Elle se modifie dans `data/countries.toml`.
@@ -267,7 +273,8 @@ Paramètres de `GEO_DEMO`, séparés par `;` :
   (et quelques autres séries) ; `delete` supprime la dernière, `confirm` affiche sa demande de
   confirmation, `bottom` défile en bas de page ;
 - `globe=N` : carte de situation de l'encart n° N ouverte ;
-- `explore` : exploration ouverte, avec un lieu choisi (`explore=CA-PE`) ;
+- `explore` : exploration ouverte, avec un lieu choisi (`explore=CA-PE`) ; avec `progress`, elle
+  part de l'aperçu, carte de maîtrise comprise ;
 - `lang=en` : langue imposée, sans l'enregistrer ;
 - `review=SVN,SVK` : partie de révision limitée à ces lieux ;
 - `skips=3` : questions passées après les réponses (`target=FRA;answers=DEU,DEU,DEU;skips=3`

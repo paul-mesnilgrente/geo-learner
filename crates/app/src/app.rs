@@ -22,7 +22,7 @@ use crate::ATLASES;
 use crate::i18n::Lang;
 use crate::icons::{Icon, icon};
 use crate::map::{self, Camera, Flash, MapEvent, MapView, Projection, Transform};
-use crate::progress::{self, Progress, Session};
+use crate::progress::{self, Level, Progress, Session};
 use crate::settings::Settings;
 use crate::style;
 use crate::tr;
@@ -89,6 +89,8 @@ pub enum Message {
     ToggleTimer,
     /// Active ou désactive la seconde chance des lieux ratés.
     ToggleSecondChance,
+    /// Aperçu coloré par maîtrise (`true`) ou zone seule.
+    ShowMastery(bool),
     /// Avancement affiché par continent (`true`) ou par sous-région.
     ByContinent(bool),
     /// Allonge (`true`) ou raccourcit la durée du minuteur.
@@ -152,6 +154,8 @@ pub struct App {
     explorer: Option<Explorer>,
     /// Aperçu de la zone choisie, sur l'écran d'accueil.
     preview: Preview,
+    /// Aperçu coloré par maîtrise (s'il y a déjà des parties) plutôt que la zone seule.
+    show_mastery: bool,
     voice: Voice,
     #[cfg(debug_assertions)]
     dev_ticks: u32,
@@ -230,6 +234,12 @@ struct Preview {
     /// Partie fictive dont les pays « à trouver » sont ceux de la zone.
     quiz: Quiz,
     cache: Cache,
+    /// Carte de maîtrise affichée : niveau de chaque lieu dans le mode choisi.
+    mastery: Option<Vec<Option<Level>>>,
+    /// Ce dont dépend `mastery` (mode, affichage, parties) : recalculé quand ça change.
+    mastery_key: Option<(Mode, bool, usize)>,
+    /// Des lieux de la zone ont déjà été joués dans ce mode (choix Zone / Maîtrise proposé).
+    has_mastery: bool,
 }
 
 impl Preview {
@@ -245,6 +255,9 @@ impl Preview {
             view: map::view_rect(zone.view, zone.center),
             quiz: Quiz::new(Mode::Free, world.countries.len(), members, Vec::new()),
             cache: Cache::new(),
+            mastery: None,
+            mastery_key: None,
+            has_mastery: false,
         }
     }
 
@@ -266,6 +279,7 @@ impl Preview {
             situation: None,
             explore: false,
             emphasis: &[],
+            mastery: self.mastery.as_deref(),
             cache: &self.cache,
         };
         let map: Element<'_, MapEvent> = canvas(map_view).width(Fill).height(Fill).into();
@@ -328,6 +342,7 @@ impl App {
             game: None,
             explorer: None,
             preview: Preview::new(0, 0),
+            show_mastery: true,
             voice: Voice {
                 commands: None,
                 installed: false,
@@ -431,10 +446,19 @@ impl App {
                 let last = self.progress.sessions.len() - 1;
                 let _ = self.update(Message::AskDelete(last));
             }
+            // Exploration ouverte depuis l'aperçu, avec sa carte de maîtrise.
+            if let Some(code) = &demo.explore {
+                let _ = self.update(Message::OpenExplore);
+                if let Some(explorer) = &mut self.explorer
+                    && let Some(c) = explorer.find(code)
+                {
+                    explorer.on_map(MapEvent::Click(Some(c)));
+                }
+            }
             return self;
         }
         if let Some(code) = &demo.explore {
-            let mut explorer = Explorer::new(self.atlas, self.region, self.lang);
+            let mut explorer = Explorer::new(self.atlas, self.region, self.lang, None);
             if let Some(c) = explorer.find(code) {
                 explorer.on_map(MapEvent::Click(Some(c)));
             }
@@ -609,9 +633,42 @@ impl App {
     // --- Mise à jour ---
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
+        let task = self.handle(message);
+        self.sync_preview();
+        task
+    }
+
+    /// Recalcule la carte de maîtrise de l'aperçu si le mode, l'affichage ou l'historique ont
+    /// changé (le nouvel aperçu d'une zone part sans).
+    fn sync_preview(&mut self) {
+        let key = (self.mode, self.show_mastery, self.progress.sessions.len());
+        if self.preview.mastery_key == Some(key) {
+            return;
+        }
+        let world = self.preview.world;
+        let mastery = self.progress.mastery(&world.info.id, self.mode);
+        let levels: Vec<Option<Level>> = world
+            .countries
+            .iter()
+            .map(|c| mastery.get(&c.code).map(|m| m.level))
+            .collect();
+        let zone = &world.regions[self.preview.region];
+        self.preview.has_mastery = zone.members.iter().any(|&c| levels[c].is_some());
+        self.preview.mastery = (self.show_mastery && self.preview.has_mastery).then_some(levels);
+        self.preview.mastery_key = Some(key);
+        self.preview.cache.clear();
+    }
+
+    fn handle(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::OpenExplore => {
-                self.explorer = Some(Explorer::new(self.atlas, self.region, self.lang));
+                self.sync_preview();
+                self.explorer = Some(Explorer::new(
+                    self.atlas,
+                    self.region,
+                    self.lang,
+                    self.preview.mastery.clone(),
+                ));
             }
             Message::CloseExplore => self.explorer = None,
             Message::ExploreMap(event) => {
@@ -707,6 +764,7 @@ impl App {
             }
             Message::ToggleTimer => self.settings.toggle_timer(),
             Message::ToggleSecondChance => self.settings.toggle_second_chance(),
+            Message::ShowMastery(show) => self.show_mastery = show,
             Message::ByContinent(by_continent) => self.settings.set_by_continent(by_continent),
             Message::StepTimer(up) => {
                 let zone = &self.world().regions[self.region];
@@ -1389,6 +1447,28 @@ impl App {
                 .on_press(Message::SelectRegion(index))
                 .into()
         };
+        // Zone qui s'ouvre sur des sous-zones (« Métropole » et ses régions) : chevron.
+        let has_subs = |index: usize| {
+            self.world()
+                .regions
+                .iter()
+                .any(|r| r.parent == Some(index) && !r.hidden)
+        };
+        let opening = |index: usize, label: &str, on: bool| -> Element<'_, Message> {
+            let color = if on { Color::WHITE } else { style::MUTED };
+            button(
+                row![
+                    text(label.to_owned()).size(14),
+                    icon(Icon::Chevron, 12.0, color)
+                ]
+                .spacing(6)
+                .align_y(Center),
+            )
+            .padding(iced::Padding::from([8, 16]).right(12))
+            .style(style::pill(on))
+            .on_press(Message::SelectRegion(index))
+            .into()
+        };
         let top = Row::with_children(
             self.world()
                 .regions
@@ -1397,11 +1477,12 @@ impl App {
                 .filter(|(_, r)| matches!(r.kind, RegionKind::World | RegionKind::Continent))
                 // Le continent ouvert reste marqué quand une de ses zones est choisie.
                 .map(|(i, r)| {
-                    pill(
-                        i,
-                        r.name.get(self.lang),
-                        self.region == i || open_continent == Some(i),
-                    )
+                    let on = self.region == i || open_continent == Some(i);
+                    if has_subs(i) {
+                        opening(i, r.name.get(self.lang), on)
+                    } else {
+                        pill(i, r.name.get(self.lang), on)
+                    }
                 }),
         )
         .spacing(8)
@@ -1604,13 +1685,31 @@ impl App {
                         .size(16)
                         .font(style::FONT_SEMIBOLD)
                         .width(Fill),
-                    text(format!(
-                        "{} {}",
-                        zone.members.len(),
-                        self.world().info.many.get(self.lang)
-                    ))
-                    .size(13)
-                    .color(style::MUTED),
+                    // Zone seule ou maîtrise, dès qu'il y a des parties dans ce mode.
+                    if self.preview.has_mastery {
+                        let choice = |label: String, on: bool| {
+                            button(text(label).size(12))
+                                .padding([4, 10])
+                                .style(style::pill(self.show_mastery == on))
+                                .on_press(Message::ShowMastery(on))
+                        };
+                        Element::from(
+                            row![
+                                choice(tr!(self.lang, "Zone", "Area"), false),
+                                choice(tr!(self.lang, "Maîtrise", "Mastery"), true),
+                            ]
+                            .spacing(4),
+                        )
+                    } else {
+                        text(format!(
+                            "{} {}",
+                            zone.members.len(),
+                            self.world().info.many.get(self.lang)
+                        ))
+                        .size(13)
+                        .color(style::MUTED)
+                        .into()
+                    },
                 ]
                 .align_y(Center),
                 // Un clic sur l'aperçu ouvre la carte à explorer, sans quiz.
@@ -1908,6 +2007,7 @@ impl App {
             situation: None,
             explore: false,
             emphasis: &[],
+            mastery: None,
             cache: &game.cache,
         };
         let map: Element<'a, MapEvent> = canvas(map_view).width(Fill).height(Fill).into();
@@ -2308,8 +2408,12 @@ impl App {
 
         // Avancement par continent ou par sous-région (mode libre, zones assez grandes).
         if quiz.mode() == Mode::Free {
-            let in_quiz =
-                |region: &&geo_core::Region| region.members.iter().any(|&c| quiz.mark(c).is_some());
+            // Un regroupement qui couvre tout le quiz (« Par numéro ») n'est pas une zone.
+            let whole = game.world.regions[0].members.len();
+            let in_quiz = |region: &&geo_core::Region| {
+                region.members.len() < whole
+                    && region.members.iter().any(|&c| quiz.mark(c).is_some())
+            };
             let count_of = |kind: RegionKind| {
                 game.world
                     .regions
@@ -2330,7 +2434,13 @@ impl App {
             };
             let mut rows = Column::new().spacing(12);
             let mut count = 0;
-            for region in game.world.regions.iter().filter(|r| r.kind == kind) {
+            for region in game
+                .world
+                .regions
+                .iter()
+                .filter(|r| r.kind == kind)
+                .filter(in_quiz)
+            {
                 let members: Vec<usize> = region
                     .members
                     .iter()

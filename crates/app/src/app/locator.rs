@@ -144,6 +144,7 @@ impl Locator {
             situation: Some(&self.situation),
             explore: false,
             emphasis: &[],
+            mastery: None,
             // Aucun nom n'est affiché sur la carte de situation.
             lang: geo_core::Lang::Fr,
             cache: &self.cache,
