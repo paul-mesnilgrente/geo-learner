@@ -198,7 +198,8 @@ Paramètres de `GEO_DEMO`, séparés par `;` :
   (et quelques autres séries) ; `delete` supprime la dernière, `confirm` affiche sa demande de
   confirmation, `bottom` défile en bas de page ;
 - `globe=N` : carte de situation de l'encart n° N ouverte ;
-- `home` : accueil affiché, même avec `atlas`, `region` ou `progress` (sinon page du quiz).
+- `home` : accueil affiché, même avec `atlas`, `region` ou `progress` (sinon page du quiz) ;
+- `flight=0.5` : zoom de la carte de situation figé à cet instant (0 à 1).
 
 `GEO_WINDOW=1600x900` impose la taille de la fenêtre.
 

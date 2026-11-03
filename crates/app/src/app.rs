@@ -420,6 +420,9 @@ impl App {
         }
         if let Some(inset) = demo.globe {
             game.locator = Locator::new(self.world(), inset);
+            if let (Some(locator), Some(t)) = (&mut game.locator, demo.flight) {
+                locator.freeze(t);
+            }
         }
         game.flash = None;
         self.game = Some(game);

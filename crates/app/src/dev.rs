@@ -46,6 +46,8 @@ pub struct Demo {
     pub globe: Option<usize>,
     /// Accueil affiché même avec un quiz ou des parties fictives (`home`).
     pub home: bool,
+    /// Zoom de la carte de situation figé à cet instant, entre 0 et 1 (`flight=0.5`).
+    pub flight: Option<f32>,
 }
 
 /// Parties fictives d'une série : scores en progrès, temps en baisse, un minuteur dépassé.
@@ -120,6 +122,7 @@ pub fn demo() -> Option<Demo> {
             "confirm" => demo.confirm = true,
             "globe" => demo.globe = value.parse().ok(),
             "home" => demo.home = true,
+            "flight" => demo.flight = value.parse().ok(),
             "type" => demo.typed = value.split('|').map(str::to_owned).collect(),
             _ => {}
         }

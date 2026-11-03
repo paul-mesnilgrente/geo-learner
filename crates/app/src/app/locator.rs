@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use geo_core::{Mode, Quiz, World};
 use iced::widget::canvas::Cache;
 use iced::widget::{button, canvas, column, container, row, text};
-use iced::{Center, Element, Fill, Rectangle, Size, Theme};
+use iced::{Center, Element, Fill, Point, Rectangle, Size, Theme, Vector};
 
 use super::Message;
 use crate::ATLASES;
@@ -56,7 +56,7 @@ impl Locator {
         let margin = 1.2 * b.width.max(b.height);
         let (w, h) = ((b.width + margin).max(0.05), (b.height + margin).max(0.035));
         let area = Rectangle::new(
-            iced::Point::new(b.center_x() - w / 2.0, b.center_y() - h / 2.0),
+            Point::new(b.center_x() - w / 2.0, b.center_y() - h / 2.0),
             Size::new(w, h),
         );
         let focus = Camera::frame(area, view, MAP_SIZE);
@@ -78,6 +78,14 @@ impl Locator {
         })
     }
 
+    /// Développement : fige l'animation à l'instant `t` (0 à 1), pour une capture.
+    #[cfg(debug_assertions)]
+    pub fn freeze(&mut self, t: f32) {
+        if let Some(flight) = self.flight.take() {
+            self.camera = fly(flight.from, flight.to, self.situation.bbox.center(), t);
+        }
+    }
+
     pub fn animating(&self) -> bool {
         self.flight.is_some()
     }
@@ -91,7 +99,7 @@ impl Locator {
         } else {
             1.0 - (2.0 - 2.0 * t).powi(3) / 2.0
         };
-        self.camera = flight.from.lerp(flight.to, eased);
+        self.camera = fly(flight.from, flight.to, self.situation.bbox.center(), eased);
         self.cache.clear();
         if t >= 1.0 {
             self.flight = None;
@@ -181,5 +189,54 @@ impl Locator {
                 ..style::floating(theme)
             })
             .into()
+    }
+}
+
+/// Caméra à l'instant `t` (0 à 1) d'un zoom de `from` vers `to` qui garde `anchor` à l'écran :
+/// le zoom progresse de façon géométrique et la position de `anchor` à l'écran glisse
+/// linéairement de son point de départ à son point d'arrivée. Interpoler le centre de la carte
+/// à vitesse constante ferait sortir `anchor` du cadre pendant le zoom.
+fn fly(from: Camera, to: Camera, anchor: Point, t: f32) -> Camera {
+    let zoom = (from.zoom.ln() + (to.zoom.ln() - from.zoom.ln()) * t).exp();
+    // Écart entre `anchor` et le centre de l'écran, en unités proportionnelles aux pixels.
+    let offset = |c: Camera| {
+        Vector::new(
+            (anchor.x - c.center.x) * c.zoom,
+            (anchor.y - c.center.y) * c.zoom,
+        )
+    };
+    let (a, b) = (offset(from), offset(to));
+    let d = a + (b - a) * t;
+    Camera {
+        center: Point::new(anchor.x - d.x / zoom, anchor.y - d.y / zoom),
+        zoom,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Pendant tout le zoom, le point visé reste entre sa position de départ et le centre :
+    /// il ne sort jamais du cadre.
+    #[test]
+    fn flight_keeps_the_anchor_in_view() {
+        let anchor = Point::new(0.9, -0.4);
+        let from = Camera {
+            center: Point::new(0.0, 0.2),
+            zoom: 1.0,
+        };
+        let to = Camera {
+            center: anchor,
+            zoom: 80.0,
+        };
+        let start = (anchor.y - from.center.y) * from.zoom;
+        for i in 0..=20 {
+            let c = fly(from, to, anchor, i as f32 / 20.0);
+            let offset = (anchor.y - c.center.y) * c.zoom;
+            assert!(offset.abs() <= start.abs() + 1e-4, "{i} : {offset}");
+        }
+        let end = fly(from, to, anchor, 1.0);
+        assert!((end.zoom - 80.0).abs() < 1e-3 && end.center.distance(anchor) < 1e-5);
     }
 }
