@@ -204,6 +204,11 @@ Les deux fiches ont les mêmes champs. Partner Center limite la description cour
 ### Mots-clés
 
 Le Store en accepte 7 au plus.
+
+**Attention** : le champ « Keywords » de Partner Center affiche les mots-clés saisis mais ne les
+enregistre pas. Passer par *Export listings*, remplir les lignes `SearchTerm1` à `SearchTerm7`
+(une colonne par langue), puis *Import listings* (.csv) ; vérifier avec un nouvel export.
+
 - Français : géographie, pays, carte du monde, quiz, départements, États-Unis, éducation.
 - Anglais : geography, countries, world map, quiz, US states, Canada provinces, education.
 
