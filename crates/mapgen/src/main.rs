@@ -16,7 +16,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 /// Tolérances de simplification (en degrés) des deux niveaux de détail.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Deserialize)]
 struct Tolerance {
     hi: f64,
     lo: f64,
@@ -119,6 +119,9 @@ struct AtlasDef {
     /// Les terres des autres pays dans ce cadre [lon_min, lat_min, lon_max, lat_max] sont
     /// dessinées en gris, pour situer la carte.
     context: [f32; 4],
+    /// Simplification des contours, en degrés (`{ hi = 0.01, lo = 0.08 }`) : plus forte pour
+    /// un grand pays vu de loin (Canada).
+    tolerance: Option<Tolerance>,
 }
 
 fn default_levels() -> [String; 2] {
@@ -277,6 +280,7 @@ fn build_world(defs: &CountriesFile, zones: &RegionsFile, features: &Value) -> R
         zoom_sub: false,
         levels: default_levels(),
         insets: Vec::new(),
+        numbers: false,
     };
     assemble(info, &defs.countries, zones, source, WORLD_TOLERANCE)
 }
@@ -313,16 +317,28 @@ fn territory(
 
 fn build_atlas(file: &AtlasFile, admin0: &Value, admin1: &Value) -> Result<World> {
     let def = &file.atlas;
-    // Entités admin-1 du pays, par code ISO 3166-2.
-    let mut features: HashMap<&str, &Value> = HashMap::new();
+    let tolerance = def.tolerance.unwrap_or(ATLAS_TOLERANCE);
+    // Entités admin-1 du pays, par code ISO 3166-2. Un code peut en désigner plusieurs
+    // (Nouvelle-Galles du Sud et île Lord Howe) : la plus étendue d'abord, elle donne le
+    // point d'étiquette et le nom anglais.
+    let mut features: HashMap<&str, Vec<(f64, &Value)>> = HashMap::new();
     for feature in admin1["features"].as_array().ok_or("GeoJSON invalide")? {
         let props = &feature["properties"];
         if props["adm0_a3"].as_str() == Some(def.country.as_str())
             && let Some(code) = props["iso_3166_2"].as_str()
         {
-            features.insert(code, feature);
+            let b = bounds_f64(read_rings_f64(&feature["geometry"])?.iter().flatten());
+            let area = (b[2] - b[0]) * (b[3] - b[1]);
+            features.entry(code).or_default().push((area, feature));
         }
     }
+    for list in features.values_mut() {
+        list.sort_by(|a, b| b.0.total_cmp(&a.0));
+    }
+    let features: HashMap<&str, Vec<&Value>> = features
+        .into_iter()
+        .map(|(code, list)| (code, list.into_iter().map(|(_, f)| f).collect()))
+        .collect();
 
     // Encarts : déplacement de chaque entité concernée.
     let mut moves: HashMap<&str, (Move, Option<[f64; 4]>)> = HashMap::new();
@@ -330,10 +346,12 @@ fn build_atlas(file: &AtlasFile, admin0: &Value, admin1: &Value) -> Result<World
     for inset in &file.inset {
         let mut rings = Vec::new();
         for code in &inset.codes {
-            let feature = features
+            let list = features
                 .get(code.as_str())
                 .ok_or_else(|| format!("encart : {code} inconnu"))?;
-            rings.extend(cropped(read_rings_f64(&feature["geometry"])?, inset.crop));
+            for feature in list {
+                rings.extend(cropped(read_rings_f64(&feature["geometry"])?, inset.crop));
+            }
         }
         let shift = Move::new(&rings, inset.to, inset.scale);
         let moved: Vec<Vec<[f64; 2]>> = rings
@@ -391,11 +409,14 @@ fn build_atlas(file: &AtlasFile, admin0: &Value, admin1: &Value) -> Result<World
         let mut rings: Vec<Vec<[f64; 2]>> = Vec::new();
         let mut label = [0.0f64; 2];
         for &code in &parts {
-            let feature = features
+            let list = features
                 .get(code)
                 .ok_or_else(|| format!("{} : entité {code} introuvable", item.name))?;
-            let props = &feature["properties"];
-            let mut part = read_rings_f64(&feature["geometry"])?;
+            let props = &list[0]["properties"];
+            let mut part = Vec::new();
+            for feature in list {
+                part.extend(read_rings_f64(&feature["geometry"])?);
+            }
             let mut point = [
                 props["longitude"].as_f64().unwrap_or(0.0),
                 props["latitude"].as_f64().unwrap_or(0.0),
@@ -443,7 +464,7 @@ fn build_atlas(file: &AtlasFile, admin0: &Value, admin1: &Value) -> Result<World
         if inside {
             source
                 .territories
-                .push(territory(props, code, None, polygons, ATLAS_TOLERANCE));
+                .push(territory(props, code, None, polygons, tolerance));
         }
     }
 
@@ -457,8 +478,9 @@ fn build_atlas(file: &AtlasFile, admin0: &Value, admin1: &Value) -> Result<World
         zoom_sub: def.zoom_sub,
         levels: def.levels.clone(),
         insets,
+        numbers: false,
     };
-    assemble(info, &file.items, &file.zones, source, ATLAS_TOLERANCE)
+    assemble(info, &file.items, &file.zones, source, tolerance)
 }
 
 /// Déplacement d'un encart : translation vers `to` et mise à l'échelle, en corrigeant

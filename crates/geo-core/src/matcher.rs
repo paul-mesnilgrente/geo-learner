@@ -16,10 +16,15 @@ pub struct Matcher {
 
 impl Matcher {
     pub fn new(world: &World) -> Self {
+        Self::with_filter(world, |_| true)
+    }
+
+    /// Ne retient que les réponses acceptées par `keep` (les noms seuls, ou les numéros seuls).
+    pub fn with_filter(world: &World, keep: impl Fn(&str) -> bool) -> Self {
         let mut answers = HashMap::new();
         let mut max_words = 1;
         for (i, country) in world.countries.iter().enumerate() {
-            for answer in &country.answers {
+            for answer in country.answers.iter().filter(|a| keep(a)) {
                 max_words = max_words.max(answer.split(' ').count());
                 answers.insert(answer.clone(), i);
             }

@@ -30,9 +30,13 @@ impl App {
 
         let title = row![
             section_title("Progression"),
-            text(format!("{} · {}", zone.name, mode_title(self.mode, &words)))
-                .size(12)
-                .color(style::MUTED),
+            text(format!(
+                "{} · {}",
+                zone.name,
+                mode_title(self.mode, &self.world().info)
+            ))
+            .size(12)
+            .color(style::MUTED),
         ]
         .spacing(10)
         .align_y(Center);

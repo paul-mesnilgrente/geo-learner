@@ -1,0 +1,88 @@
+# Provinces et territoires du Canada (Natural Earth admin-1) : dix provinces et trois
+# territoires, regroupés selon les grandes régions habituelles.
+
+# Lieux à trouver (avant toute section : en TOML, une clé suit sinon la dernière section).
+items = [
+  { code = "CA-NL", name = "Terre-Neuve-et-Labrador", sub = "atlantique" },
+  { code = "CA-PE", name = "Île-du-Prince-Édouard", sub = "atlantique" },
+  { code = "CA-NS", name = "Nouvelle-Écosse", sub = "atlantique" },
+  { code = "CA-NB", name = "Nouveau-Brunswick", sub = "atlantique" },
+  { code = "CA-QC", name = "Québec", sub = "centre" },
+  { code = "CA-ON", name = "Ontario", sub = "centre" },
+  { code = "CA-MB", name = "Manitoba", sub = "prairies" },
+  { code = "CA-SK", name = "Saskatchewan", sub = "prairies" },
+  { code = "CA-AB", name = "Alberta", sub = "prairies" },
+  { code = "CA-BC", name = "Colombie-Britannique", sub = "ouest" },
+  { code = "CA-YT", name = "Yukon", sub = "nord" },
+  { code = "CA-NT", name = "Territoires du Nord-Ouest", sub = "nord" },
+  { code = "CA-NU", name = "Nunavut", sub = "nord" },
+]
+
+[atlas]
+id = "ca-provinces"
+title = "Provinces et territoires du Canada"
+category = "Canada"
+levels = ["Régions", "Régions"]
+one = "province ou territoire"
+many = "provinces et territoires"
+feminine = true
+country = "CAN"
+context = [-175.0, 25.0, -10.0, 85.0]
+# Le pays est immense et les îles de l'Arctique très découpées : contours plus simplifiés
+# que pour les autres atlas (environ 2 km), ce qui divise le fichier par deux.
+tolerance = { hi = 0.02, lo = 0.08 }
+
+[world]
+name = "Canada"
+view = [-141.0, 41.5, -52.0, 83.5]
+center = -96
+
+[[continent]]
+id = "atlantique"
+name = "Provinces de l'Atlantique"
+
+[[continent]]
+id = "centre"
+name = "Centre"
+
+[[continent]]
+id = "prairies"
+name = "Prairies"
+
+[[continent]]
+id = "ouest"
+name = "Côte Ouest"
+
+[[continent]]
+id = "nord"
+name = "Nord"
+
+[[sub]]
+id = "atlantique"
+name = "Provinces de l'Atlantique"
+continent = "atlantique"
+hidden = true
+
+[[sub]]
+id = "centre"
+name = "Centre"
+continent = "centre"
+hidden = true
+
+[[sub]]
+id = "prairies"
+name = "Prairies"
+continent = "prairies"
+hidden = true
+
+[[sub]]
+id = "ouest"
+name = "Côte Ouest"
+continent = "ouest"
+hidden = true
+
+[[sub]]
+id = "nord"
+name = "Nord"
+continent = "nord"
+hidden = true

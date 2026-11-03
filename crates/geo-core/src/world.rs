@@ -93,6 +93,9 @@ pub struct Info {
     pub levels: [String; 2],
     /// Encarts : terres rapprochées de la carte principale (outre-mer, Alaska…).
     pub insets: Vec<Inset>,
+    /// Quiz sans carte, sur les numéros des lieux (départements) : « Numéro → nom » et
+    /// « Nom → numéro ».
+    pub numbers: bool,
 }
 
 /// Encart, en (lon, lat) : `[lon_min, lat_min, lon_max, lat_max]`.

@@ -10,7 +10,6 @@ use super::{App, HOME_SCROLL, Message, clock, mode_title, percent, plural, score
 use crate::ATLASES;
 use crate::dates::DateTime;
 use crate::style;
-use crate::words::Words;
 
 /// Largeur d'une carte de quiz : trois par ligne sur une fenêtre normale.
 const CARD_WIDTH: f32 = 272.0;
@@ -72,7 +71,11 @@ impl App {
         };
         button(
             column![
-                self.thumbnails[index].view(130.0),
+                if atlas.info.numbers {
+                    numbers_thumbnail()
+                } else {
+                    self.thumbnails[index].view(130.0)
+                },
                 column![
                     text(atlas.info.category.to_uppercase())
                         .size(11)
@@ -121,7 +124,7 @@ impl App {
                     text(format!(
                         "{} · {}",
                         atlas.info.title,
-                        mode_title(session.mode, &Words::of(&atlas.info))
+                        mode_title(session.mode, &atlas.info)
                     ))
                     .size(12)
                     .color(style::MUTED),
@@ -168,4 +171,36 @@ impl App {
         .style(style::card)
         .into()
     }
+}
+
+/// Miniature d'un quiz sans carte : quelques numéros en grand.
+fn numbers_thumbnail<'a>() -> Element<'a, Message> {
+    let number = |n: &'a str, alpha: f32| {
+        text(n)
+            .size(34)
+            .font(style::FONT_BOLD)
+            .color(style::with_alpha(style::lighten(style::ACCENT, 0.2), alpha))
+    };
+    container(
+        row![
+            number("01", 0.55),
+            number("2A", 0.8),
+            number("75", 1.0),
+            number("971", 0.65),
+        ]
+        .spacing(16)
+        .align_y(Center),
+    )
+    .center_x(Fill)
+    .center_y(130)
+    .style(|_: &iced::Theme| container::Style {
+        background: Some(style::OCEAN.into()),
+        border: iced::Border {
+            color: style::BORDER,
+            width: 1.0,
+            radius: 14.0.into(),
+        },
+        ..Default::default()
+    })
+    .into()
 }

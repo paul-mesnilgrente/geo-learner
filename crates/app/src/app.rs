@@ -6,7 +6,7 @@ mod progression;
 
 use std::time::{Duration, Instant};
 
-use geo_core::{Mark, Matcher, Mode, Outcome, Quiz, RegionKind, World};
+use geo_core::{Info, Mark, Matcher, Mode, Outcome, Quiz, RegionKind, World};
 use iced::alignment::{Horizontal, Vertical};
 use iced::widget::canvas::Cache;
 use iced::widget::{
@@ -103,8 +103,10 @@ pub enum Message {
 }
 
 pub struct App {
-    /// Reconnaissance des noms, une par atlas.
+    /// Reconnaissance des noms, une par atlas (sans les numéros pour un quiz sans carte).
     matchers: Vec<Matcher>,
+    /// Reconnaissance des numéros seuls, pour les quiz sans carte (mode « Nom → numéro »).
+    number_matchers: Vec<Option<Matcher>>,
     /// Atlas choisi (index dans `ATLASES`).
     atlas: usize,
     progress: Progress,
@@ -266,7 +268,17 @@ struct Feedback {
 impl App {
     pub fn new() -> (Self, Task<Message>) {
         let app = Self {
-            matchers: ATLASES.iter().map(Matcher::new).collect(),
+            matchers: ATLASES
+                .iter()
+                .map(|a| match a.info.numbers {
+                    true => Matcher::with_filter(a, |answer| !has_digit(answer)),
+                    false => Matcher::new(a),
+                })
+                .collect(),
+            number_matchers: ATLASES
+                .iter()
+                .map(|a| a.info.numbers.then(|| Matcher::with_filter(a, has_digit)))
+                .collect(),
             progress: Progress::load(),
             settings: Settings::load(),
             mode: Mode::Free,
@@ -447,6 +459,10 @@ impl App {
 
     /// Affiche la page du quiz choisi (atlas, mode et zone déjà réglés).
     fn open_quiz(&mut self) {
+        let modes = modes(&self.world().info);
+        if !modes.contains(&self.mode) {
+            self.mode = modes[0];
+        }
         self.screen = Screen::Quiz;
         self.clear_run_actions();
         self.refresh_preview();
@@ -465,7 +481,7 @@ impl App {
             Some(game) => format!(
                 "{} · {} — GeoLearner",
                 game.world.regions[game.region].name,
-                mode_title(game.quiz.mode(), &Words::of(&game.world.info))
+                mode_title(game.quiz.mode(), &game.world.info)
             ),
             None => "GeoLearner".into(),
         }
@@ -592,7 +608,7 @@ impl App {
                 if let Some(game) = &mut self.game
                     && let Some(country) = game.quiz.skip()
                 {
-                    let name = &game.world.countries[country].name;
+                    let name = place_label(game.world, country);
                     game.say(format!("C'était : {name}"), style::DANGER);
                     game.flash(country, style::DANGER, 1800);
                     game.history.push(country);
@@ -759,7 +775,11 @@ impl App {
         let Some(game) = &mut self.game else { return };
         game.input = value;
         game.pending = None;
-        let Some(country) = self.matchers[game.atlas].lookup(&game.input) else {
+        let matcher = match &self.number_matchers[game.atlas] {
+            Some(numbers) if game.quiz.mode() == Mode::Locate => numbers,
+            _ => &self.matchers[game.atlas],
+        };
+        let Some(country) = matcher.lookup(&game.input) else {
             return;
         };
         match game.quiz.mode() {
@@ -771,7 +791,11 @@ impl App {
                     game.apply(outcome);
                 }
             }
-            Mode::Identify if game.quiz.target() == Some(country) => {
+            // Sans carte, « Nom → numéro » se joue aussi au clavier.
+            Mode::Identify | Mode::Locate
+                if game.quiz.target() == Some(country)
+                    && (game.quiz.mode() == Mode::Identify || game.world.info.numbers) =>
+            {
                 let outcome = game.quiz.submit(country);
                 game.apply(outcome);
             }
@@ -785,7 +809,11 @@ impl App {
         if game.input.trim().is_empty() {
             return;
         }
-        let Some(country) = self.matchers[game.atlas].lookup(&game.input) else {
+        let matcher = match &self.number_matchers[game.atlas] {
+            Some(numbers) if game.quiz.mode() == Mode::Locate => numbers,
+            _ => &self.matchers[game.atlas],
+        };
+        let Some(country) = matcher.lookup(&game.input) else {
             let info = &game.world.info;
             let words = Words::of(info);
             let typed = geo_core::normalize(&game.input);
@@ -825,6 +853,10 @@ impl App {
                 ),
             },
             Mode::Identify => {
+                let outcome = game.quiz.submit(country);
+                game.apply(outcome);
+            }
+            Mode::Locate if game.world.info.numbers => {
                 let outcome = game.quiz.submit(country);
                 game.apply(outcome);
             }
@@ -958,10 +990,11 @@ impl App {
         } else if matches!(self.voice.state, voice::State::Downloading(..)) {
         } else if !self.voice.installed {
             self.send_voice(voice::Command::Download);
-        } else if self.game.is_some() {
-            self.send_voice(voice::Command::Start(
-                self.game.as_ref().map_or(self.atlas, |g| g.atlas),
-            ));
+        } else if let Some(game) = &self.game
+            && voice_allowed(game)
+        {
+            let atlas = game.atlas;
+            self.send_voice(voice::Command::Start(atlas));
         }
     }
 
@@ -1092,13 +1125,13 @@ impl App {
     /// Mode, zone et lancement.
     fn play_main(&self) -> Element<'_, Message> {
         let words = Words::of(&self.world().info);
-        let modes = Row::with_children(Mode::ALL.iter().map(|&mode| {
+        let modes = Row::with_children(modes(&self.world().info).iter().map(|&mode| {
             button(
                 column![
-                    text(mode_title(mode, &words))
+                    text(mode_title(mode, &self.world().info))
                         .size(16)
                         .font(style::FONT_SEMIBOLD),
-                    text(mode_description(mode, &words))
+                    text(mode_description(mode, &self.world().info))
                         .size(13)
                         .color(style::MUTED),
                 ]
@@ -1172,7 +1205,7 @@ impl App {
                     text(selected.name.clone()).size(22).font(style::FONT_BOLD),
                     text(format!(
                         "{} · {} {}",
-                        mode_title(self.mode, &words),
+                        mode_title(self.mode, &self.world().info),
                         selected.members.len(),
                         words.many()
                     ))
@@ -1360,10 +1393,12 @@ impl App {
     }
 
     fn game_view<'a>(&'a self, game: &'a Game) -> Element<'a, Message> {
-        let column = column![
-            self.top_bar(game),
-            row![self.map_area(game), self.sidebar(game)]
-        ];
+        let main = if game.world.info.numbers {
+            self.card_area(game)
+        } else {
+            self.map_area(game)
+        };
+        let column = column![self.top_bar(game), row![main, self.sidebar(game)]];
         container(column)
             .style(style::page)
             .width(Fill)
@@ -1476,7 +1511,7 @@ impl App {
                 text(region.name.clone())
                     .size(16)
                     .font(style::FONT_SEMIBOLD),
-                text(mode_title(quiz.mode(), &Words::of(&game.world.info)))
+                text(mode_title(quiz.mode(), &game.world.info))
                     .size(12)
                     .color(style::MUTED),
             ]
@@ -1610,6 +1645,92 @@ impl App {
         layers.width(Fill).height(Fill).into()
     }
 
+    /// Quiz sans carte : la question en grand et le champ de réponse ; une fois la partie
+    /// finie, toutes les réponses, ratées en rouge.
+    fn card_area<'a>(&'a self, game: &'a Game) -> Element<'a, Message> {
+        let quiz = &game.quiz;
+        let info = &game.world.info;
+        let body: Element<'a, Message> = match quiz.target().filter(|_| !quiz.is_finished()) {
+            Some(target) => {
+                let place = &game.world.countries[target];
+                let (question, shown, size) = match quiz.mode() {
+                    Mode::Locate => ("Quel est le numéro de…".to_owned(), place.name.clone(), 44),
+                    _ => (
+                        format!(
+                            "Quel{} {} porte le numéro…",
+                            if info.feminine { "le" } else { "" },
+                            info.one
+                        ),
+                        crate::number_of(place).unwrap_or_default(),
+                        110,
+                    ),
+                };
+                let mut card = column![
+                    text(question).size(16).color(style::MUTED),
+                    text(shown).size(size).font(style::FONT_BOLD),
+                ]
+                .spacing(6)
+                .width(Fill)
+                .align_x(Center);
+                if quiz.wrong_tries() > 0 {
+                    card = card.push(
+                        text(format!(
+                            "Essai {} sur {}",
+                            quiz.wrong_tries() + 1,
+                            geo_core::quiz::MAX_TRIES
+                        ))
+                        .size(13)
+                        .color(style::ORANGE),
+                    );
+                }
+                column![
+                    container(card)
+                        .padding([32, 56])
+                        .width(Fill)
+                        .max_width(640)
+                        .style(style::floating),
+                    self.answer_bar(game),
+                ]
+                .spacing(16)
+                .align_x(Center)
+                .into()
+            }
+            None => {
+                let chips = quiz.members().iter().map(|&c| {
+                    let color = map::mark_color(quiz.mark(c));
+                    container(text(place_label(game.world, c)).size(13))
+                        .padding([5, 12])
+                        .style(style::chip(color))
+                        .into()
+                });
+                scrollable(
+                    container(
+                        column![
+                            text("Réponses").size(18).font(style::FONT_SEMIBOLD),
+                            Row::with_children(chips)
+                                .spacing(6)
+                                .wrap()
+                                .vertical_spacing(6),
+                        ]
+                        .spacing(14),
+                    )
+                    .padding(32)
+                    .max_width(960),
+                )
+                .into()
+            }
+        };
+        let mut layers = stack![container(body).center(Fill).padding(24)];
+        if quiz.is_finished() && game.summary {
+            layers = layers.push(self.summary(game));
+        }
+        container(layers.width(Fill).height(Fill))
+            .width(Fill)
+            .height(Fill)
+            .style(style::page)
+            .into()
+    }
+
     fn prompt<'a>(&'a self, game: &'a Game) -> Option<Element<'a, Message>> {
         let quiz = &game.quiz;
         let target = quiz.target()?;
@@ -1665,7 +1786,10 @@ impl App {
             .style(style::mic(listening))
             .on_press(Message::ToggleMic);
         let words = Words::of(&game.world.info);
+        let numbers = game.world.info.numbers;
         let placeholder = match game.quiz.mode() {
+            Mode::Locate if numbers => format!("Numéro {}…", words.of_the()),
+            Mode::Identify if numbers => format!("Nom {}…", words.of_the()),
             Mode::Identify => format!("Nom {} en surbrillance…", words.of_the()),
             _ => format!("Nom {}…", words.of_a()),
         };
@@ -1682,7 +1806,13 @@ impl App {
             .padding([12, 16])
             .style(style::answer_input(flash_border));
 
-        let mut body = column![row![mic, input].spacing(12).align_y(Center)].spacing(10);
+        // Les numéros se tapent : pas de micro pour « Nom → numéro ».
+        let field: Element<'a, Message> = if voice_allowed(game) {
+            row![mic, input].spacing(12).align_y(Center).into()
+        } else {
+            input.into()
+        };
+        let mut body = column![field].spacing(10);
 
         let status: Option<Element<'a, Message>> = match &self.voice.state {
             voice::State::Loading => Some(
@@ -1887,9 +2017,7 @@ impl App {
                         .width(8)
                         .height(8)
                         .style(style::dot(map::mark_color(mark))),
-                    text(game.world.countries[country].name.clone())
-                        .size(13)
-                        .width(Fill),
+                    text(place_label(game.world, country)).size(13).width(Fill),
                     text(note).size(12).color(style::MUTED),
                 ]
                 .spacing(10)
@@ -1942,7 +2070,7 @@ impl App {
             text(format!(
                 "{} · {}",
                 region.name,
-                mode_title(quiz.mode(), &Words::of(&game.world.info))
+                mode_title(quiz.mode(), &game.world.info)
             ))
             .size(14)
             .color(style::MUTED),
@@ -1970,9 +2098,14 @@ impl App {
                 text({
                     let words = Words::of(&game.world.info);
                     format!(
-                        "Les {} {} sont en rouge sur la carte.",
+                        "Les {} {} sont en rouge {}.",
                         words.many(),
-                        words.agree("ratés")
+                        words.agree("ratés"),
+                        if game.world.info.numbers {
+                            "dans la liste"
+                        } else {
+                            "sur la carte"
+                        }
                     )
                 })
                 .size(13)
@@ -1981,10 +2114,17 @@ impl App {
         }
         content = content.push(
             row![
-                button(text("Voir la carte").size(14))
-                    .padding([10, 16])
-                    .style(style::secondary)
-                    .on_press(Message::CloseSummary),
+                button(
+                    text(if game.world.info.numbers {
+                        "Voir les réponses"
+                    } else {
+                        "Voir la carte"
+                    })
+                    .size(14),
+                )
+                .padding([10, 16])
+                .style(style::secondary)
+                .on_press(Message::CloseSummary),
                 button(text("Menu").size(14))
                     .padding([10, 16])
                     .style(style::secondary)
@@ -2157,7 +2297,7 @@ impl Game {
 
     /// Réagit au résultat d'une réponse.
     fn apply(&mut self, outcome: Outcome) {
-        let name = |c: usize| self.world.countries[c].name.clone();
+        let name = |c: usize| place_label(self.world, c);
         match outcome {
             Outcome::Found(c) => {
                 self.input.clear();
@@ -2202,6 +2342,15 @@ impl Game {
     }
 }
 
+/// La saisie vocale a-t-elle un sens ? Pas pour taper des numéros.
+fn voice_allowed(game: &Game) -> bool {
+    !(game.world.info.numbers && game.quiz.mode() == Mode::Locate)
+}
+
+fn has_digit(answer: &str) -> bool {
+    answer.chars().any(|c| c.is_ascii_digit())
+}
+
 /// Le texte saisi est-il aussi le début du nom d'un autre pays encore à trouver ?
 fn is_prefix_of_other(world: &World, input: &str, country: usize, quiz: &Quiz) -> bool {
     let typed = geo_core::normalize(input);
@@ -2234,26 +2383,54 @@ fn section_title<'a>(label: &'a str) -> Element<'a, Message> {
         .into()
 }
 
-/// « Tous les pays », « Nommer la région »…
-pub fn mode_title(mode: Mode, w: &Words) -> String {
-    match mode {
-        Mode::Free => capitalize(&w.all()),
-        Mode::Identify => format!("Nommer {}", w.the()),
-        Mode::Locate => "Trouver sur la carte".into(),
+/// Modes proposés par un quiz : sans carte, seulement les deux sens numéro ↔ nom.
+pub fn modes(info: &Info) -> &'static [Mode] {
+    if info.numbers {
+        &[Mode::Identify, Mode::Locate]
+    } else {
+        &Mode::ALL
     }
 }
 
-fn mode_description(mode: Mode, w: &Words) -> String {
-    match mode {
-        Mode::Free => format!(
+/// « Tous les pays », « Nommer la région », « Numéro → nom »…
+pub fn mode_title(mode: Mode, info: &Info) -> String {
+    let w = Words::of(info);
+    match (info.numbers, mode) {
+        (true, Mode::Locate) => "Nom → numéro".into(),
+        (true, _) => "Numéro → nom".into(),
+        (false, Mode::Free) => capitalize(&w.all()),
+        (false, Mode::Identify) => format!("Nommer {}", w.the()),
+        (false, Mode::Locate) => "Trouver sur la carte".into(),
+    }
+}
+
+fn mode_description(mode: Mode, info: &Info) -> String {
+    let w = Words::of(info);
+    match (info.numbers, mode) {
+        (true, Mode::Locate) => format!("Le nom {} s'affiche : taper son numéro.", w.of_a()),
+        (true, _) => format!(
+            "Un numéro s'affiche : donner le nom {}. Au clavier ou à la voix.",
+            w.of_the()
+        ),
+        (false, Mode::Free) => format!(
             "Citer {} de la zone, dans n'importe quel ordre. Au clavier ou à la voix.",
             w.all()
         ),
-        Mode::Identify => format!(
+        (false, Mode::Identify) => format!(
             "{} s'allume sur la carte : donner son nom.",
             capitalize(&w.a())
         ),
-        Mode::Locate => "Un nom s'affiche : cliquer dessus sur la carte.".into(),
+        (false, Mode::Locate) => "Un nom s'affiche : cliquer dessus sur la carte.".into(),
+    }
+}
+
+/// Nom d'un lieu tel qu'affiché en partie : précédé de son numéro dans un quiz sans carte
+/// (« 75 · Paris »).
+fn place_label(world: &World, country: usize) -> String {
+    let c = &world.countries[country];
+    match world.info.numbers.then(|| crate::number_of(c)).flatten() {
+        Some(number) => format!("{number} · {}", c.name),
+        None => c.name.clone(),
     }
 }
 

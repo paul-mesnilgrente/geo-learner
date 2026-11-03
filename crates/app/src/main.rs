@@ -18,18 +18,41 @@ use std::sync::LazyLock;
 
 use geo_core::World;
 
-/// Atlas intégrés à l'exécutable, un par quiz, dans l'ordre du catalogue.
+/// Quiz du catalogue, dans l'ordre de l'accueil : un atlas intégré à l'exécutable chacun, sauf
+/// les numéros des départements, dérivés des départements (sans carte, rien de plus à stocker).
 pub static ATLASES: LazyLock<Vec<World>> = LazyLock::new(|| {
-    [
-        include_bytes!("../../../assets/world.bin").as_slice(),
-        include_bytes!("../../../assets/fr-departements.bin"),
-        include_bytes!("../../../assets/fr-regions.bin"),
-        include_bytes!("../../../assets/us-etats.bin"),
+    let load = |bytes: &[u8]| World::from_bytes(bytes).expect("atlas invalide");
+    let departements = load(include_bytes!("../../../assets/fr-departements.bin"));
+    let numbers = numbers_quiz(&departements);
+    vec![
+        load(include_bytes!("../../../assets/world.bin")),
+        departements,
+        numbers,
+        load(include_bytes!("../../../assets/fr-regions.bin")),
+        load(include_bytes!("../../../assets/us-etats.bin")),
+        load(include_bytes!("../../../assets/ca-provinces.bin")),
+        load(include_bytes!("../../../assets/au-etats.bin")),
     ]
-    .iter()
-    .map(|bytes| World::from_bytes(bytes).expect("atlas invalide"))
-    .collect()
 });
+
+/// Quiz « Numéros des départements » : mêmes lieux et mêmes zones, sans carte.
+fn numbers_quiz(departements: &World) -> World {
+    let mut world = departements.clone();
+    world.info.id = "fr-numeros".into();
+    world.info.title = "Numéros des départements".into();
+    world.info.numbers = true;
+    world.territories.clear();
+    world
+}
+
+/// Numéro d'un lieu (« 75 », « 2A », « 971 ») : sa première réponse qui contient un chiffre.
+pub fn number_of(country: &geo_core::Country) -> Option<String> {
+    country
+        .answers
+        .iter()
+        .find(|a| a.chars().any(|c| c.is_ascii_digit()))
+        .map(|a| a.to_uppercase())
+}
 
 fn main() -> iced::Result {
     let size = iced::Size::new(1360.0, 860.0);
@@ -119,6 +142,26 @@ mod tests {
         );
     }
 
+    /// Chaque département a un numéro, unique, avec ses zéros (« 01 », pas « 1 »).
+    #[test]
+    fn every_departement_has_a_number() {
+        let numbers = ATLASES.iter().find(|a| a.info.numbers).unwrap();
+        let list: Vec<String> = numbers
+            .countries
+            .iter()
+            .map(|c| super::number_of(c).unwrap_or_else(|| panic!("{} sans numéro", c.name)))
+            .collect();
+        let mut unique = list.clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(unique.len(), 101);
+        let name = |n: &str| &numbers.countries[list.iter().position(|x| x == n).unwrap()].name;
+        assert_eq!(name("01"), "Ain");
+        assert_eq!(name("2A"), "Corse-du-Sud");
+        assert_eq!(name("75"), "Paris");
+        assert_eq!(name("976"), "Mayotte");
+    }
+
     #[test]
     fn atlases_are_complete() {
         let counts: Vec<(String, usize)> = ATLASES
@@ -130,8 +173,11 @@ mod tests {
             [
                 ("monde".to_owned(), 197),
                 ("fr-departements".to_owned(), 101),
+                ("fr-numeros".to_owned(), 101),
                 ("fr-regions".to_owned(), 18),
                 ("us-etats".to_owned(), 50),
+                ("ca-provinces".to_owned(), 13),
+                ("au-etats".to_owned(), 8),
             ]
         );
     }

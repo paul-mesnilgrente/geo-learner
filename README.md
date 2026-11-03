@@ -9,8 +9,22 @@ Application de bureau pour apprendre les pays du monde sur une carte, au clavier
 |---|---|---|---|
 | Monde | Pays du monde | 197 pays | continents, sous-régions, regroupements |
 | France | Départements français | 101 départements | métropole, outre-mer, régions |
+| France | Numéros des départements (sans carte) | 101 départements | métropole, outre-mer, régions |
 | France | Régions françaises | 18 régions | métropole, outre-mer |
 | États-Unis | États des États-Unis | 50 États | régions et divisions du recensement |
+| Canada | Provinces et territoires du Canada | 13 | Atlantique, Centre, Prairies, Côte Ouest, Nord |
+| Australie | États et territoires d'Australie | 8 | États, territoires |
+
+**Numéros des départements** se joue sans carte, dans les deux sens : « Numéro → nom » (le
+numéro s'affiche en grand, on tape ou dit le nom) et « Nom → numéro » (on tape le numéro, sans
+micro). Les noms ne valident pas « Nom → numéro » et inversement. Ce quiz est dérivé à
+l'exécution de l'atlas des départements : il n'ajoute rien à l'exécutable. En fin de partie,
+toutes les paires numéro · nom s'affichent, les ratées en rouge.
+
+L'Australie compte six États et deux territoires continentaux (Territoire du Nord, Territoire de
+la capitale australienne) ; l'île Lord Howe est rattachée à la Nouvelle-Galles du Sud. Les
+contours du Canada sont un peu plus simplifiés que les autres (`tolerance` dans le fichier de
+l'atlas) : les îles de l'Arctique doubleraient sinon la taille du fichier.
 
 L'**accueil** présente les quiz en cartes (miniature, catégorie, dernière partie), avec les
 dernières parties à droite : un clic sur l'une d'elles rouvre son quiz, réglé sur le même mode et
@@ -30,7 +44,7 @@ sont acceptés au clavier
 Un quiz de subdivisions (provinces, Länder…) se décrit dans un fichier `data/atlases/<id>.toml`
 (voir ceux existants) :
 - `[atlas]` : titre, catégorie, noms au singulier et au pluriel, genre, pays Natural Earth,
-  cadre des terres voisines ;
+  cadre des terres voisines, et au besoin `tolerance` (simplification des contours) ;
 - `[[inset]]` : encarts ;
 - `[world]`, `[[continent]]`, `[[sub]]` : zones ;
 - `items` : les lieux, avec leurs codes ISO 3166-2. `parts` réunit plusieurs entités en une
