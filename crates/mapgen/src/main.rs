@@ -363,6 +363,12 @@ fn build_atlas(file: &AtlasFile, admin0: &Value, admin1: &Value) -> Result<World
                 (b[3] + pad) as f32,
             ],
             origin: origin.map(|v| v as f32),
+            from: shift.from.map(|v| v as f32),
+            to: shift.to.map(|v| v as f32),
+            factor: [
+                (1.0 / (shift.scale * shift.stretch())) as f32,
+                (1.0 / shift.scale) as f32,
+            ],
         });
         for code in &inset.codes {
             moves.insert(code.as_str(), (shift, inset.crop));
@@ -496,9 +502,14 @@ impl Move {
         [lon, lat]
     }
 
+    /// Correction de la largeur des degrés de longitude entre les deux latitudes.
+    fn stretch(&self) -> f64 {
+        self.from[1].to_radians().cos() / self.to[1].to_radians().cos()
+    }
+
     fn apply(&self, p: [f64; 2]) -> [f64; 2] {
         let [lon, lat] = self.unwrap(p);
-        let stretch = self.from[1].to_radians().cos() / self.to[1].to_radians().cos();
+        let stretch = self.stretch();
         [
             self.to[0] + (lon - self.from[0]) * self.scale * stretch,
             self.to[1] + (lat - self.from[1]) * self.scale,

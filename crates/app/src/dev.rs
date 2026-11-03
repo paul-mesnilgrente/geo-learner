@@ -44,6 +44,8 @@ pub struct Demo {
     pub confirm: bool,
     /// Carte de situation de l'encart n° N ouverte (`globe=N`).
     pub globe: Option<usize>,
+    /// Accueil affiché même avec un quiz ou des parties fictives (`home`).
+    pub home: bool,
 }
 
 /// Parties fictives d'une série : scores en progrès, temps en baisse, un minuteur dépassé.
@@ -117,6 +119,7 @@ pub fn demo() -> Option<Demo> {
             "bottom" => demo.bottom = true,
             "confirm" => demo.confirm = true,
             "globe" => demo.globe = value.parse().ok(),
+            "home" => demo.home = true,
             "type" => demo.typed = value.split('|').map(str::to_owned).collect(),
             _ => {}
         }

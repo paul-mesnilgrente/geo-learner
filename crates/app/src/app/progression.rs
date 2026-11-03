@@ -1,12 +1,10 @@
-//! Onglet « Progression » : évolution du score et du temps d'une série de parties
+//! Progression sur la page du quiz : évolution du score et du temps d'une série de parties
 //! (quiz, mode et zone), et suppression des parties à écarter.
 
 use std::time::Duration;
 
-use geo_core::Mode;
-use iced::alignment::Horizontal;
-use iced::widget::{Column, Row, button, canvas, column, container, row, space, text};
-use iced::{Center, Color, Element, Fill, Theme};
+use iced::widget::{Row, button, canvas, column, container, row, space, text};
+use iced::{Center, Element, Fill, Theme};
 
 use super::{App, Message, clock, mode_title, percent, plural, score_color, section_title};
 use crate::chart::{Chart, Unit};
@@ -18,43 +16,48 @@ use crate::words::{Words, capitalize};
 
 /// Nombre de parties prises en compte dans la moyenne récente.
 const RECENT: usize = 5;
+/// Parties listées avant « Afficher les N parties ».
+const RECENT_RUNS: usize = 5;
 
 impl App {
-    pub(super) fn progress_main(&self) -> Element<'_, Message> {
+    /// Section « Progression » de la page du quiz, pour le mode et la zone choisis.
+    pub(super) fn progress_section(&self) -> Element<'_, Message> {
         let world = self.world();
         let id = &world.info.id;
         let zone = &world.regions[self.region];
+        let words = Words::of(&world.info);
         let runs = self.progress.runs(id, self.mode, &zone.id);
 
-        let mut content = Column::new().spacing(20);
-        if let Some(picker) = self.series_picker() {
-            content = content.push(picker);
-        }
-        content = content.push(self.series_header(runs.len()));
+        let title = row![
+            section_title("Progression"),
+            text(format!("{} · {}", zone.name, mode_title(self.mode, &words)))
+                .size(12)
+                .color(style::MUTED),
+        ]
+        .spacing(10)
+        .align_y(Center);
+        let mut content = column![title].spacing(12);
         if runs.is_empty() {
-            content = content.push(
-                container(
-                    column![
-                        icon(Icon::Chart, 28.0, style::MUTED),
-                        text("Aucune partie pour cette série.")
-                            .size(15)
-                            .font(style::FONT_SEMIBOLD),
-                        text(
-                            "Chaque partie terminée s'ajoute ici : son score et son temps \
-                             sont tracés au fil des essais."
-                        )
-                        .size(13)
-                        .color(style::MUTED)
-                        .align_x(Horizontal::Center),
-                    ]
-                    .spacing(10)
-                    .align_x(Center),
+            return content
+                .push(
+                    container(
+                        row![
+                            icon(Icon::Chart, 22.0, style::MUTED),
+                            text(
+                                "Pas encore de partie pour ce mode et cette zone. Chaque partie \
+                                 terminée s'ajoutera ici, avec son score et son temps."
+                            )
+                            .size(13)
+                            .color(style::MUTED),
+                        ]
+                        .spacing(14)
+                        .align_y(Center),
+                    )
+                    .padding([18, 20])
+                    .width(Fill)
+                    .style(style::card),
                 )
-                .padding(32)
-                .width(Fill)
-                .style(style::card),
-            );
-            return content.into();
+                .into();
         }
 
         let now = DateTime::local(crate::progress::now());
@@ -73,129 +76,25 @@ impl App {
             ticks,
             details,
         };
-        let words = Words::of(&world.info);
-        content
+        content = content
             .push(stats(&runs))
-            .push(chart_card(
-                "Score",
-                format!(
-                    "{} {}, moins les erreurs",
-                    capitalize(words.many()),
-                    words.agree("trouvés")
-                ),
-                score,
-            ))
-            .push(chart_card("Temps", "Durée de chaque partie".into(), time))
-            .push(self.runs_card(&runs, &now))
-            .into()
-    }
-
-    pub(super) fn progress_side(&self) -> Element<'_, Message> {
-        column![self.preview_card(), self.series_missed_card()]
-            .spacing(16)
-            .into()
-    }
-
-    /// Séries déjà jouées dans ce quiz, regroupées par mode.
-    fn series_picker(&self) -> Option<Element<'_, Message>> {
-        let world = self.world();
-        let words = Words::of(&world.info);
-        let series = self.progress.series(&world.info.id);
-        if series.is_empty() {
-            return None;
-        }
-        let mut list = column![section_title("Séries jouées")].spacing(10);
-        for mode in Mode::ALL {
-            // Zones dans l'ordre de l'atlas ; les zones inconnues (données anciennes) sont omises.
-            let mut zones: Vec<(usize, usize)> = series
-                .iter()
-                .filter(|(m, _, _)| *m == mode)
-                .filter_map(|(_, region, count)| world.region(region).map(|r| (r, *count)))
-                .collect();
-            if zones.is_empty() {
-                continue;
-            }
-            zones.sort_unstable();
-            let pills = zones.into_iter().map(|(region, count)| {
-                let on = self.mode == mode && self.region == region;
-                button(
-                    row![
-                        text(world.regions[region].name.clone()).size(13),
-                        text(count.to_string()).size(12).color(if on {
-                            Color::WHITE
-                        } else {
-                            style::MUTED
-                        }),
-                    ]
-                    .spacing(8)
-                    .align_y(Center),
-                )
-                .padding([6, 14])
-                .style(style::pill(on))
-                .on_press(Message::SelectSeries(mode, region))
-                .into()
-            });
-            list = list.push(
+            .push(
                 row![
-                    text(mode_title(mode, &words))
-                        .size(13)
-                        .color(style::MUTED)
-                        .width(150),
-                    container(
-                        Row::with_children(pills)
-                            .spacing(6)
-                            .wrap()
-                            .vertical_spacing(6)
-                    )
-                    .width(Fill),
+                    chart_card(
+                        "Score",
+                        format!(
+                            "{} {}, moins les erreurs",
+                            capitalize(words.many()),
+                            words.agree("trouvés")
+                        ),
+                        score,
+                    ),
+                    chart_card("Temps", "Durée de chaque partie".into(), time),
                 ]
                 .spacing(12),
-            );
-        }
-        Some(list.into())
-    }
-
-    fn series_header(&self, count: usize) -> Element<'_, Message> {
-        let world = self.world();
-        let words = Words::of(&world.info);
-        let zone = &world.regions[self.region];
-        container(
-            row![
-                column![
-                    text(zone.name.clone()).size(22).font(style::FONT_BOLD),
-                    text(format!(
-                        "{} · {} {} · {}",
-                        mode_title(self.mode, &words),
-                        zone.members.len(),
-                        words.many(),
-                        match count {
-                            0 => "aucune partie".to_owned(),
-                            n => format!("{n} partie{}", plural(n)),
-                        }
-                    ))
-                    .size(14)
-                    .color(style::MUTED),
-                ]
-                .spacing(4)
-                .width(Fill),
-                button(
-                    row![
-                        icon(Icon::Play, 14.0, Color::WHITE),
-                        text("Jouer").size(15).font(style::FONT_SEMIBOLD)
-                    ]
-                    .spacing(8)
-                    .align_y(Center)
-                )
-                .padding([11, 20])
-                .style(style::primary)
-                .on_press(Message::Start),
-            ]
-            .spacing(16)
-            .align_y(Center),
-        )
-        .padding(20)
-        .style(style::card)
-        .into()
+            )
+            .push(self.runs_card(&runs, &now));
+        content.into()
     }
 
     /// Liste des parties de la série, la plus récente en premier, avec suppression.
@@ -271,7 +170,12 @@ impl App {
             .padding([0, 8]),
         );
         let mut timed_out = false;
-        for &(index, session) in runs.iter().rev() {
+        let shown = if self.all_runs {
+            runs.len()
+        } else {
+            RECENT_RUNS
+        };
+        for &(index, session) in runs.iter().rev().take(shown) {
             timed_out |= session.timed_out();
             let time_color = if session.timed_out() {
                 style::ORANGE
@@ -356,6 +260,19 @@ impl App {
                     }),
             );
         }
+        if runs.len() > RECENT_RUNS {
+            let label = if self.all_runs {
+                "Afficher moins".to_owned()
+            } else {
+                format!("Afficher les {} parties", runs.len())
+            };
+            body = body.push(
+                button(text(label).size(13))
+                    .padding([6, 12])
+                    .style(style::ghost)
+                    .on_press(Message::ToggleAllRuns),
+            );
+        }
         if timed_out {
             body = body.push(
                 row![
@@ -376,7 +293,7 @@ impl App {
     }
 
     /// Lieux les plus souvent ratés dans la série choisie.
-    fn series_missed_card(&self) -> Element<'_, Message> {
+    pub(super) fn series_missed_card(&self) -> Element<'_, Message> {
         let world = self.world();
         let zone = &world.regions[self.region];
         let id = &world.info.id;
@@ -506,7 +423,7 @@ fn chart_card<'a>(title: &'a str, subtitle: String, chart: Chart) -> Element<'a,
             ]
             .spacing(10)
             .align_y(iced::Alignment::End),
-            canvas(chart).width(Fill).height(190),
+            canvas(chart).width(Fill).height(170),
         ]
         .spacing(12),
     )

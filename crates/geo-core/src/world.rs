@@ -103,6 +103,27 @@ pub struct Inset {
     /// Emprise réelle de ces terres (leur plus grande île ou masse), pour les situer sur le
     /// globe.
     pub origin: [f32; 4],
+    /// Déplacement inverse, de l'encart vers la position réelle :
+    /// `réel = from + (encart - to) * factor`.
+    pub from: [f32; 2],
+    pub to: [f32; 2],
+    pub factor: [f32; 2],
+}
+
+impl Inset {
+    /// Position réelle d'un point de l'encart.
+    pub fn real(&self, [lon, lat]: [f32; 2]) -> [f32; 2] {
+        [
+            self.from[0] + (lon - self.to[0]) * self.factor[0],
+            self.from[1] + (lat - self.to[1]) * self.factor[1],
+        ]
+    }
+
+    /// Le point (en coordonnées de la carte) est-il dans le cadre de l'encart ?
+    pub fn contains(&self, [lon, lat]: [f32; 2]) -> bool {
+        let [x0, y0, x1, y1] = self.frame;
+        (x0..=x1).contains(&lon) && (y0..=y1).contains(&lat)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

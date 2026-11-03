@@ -577,9 +577,39 @@ pub struct MapView<'a> {
     pub clickable: bool,
     /// Aperçu de l'écran d'accueil : pays de la zone mis en évidence, carte figée.
     pub preview: bool,
-    /// Lieu à entourer, en (lon, lat) : `[lon_min, lat_min, lon_max, lat_max]`.
-    pub marker: Option<[f32; 4]>,
+    /// Carte de situation : terres d'un encart replacées à leur position réelle.
+    pub situation: Option<&'a Situation>,
     pub cache: &'a Cache,
+}
+
+/// Terres d'un encart (outre-mer, Alaska…) replacées à leur position réelle, projetées.
+pub struct Situation {
+    pub rings: Vec<Vec<Point>>,
+    pub bbox: Rectangle,
+}
+
+impl Situation {
+    /// Lieux de `atlas` dessinés dans l'encart, ramenés à leur vraie place sur une carte
+    /// centrée sur la longitude `center`.
+    pub fn new(atlas: &World, inset: &geo_core::Inset, center: f32) -> Self {
+        let rings: Vec<Vec<Point>> = atlas
+            .countries
+            .iter()
+            .filter(|c| inset.contains(c.label))
+            .flat_map(|c| &c.shape.rings)
+            .map(|ring| {
+                ring.iter()
+                    .map(|&p| {
+                        let [lon, lat] = inset.real(p);
+                        let [x, y] = project(lon, lat, center);
+                        Point::new(x, y)
+                    })
+                    .collect()
+            })
+            .collect();
+        let bbox = bounds(rings.iter().flatten());
+        Self { rings, bbox }
+    }
 }
 
 #[derive(Default)]
@@ -655,7 +685,7 @@ impl MapView<'_> {
         match self.quiz.mark(country) {
             Some(Mark::Pending) if self.preview => Tint::Highlight,
             // Carte de situation : toutes les terres en gris neutre, aucune n'est à trouver.
-            None if self.marker.is_some() => Tint::Pending,
+            None if self.situation.is_some() => Tint::Pending,
             mark => tint(mark),
         }
     }
@@ -819,7 +849,11 @@ impl MapView<'_> {
 
         // Bulles des archipels, sous les terres.
         for (c, shape) in self.projection.countries.iter().enumerate() {
-            if !self.projection.bubbles[c].is_empty() && shape.bbox.intersects(&visible) {
+            // Pas de bulles sur la carte de situation : seules les terres de l'encart comptent.
+            if self.situation.is_none()
+                && !self.projection.bubbles[c].is_empty()
+                && shape.bbox.intersects(&visible)
+            {
                 self.draw_bubble(frame, c, t, self.bubble_color(c));
             }
         }
@@ -1018,37 +1052,44 @@ impl MapView<'_> {
         }
     }
 
-    /// Lieu entouré (carte de situation d'un encart), visible même s'il est minuscule.
-    fn draw_marker(&self, frame: &mut Frame, t: &Transform) {
-        let Some(marker) = self.marker else { return };
-        let r = view_rect(marker, self.projection.center);
+    /// Terres de l'encart à leur vraie place, entourées si elles sont minuscules à l'écran.
+    fn draw_situation(&self, frame: &mut Frame, t: &Transform) {
+        let Some(situation) = self.situation else {
+            return;
+        };
+        let mut b = Builder::new();
+        Self::add_rings(&mut b, &situation.rings, t);
+        let path = b.build();
+        frame.fill(
+            &path,
+            Fill {
+                style: style::ACCENT.into(),
+                rule: Rule::EvenOdd,
+            },
+        );
+        frame.stroke(
+            &path,
+            Stroke::default()
+                .with_color(style::lighten(style::ACCENT, 0.6))
+                .with_width(1.2),
+        );
+        let r = situation.bbox;
         let a = t.to_screen(Point::new(r.x, r.y + r.height));
         let b = t.to_screen(Point::new(r.x + r.width, r.y));
-        let center = Point::new((a.x + b.x) / 2.0, (a.y + b.y) / 2.0);
-        let radii = Vector::new(
-            ((b.x - a.x) / 2.0 + 8.0).max(14.0),
-            ((b.y - a.y) / 2.0 + 8.0).max(14.0),
-        );
-        let ring = Path::new(|p| {
-            p.ellipse(canvas::path::arc::Elliptical {
-                center,
-                radii,
-                rotation: iced::Radians(0.0),
-                start_angle: iced::Radians(0.0),
-                end_angle: iced::Radians(std::f32::consts::TAU),
-            });
-        });
-        frame.fill(&ring, style::with_alpha(style::ACCENT, 0.08));
-        frame.stroke(
-            &ring,
-            Stroke::default()
-                .with_color(style::lighten(style::ACCENT, 0.3))
-                .with_width(2.5),
-        );
+        let size = (b.x - a.x).max(b.y - a.y);
+        if size < 18.0 {
+            let center = Point::new((a.x + b.x) / 2.0, (a.y + b.y) / 2.0);
+            frame.stroke(
+                &Path::circle(center, size / 2.0 + 9.0),
+                Stroke::default()
+                    .with_color(style::lighten(style::ACCENT, 0.3))
+                    .with_width(2.0),
+            );
+        }
     }
 
     fn draw_overlay(&self, frame: &mut Frame, t: &Transform, cursor: Option<Point>) {
-        self.draw_marker(frame, t);
+        self.draw_situation(frame, t);
         if let Some(target) = self.target {
             let pulse = 0.5 + 0.5 * (self.pulse * std::f32::consts::TAU).sin();
             let bubbled = !self.projection.bubbles[target].is_empty();
@@ -1399,7 +1440,7 @@ mod tests {
             reveal_all: false,
             clickable: true,
             preview: false,
-            marker: None,
+            situation: None,
             cache: &cache,
         };
         let bounds = rect(0.0, 0.0, 1000.0, 700.0);

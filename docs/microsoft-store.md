@@ -101,7 +101,7 @@ Certification Kit* (fourni avec le SDK Windows) permet aussi de lancer les tests
 > Saisie vocale : énumérez les noms à voix haute, ils sont validés au fil de la parole. La
 > reconnaissance se fait entièrement sur votre ordinateur, sans envoyer votre voix sur Internet.
 >
-> Minuteur facultatif, réglable pour chaque mode et chaque zone. L'onglet Progression trace
+> Minuteur facultatif, réglable pour chaque mode et chaque zone. Chaque quiz trace
 > l'évolution de votre score et de votre temps, partie après partie, et liste les lieux que vous
 > ratez le plus souvent.
 >

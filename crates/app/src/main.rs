@@ -104,6 +104,19 @@ mod tests {
         let [x0, y0, x1, y1] = fr.info.insets[3].origin; // La Réunion
         assert!((55.0..56.0).contains(&((x0 + x1) / 2.0)));
         assert!((-21.5..-20.8).contains(&((y0 + y1) / 2.0)));
+        // Le déplacement inverse ramène la Guadeloupe de son encart à sa vraie place.
+        let gp = fr.countries.iter().find(|c| c.code == "FR-GP").unwrap();
+        let inset = fr
+            .info
+            .insets
+            .iter()
+            .find(|i| i.contains(gp.label))
+            .unwrap();
+        let [lon, lat] = inset.real(gp.label);
+        assert!(
+            (-62.0..-61.0).contains(&lon) && (15.8..16.6).contains(&lat),
+            "{lon} {lat}"
+        );
     }
 
     #[test]

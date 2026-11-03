@@ -12,13 +12,17 @@ Application de bureau pour apprendre les pays du monde sur une carte, au clavier
 | France | Régions françaises | 18 régions | métropole, outre-mer |
 | États-Unis | États des États-Unis | 50 États | régions et divisions du recensement |
 
-L'écran d'accueil présente le catalogue dans une colonne à gauche, groupé par catégorie : la
-liste peut s'allonger sans changer l'interface. Les textes s'accordent au quiz (« Nommer la
-région », « 13 régions trouvées », « Quel est cet État ? »).
+L'**accueil** présente les quiz en cartes (miniature, catégorie, dernière partie), avec les
+dernières parties à droite : un clic sur l'une d'elles rouvre son quiz, réglé sur le même mode et
+la même zone. Une carte ouvre la **page du quiz** (mode, zone, lancement, progression), d'où
+« Accueil » ramène à la liste. Les textes s'accordent au quiz (« Nommer la région »,
+« 13 régions trouvées », « Quel est cet État ? »).
 
 Les départements et régions d'outre-mer, l'Alaska et Hawaï sont déplacés en **encarts** près de
-la carte principale, dans un cadre. La pastille « globe » au coin de chaque cadre ouvre une
-petite carte du monde qui situe ces terres, sans les nommer. Les numéros de département sont acceptés au clavier
+la carte principale, dans un cadre. La pastille « globe » au coin de chaque cadre ouvre une carte
+du monde qui part de la vue d'ensemble et zoome sur ces terres, dessinées à leur vraie place et
+sans les nommer ; on peut ensuite la déplacer et zoomer à la molette. Les numéros de département
+sont acceptés au clavier
 (« 75 », « 2A », « 971 »), et les noms anglais des États (« California »).
 
 ### Ajouter un quiz
@@ -44,16 +48,16 @@ Ensuite :
 | **Nommer le pays** | Un pays s'allume sur la carte : il faut donner son nom. |
 | **Trouver sur la carte** | Un nom s'affiche : il faut cliquer sur le bon pays. |
 
-Un **minuteur** facultatif s'active sur l'écran d'accueil. Par défaut, il dure 15 minutes pour
+Un **minuteur** facultatif s'active sur la page du quiz. Par défaut, il dure 15 minutes pour
 citer les 197 pays du monde, au prorata du nombre de pays de la zone, et un peu plus par pays en
 « Nommer » (7 s) et « Trouver » (9 s). La durée se règle pour chaque mode et chaque zone. À zéro,
 la partie est validée : les pays restants comptent comme ratés.
 
-L'onglet **Progression** de chaque quiz trace l'évolution du **score** et du **temps** partie après
-partie. Une série regroupe les parties d'un même quiz, mode et zone : « Tous les pays » sur le
-monde, sur l'Afrique et sur l'Afrique du Nord sont trois séries distinctes. Les séries jouées
-sont listées par mode. Le survol d'un point affiche la date et la valeur. Sous les courbes, la
-liste des parties permet d'écarter celles qui ne comptent pas (fenêtre oubliée, partie
+La **progression** s'affiche sur la page du quiz, sous le lancement : l'évolution du **score** et
+du **temps** partie après partie, pour le mode et la zone choisis. Une série regroupe les parties
+d'un même quiz, mode et zone : « Tous les pays » sur le monde, sur l'Afrique et sur l'Afrique du
+Nord sont trois séries distinctes. Le survol d'un point affiche la date et la valeur. Sous les
+courbes, la liste des parties (les cinq dernières, ou toutes à la demande) permet d'écarter celles qui ne comptent pas (fenêtre oubliée, partie
 interrompue) : la corbeille demande confirmation dans la ligne même (Échap pour renoncer), puis
 un bouton « Annuler » (ou Ctrl+Z) permet encore de revenir en arrière. Les records et les lieux
 « à revoir » en tiennent compte.
@@ -74,7 +78,7 @@ Zones jouables :
 - leurs sous-régions (Balkans, Caraïbes, Asie centrale, Polynésie…) ;
 - des regroupements libres : Petites Antilles, Grandes Antilles, Union européenne, îles africaines.
 
-Sur l'écran d'accueil, un **aperçu** montre la zone choisie, cadrée comme en partie, avec ses pays
+Sur la page du quiz, un **aperçu** montre la zone choisie, cadrée comme en partie, avec ses pays
 en bleu.
 
 La liste compte 197 pays : les 193 membres de l'ONU, plus le Vatican, la Palestine, le Kosovo
@@ -190,10 +194,11 @@ Paramètres de `GEO_DEMO`, séparés par `;` :
 - `elapsed` : temps déjà écoulé, en secondes ;
 - `timer` : minuteur imposé, en secondes ;
 - `giveup`, `summary` : partie abandonnée, bilan affiché ;
-- `progress=14` : onglet Progression, avec 14 parties fictives dans la zone choisie
+- `progress=14` : page du quiz avec 14 parties fictives dans la zone choisie
   (et quelques autres séries) ; `delete` supprime la dernière, `confirm` affiche sa demande de
   confirmation, `bottom` défile en bas de page ;
-- `globe=N` : carte de situation de l'encart n° N ouverte.
+- `globe=N` : carte de situation de l'encart n° N ouverte ;
+- `home` : accueil affiché, même avec `atlas`, `region` ou `progress` (sinon page du quiz).
 
 `GEO_WINDOW=1600x900` impose la taille de la fenêtre.
 

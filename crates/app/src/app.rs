@@ -1,5 +1,7 @@
 //! Application : écran d'accueil (choix du mode et de la zone, progression) et écran de jeu.
 
+mod home;
+mod locator;
 mod progression;
 
 use std::time::{Duration, Instant};
@@ -8,11 +10,12 @@ use geo_core::{Mark, Matcher, Mode, Outcome, Quiz, RegionKind, World};
 use iced::alignment::{Horizontal, Vertical};
 use iced::widget::canvas::Cache;
 use iced::widget::{
-    Column, Row, button, canvas, column, container, opaque, operation, progress_bar, row, rule,
+    Column, Row, button, canvas, column, container, opaque, operation, progress_bar, row,
     scrollable, sensor, space, stack, text, text_input,
 };
 use iced::{Center, Color, Element, Fill, Size, Subscription, Task, Theme, Vector, keyboard, time};
 
+use self::locator::Locator;
 use crate::ATLASES;
 use crate::icons::{Icon, icon};
 use crate::map::{self, Camera, Flash, MapEvent, MapView, Projection, Transform};
@@ -39,29 +42,30 @@ const SAFE_AREA: map::Insets = map::Insets {
     left: 40.0,
 };
 
-/// Onglet de l'écran d'accueil.
+/// Écran affiché hors partie : l'accueil (liste des quiz) ou la page d'un quiz.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Tab {
-    Play,
-    Progress,
+pub enum Screen {
+    Home,
+    Quiz,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    ShowTab(Tab),
-    /// Choix d'une série dans l'onglet Progression : mode et zone.
-    SelectSeries(Mode, usize),
+    /// Retour à l'accueil.
+    GoHome,
+    /// Ouvre la page d'un quiz (index dans `ATLASES`).
+    OpenQuiz(usize),
+    /// Ouvre la page d'un quiz réglée sur un mode et une zone (dernières parties).
+    OpenSeries(usize, Mode, usize),
+    /// Affiche toutes les parties de la série, ou seulement les plus récentes.
+    ToggleAllRuns,
     /// Demande confirmation avant de supprimer une partie (index dans l'historique).
     AskDelete(usize),
     CancelDelete,
     /// Supprime une partie (index dans l'historique), après confirmation.
     DeleteRun(usize),
     UndoDelete,
-    /// Quitte la partie terminée pour voir la progression de sa série.
-    ShowProgress,
     SelectMode(Mode),
-    /// Choix du quiz (index dans `ATLASES`).
-    SelectAtlas(usize),
     SelectRegion(usize),
     ToggleTimer,
     /// Avancement affiché par continent (`true`) ou par sous-région.
@@ -83,6 +87,10 @@ pub enum Message {
     CloseSummary,
     /// Ferme la carte de situation d'un encart.
     CloseLocator,
+    /// Événement de la carte de situation (déplacement, zoom).
+    LocatorMap(MapEvent),
+    /// Recentre la carte de situation sur les terres de l'encart.
+    LocatorRecenter,
     Tick(Instant),
     Voice(voice::Event),
     ToggleMic,
@@ -103,7 +111,11 @@ pub struct App {
     settings: Settings,
     mode: Mode,
     region: usize,
-    tab: Tab,
+    screen: Screen,
+    /// Toutes les parties de la série sont listées (sinon les plus récentes).
+    all_runs: bool,
+    /// Miniatures des quiz sur l'accueil (une par atlas).
+    thumbnails: Vec<Preview>,
     /// Dernière partie supprimée et sa place dans l'historique, pour pouvoir l'annuler.
     deleted: Option<(usize, Session)>,
     /// Partie dont la suppression attend confirmation.
@@ -175,102 +187,6 @@ struct Game {
     locator: Option<Locator>,
 }
 
-/// Petite carte du monde qui situe les terres d'un encart.
-struct Locator {
-    inset: usize,
-    projection: Projection,
-    view: iced::Rectangle,
-    origin: [f32; 4],
-    /// Partie vide : aucun lieu mis en évidence ni nommé (pas d'indice).
-    quiz: Quiz,
-    cache: Cache,
-}
-
-impl Locator {
-    fn new(inset: usize, origin: [f32; 4]) -> Self {
-        let world = &ATLASES[0];
-        let [x0, y0, x1, y1] = origin;
-        let (lon, lat) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
-        // Assez large pour voir les terres voisines (Caraïbes, Madagascar, Californie…).
-        let half_w = (1.3 * (x1 - x0)).max(45.0);
-        let half_h = (1.3 * (y1 - y0)).max(25.0);
-        let view = [
-            lon - half_w,
-            (lat - half_h).max(-80.0),
-            lon + half_w,
-            (lat + half_h).min(85.0),
-        ];
-        Self {
-            inset,
-            projection: Projection::new(world, lon),
-            view: map::view_rect(view, lon),
-            origin,
-            quiz: Quiz::new(Mode::Free, world.countries.len(), Vec::new(), Vec::new()),
-            cache: Cache::new(),
-        }
-    }
-
-    fn view(&self) -> Element<'_, Message> {
-        let map_view = MapView {
-            world: &ATLASES[0],
-            projection: &self.projection,
-            view: self.view,
-            camera: Camera::fit(self.view),
-            quiz: &self.quiz,
-            hover: None,
-            target: None,
-            flash: None,
-            pulse: 0.0,
-            reveal_all: false,
-            clickable: false,
-            preview: true,
-            marker: Some(self.origin),
-            cache: &self.cache,
-        };
-        let map: Element<'_, MapEvent> = canvas(map_view).width(Fill).height(Fill).into();
-        let close = button(container(icon(Icon::Close, 12.0, style::TEXT)).center(Fill))
-            .width(28)
-            .height(28)
-            .padding(0)
-            .style(style::map_control)
-            .on_press(Message::CloseLocator);
-        let card = column![
-            row![
-                icon(Icon::Globe, 16.0, style::TEXT),
-                text("Sur la carte du monde")
-                    .size(14)
-                    .font(style::FONT_SEMIBOLD)
-                    .width(Fill),
-                close,
-            ]
-            .spacing(8)
-            .align_y(Center),
-            container(map.map(Message::Map))
-                .width(Fill)
-                .height(210)
-                .clip(true)
-                .style(|_: &Theme| container::Style {
-                    background: Some(style::OCEAN.into()),
-                    border: iced::Border {
-                        color: style::BORDER,
-                        width: 1.0,
-                        radius: 10.0.into(),
-                    },
-                    ..Default::default()
-                }),
-        ]
-        .spacing(10);
-        container(card)
-            .padding(14)
-            .width(360)
-            .style(|theme: &Theme| container::Style {
-                background: Some(style::SURFACE.into()),
-                ..style::floating(theme)
-            })
-            .into()
-    }
-}
-
 /// Carte de l'écran d'accueil : la zone choisie, ses pays mis en évidence.
 struct Preview {
     atlas: usize,
@@ -299,7 +215,7 @@ impl Preview {
         }
     }
 
-    fn view(&self) -> Element<'_, Message> {
+    fn view(&self, height: f32) -> Element<'_, Message> {
         let map_view = MapView {
             world: self.world,
             projection: &self.projection,
@@ -313,13 +229,13 @@ impl Preview {
             reveal_all: false,
             clickable: false,
             preview: true,
-            marker: None,
+            situation: None,
             cache: &self.cache,
         };
         let map: Element<'_, MapEvent> = canvas(map_view).width(Fill).height(Fill).into();
         container(map.map(Message::Map))
             .width(Fill)
-            .height(200)
+            .height(height)
             .padding(2)
             .clip(true)
             .style(|_: &Theme| container::Style {
@@ -356,7 +272,9 @@ impl App {
             mode: Mode::Free,
             atlas: 0,
             region: 0,
-            tab: Tab::Play,
+            screen: Screen::Home,
+            all_runs: false,
+            thumbnails: (0..ATLASES.len()).map(|i| Preview::new(i, 0)).collect(),
             deleted: None,
             confirm_delete: None,
             game: None,
@@ -417,6 +335,11 @@ impl App {
             self.region = region;
             self.preview = Preview::new(self.atlas, region);
         }
+        // Un quiz, une zone ou une progression demandés : page du quiz plutôt que l'accueil.
+        if !demo.home && (demo.atlas.is_some() || demo.region.is_some() || demo.progress.is_some())
+        {
+            self.screen = Screen::Quiz;
+        }
         // En mémoire seulement, comme le minuteur ci-dessous.
         self.settings.by_continent = demo.by_continent;
         if demo.timer.is_some() {
@@ -424,7 +347,6 @@ impl App {
             self.settings.timer = true;
         }
         if let Some(count) = demo.progress {
-            self.tab = Tab::Progress;
             let world = self.world();
             let zone = &world.regions[self.region];
             let id = &world.info.id;
@@ -496,11 +418,8 @@ impl App {
         if demo.give_up {
             game.quiz.give_up();
         }
-        if let Some(inset) = demo
-            .globe
-            .and_then(|i| self.world().info.insets.get(i).map(|x| (i, x)))
-        {
-            game.locator = Some(Locator::new(inset.0, inset.1.origin));
+        if let Some(inset) = demo.globe {
+            game.locator = Locator::new(self.world(), inset);
         }
         game.flash = None;
         self.game = Some(game);
@@ -521,6 +440,21 @@ impl App {
         if self.preview.atlas != self.atlas || self.preview.region != self.region {
             self.preview = Preview::new(self.atlas, self.region);
         }
+    }
+
+    /// Affiche la page du quiz choisi (atlas, mode et zone déjà réglés).
+    fn open_quiz(&mut self) {
+        self.screen = Screen::Quiz;
+        self.clear_run_actions();
+        self.refresh_preview();
+    }
+
+    /// Oublie la confirmation de suppression, l'annulation possible et la liste dépliée,
+    /// qui ne valent que pour la série affichée.
+    fn clear_run_actions(&mut self) {
+        self.deleted = None;
+        self.confirm_delete = None;
+        self.all_runs = false;
     }
 
     pub fn title(&self) -> String {
@@ -553,7 +487,7 @@ impl App {
             let effects = game.flash.is_some()
                 || game.pending.is_some()
                 || (game.quiz.mode() == Mode::Identify && game.quiz.target().is_some());
-            if game.animation.is_some() {
+            if game.animation.is_some() || game.locator.as_ref().is_some_and(Locator::animating) {
                 subs.push(time::every(Duration::from_millis(16)).map(Message::Tick));
             } else if effects {
                 subs.push(time::every(Duration::from_millis(40)).map(Message::Tick));
@@ -568,18 +502,27 @@ impl App {
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::ShowTab(tab) => {
-                self.tab = tab;
-                self.deleted = None;
-                self.confirm_delete = None;
+            Message::GoHome => {
+                self.screen = Screen::Home;
+                self.clear_run_actions();
+                return operation::snap_to(HOME_SCROLL, operation::RelativeOffset::START);
             }
-            Message::SelectSeries(mode, region) => {
+            Message::OpenQuiz(atlas) => {
+                if atlas != self.atlas {
+                    self.atlas = atlas;
+                    self.region = 0;
+                }
+                self.open_quiz();
+                return operation::snap_to(HOME_SCROLL, operation::RelativeOffset::START);
+            }
+            Message::OpenSeries(atlas, mode, region) => {
+                self.atlas = atlas;
                 self.mode = mode;
                 self.region = region;
-                self.deleted = None;
-                self.confirm_delete = None;
-                self.refresh_preview();
+                self.open_quiz();
+                return operation::snap_to(HOME_SCROLL, operation::RelativeOffset::START);
             }
+            Message::ToggleAllRuns => self.all_runs = !self.all_runs,
             Message::AskDelete(index) => self.confirm_delete = Some(index),
             Message::CancelDelete => self.confirm_delete = None,
             Message::DeleteRun(index) => {
@@ -595,30 +538,13 @@ impl App {
                     self.progress.restore(index, session);
                 }
             }
-            Message::ShowProgress => {
-                if let Some(game) = self.game.take() {
-                    self.atlas = game.atlas;
-                    self.region = game.region;
-                    self.mode = game.quiz.mode();
-                }
-                self.tab = Tab::Progress;
-                self.deleted = None;
-                self.confirm_delete = None;
-                self.refresh_preview();
-                self.send_voice(voice::Command::Stop);
-            }
-            Message::SelectMode(mode) => self.mode = mode,
-            Message::SelectAtlas(atlas) => {
-                if atlas != self.atlas {
-                    self.atlas = atlas;
-                    self.region = 0;
-                    self.deleted = None;
-                    self.confirm_delete = None;
-                    self.refresh_preview();
-                }
+            Message::SelectMode(mode) => {
+                self.mode = mode;
+                self.clear_run_actions();
             }
             Message::SelectRegion(region) => {
                 self.region = region;
+                self.clear_run_actions();
                 self.refresh_preview();
             }
             Message::ToggleTimer => self.settings.toggle_timer(),
@@ -690,6 +616,21 @@ impl App {
                     };
                     game.manual_camera = !matches!(message, Message::ResetView);
                     game.animate_to(to);
+                }
+                return operation::focus(ANSWER_INPUT);
+            }
+            Message::LocatorMap(event) => {
+                if let Some(locator) = self.game.as_mut().and_then(|g| g.locator.as_mut()) {
+                    let refocus = matches!(event, MapEvent::Click(_) | MapEvent::DragEnded);
+                    locator.on_map(event);
+                    if refocus {
+                        return operation::focus(ANSWER_INPUT);
+                    }
+                }
+            }
+            Message::LocatorRecenter => {
+                if let Some(locator) = self.game.as_mut().and_then(|g| g.locator.as_mut()) {
+                    locator.recenter();
                 }
                 return operation::focus(ANSWER_INPUT);
             }
@@ -773,12 +714,7 @@ impl App {
                 // Un second clic sur la même pastille referme la carte.
                 game.locator = match &game.locator {
                     Some(l) if l.inset == inset => None,
-                    _ => game
-                        .world
-                        .info
-                        .insets
-                        .get(inset)
-                        .map(|i| Locator::new(inset, i.origin)),
+                    _ => Locator::new(game.world, inset),
                 };
             }
             MapEvent::Click(_) | MapEvent::DragEnded => {}
@@ -903,6 +839,9 @@ impl App {
             game.started += now - game.now;
         }
         game.now = now;
+        if let Some(locator) = &mut game.locator {
+            locator.tick(now);
+        }
         if let Some(animation) = &game.animation {
             let t = ((now - animation.start).as_secs_f32() / 0.45).min(1.0);
             let eased = 1.0 - (1.0 - t).powi(3);
@@ -1083,20 +1022,31 @@ impl App {
     }
 
     fn home_view(&self) -> Element<'_, Message> {
-        let (main, side) = match self.tab {
-            Tab::Play => (
-                self.play_main(),
-                column![self.preview_card(), self.voice_card(), self.history_card()]
-                    .spacing(16)
-                    .into(),
-            ),
-            Tab::Progress => (self.progress_main(), self.progress_side()),
-        };
-        let main = column![self.home_header(), main].spacing(24).width(Fill);
-        let side = container(side).width(320);
-        let content = container(row![self.catalog(), main, side].spacing(28))
+        match self.screen {
+            Screen::Home => self.home_page(),
+            Screen::Quiz => self.quiz_page(),
+        }
+    }
+
+    /// Page d'un quiz : mode, zone, lancement et progression ; aperçu et voix à droite.
+    fn quiz_page(&self) -> Element<'_, Message> {
+        let main = column![
+            self.quiz_header(),
+            self.play_main(),
+            self.progress_section()
+        ]
+        .spacing(24)
+        .width(Fill);
+        let side = column![
+            self.preview_card(),
+            self.series_missed_card(),
+            self.voice_card()
+        ]
+        .spacing(16)
+        .width(320);
+        let content = container(row![main, side].spacing(28))
             .padding(32)
-            .max_width(1440);
+            .max_width(1280);
         container(
             scrollable(container(content).center_x(Fill))
                 .id(HOME_SCROLL)
@@ -1108,55 +1058,35 @@ impl App {
         .into()
     }
 
-    /// Titre du quiz choisi et onglets Jouer / Progression.
-    fn home_header(&self) -> Element<'_, Message> {
+    /// Retour à l'accueil, titre du quiz et nombre de lieux.
+    fn quiz_header(&self) -> Element<'_, Message> {
         let info = &self.world().info;
-        let tab = |tab: Tab, i: Icon, label: &'static str| {
-            let on = self.tab == tab;
+        column![
             button(
                 row![
-                    icon(i, 14.0, if on { Color::WHITE } else { style::TEXT }),
-                    text(label).size(14)
+                    icon(Icon::Back, 14.0, style::MUTED),
+                    text("Accueil").size(13).color(style::MUTED)
                 ]
-                .spacing(8)
-                .align_y(Center),
+                .spacing(6)
+                .align_y(Center)
             )
-            .padding([8, 16])
-            .style(style::pill(on))
-            .on_press(Message::ShowTab(tab))
-        };
-        row![
-            column![
-                text(info.title.clone()).size(26).font(style::FONT_BOLD),
+            .padding([5, 10])
+            .style(style::ghost)
+            .on_press(Message::GoHome),
+            row![
+                text(info.title.clone()).size(28).font(style::FONT_BOLD),
                 text(format!("{} {}", self.world().countries.len(), info.many))
                     .size(14)
                     .color(style::MUTED),
             ]
-            .spacing(2)
-            .width(Fill),
-            container(
-                row![
-                    tab(Tab::Play, Icon::Play, "Jouer"),
-                    tab(Tab::Progress, Icon::Chart, "Progression"),
-                ]
-                .spacing(4)
-            )
-            .padding(4)
-            .style(|_: &Theme| container::Style {
-                background: Some(style::SURFACE.into()),
-                border: iced::Border {
-                    color: style::BORDER,
-                    width: 1.0,
-                    radius: 999.0.into(),
-                },
-                ..Default::default()
-            }),
+            .spacing(12)
+            .align_y(iced::Alignment::End),
         ]
-        .align_y(Center)
+        .spacing(6)
         .into()
     }
 
-    /// Onglet Jouer : mode, zone et lancement.
+    /// Mode, zone et lancement.
     fn play_main(&self) -> Element<'_, Message> {
         let words = Words::of(&self.world().info);
         let modes = Row::with_children(Mode::ALL.iter().map(|&mode| {
@@ -1233,16 +1163,6 @@ impl App {
             }
         }
 
-        let best = self
-            .progress
-            .best(&self.world().info.id, self.mode, &selected.id)
-            .map(|s| {
-                format!(
-                    "Record : {} en {}",
-                    percent(s.score),
-                    clock(Duration::from_secs(u64::from(s.seconds)))
-                )
-            });
         let launch = container(
             row![
                 column![
@@ -1255,9 +1175,6 @@ impl App {
                     ))
                     .size(14)
                     .color(style::MUTED),
-                    text(best.unwrap_or_else(|| "Pas encore de record".into()))
-                        .size(13)
-                        .color(style::MUTED),
                     self.timer_setting(),
                 ]
                 .spacing(4)
@@ -1348,51 +1265,6 @@ impl App {
             .into()
     }
 
-    /// Catalogue des quiz, groupés par catégorie (dans l'ordre de `ATLASES`).
-    fn catalog(&self) -> Element<'_, Message> {
-        let mut list = column![
-            text("GeoLearner").size(26).font(style::FONT_BOLD),
-            text("La géographie, carte en main.")
-                .size(13)
-                .color(style::MUTED),
-        ]
-        .spacing(4);
-        let mut categories: Vec<&str> = Vec::new();
-        for atlas in ATLASES.iter() {
-            if !categories.contains(&atlas.info.category.as_str()) {
-                categories.push(&atlas.info.category);
-            }
-        }
-        for category in categories {
-            let mut group = column![section_title(category)].spacing(6);
-            for (i, atlas) in ATLASES
-                .iter()
-                .enumerate()
-                .filter(|(_, a)| a.info.category == category)
-            {
-                group = group.push(
-                    button(
-                        column![
-                            text(atlas.info.title.clone())
-                                .size(14)
-                                .font(style::FONT_SEMIBOLD),
-                            text(format!("{} {}", atlas.countries.len(), atlas.info.many))
-                                .size(12)
-                                .color(style::MUTED),
-                        ]
-                        .spacing(2),
-                    )
-                    .padding([9, 12])
-                    .width(Fill)
-                    .style(style::option_card(self.atlas == i))
-                    .on_press(Message::SelectAtlas(i)),
-                );
-            }
-            list = list.push(container(group).padding(iced::Padding::ZERO.top(14)));
-        }
-        container(list).width(230).into()
-    }
-
     /// Aperçu de la zone choisie : ses pays en bleu sur la carte.
     fn preview_card(&self) -> Element<'_, Message> {
         let zone = &self.world().regions[self.region];
@@ -1408,7 +1280,7 @@ impl App {
                         .color(style::MUTED),
                 ]
                 .align_y(Center),
-                self.preview.view(),
+                self.preview.view(200.0),
             ]
             .spacing(12),
         )
@@ -1476,102 +1348,6 @@ impl App {
                 );
             }
             _ => {}
-        }
-        container(body)
-            .padding(18)
-            .width(Fill)
-            .style(style::card)
-            .into()
-    }
-
-    fn history_card(&self) -> Element<'_, Message> {
-        let mut list = Column::new().spacing(10);
-        let mut empty = true;
-        for session in self.progress.recent(6) {
-            empty = false;
-            let atlas = ATLASES
-                .iter()
-                .find(|a| a.info.id == session.atlas)
-                .unwrap_or(&ATLASES[0]);
-            let region = atlas
-                .region(&session.region)
-                .map(|i| atlas.regions[i].name.clone())
-                .unwrap_or_else(|| session.region.clone());
-            list = list.push(
-                row![
-                    container(space())
-                        .width(8)
-                        .height(8)
-                        .style(style::dot(score_color(session.score))),
-                    column![
-                        text(region).size(14),
-                        text(if atlas.info.id == "monde" {
-                            mode_title(session.mode, &Words::of(&atlas.info))
-                        } else {
-                            format!(
-                                "{} · {}",
-                                atlas.info.title,
-                                mode_title(session.mode, &Words::of(&atlas.info))
-                            )
-                        })
-                        .size(12)
-                        .color(style::MUTED),
-                    ]
-                    .width(Fill),
-                    column![
-                        text(percent(session.score))
-                            .size(14)
-                            .font(style::FONT_SEMIBOLD),
-                        text(clock(Duration::from_secs(u64::from(session.seconds))))
-                            .size(12)
-                            .color(style::MUTED),
-                    ]
-                    .align_x(Horizontal::Right),
-                ]
-                .spacing(12)
-                .align_y(Center),
-            );
-        }
-        if empty {
-            list = list.push(
-                text("Aucune partie pour l'instant.")
-                    .size(13)
-                    .color(style::MUTED),
-            );
-        }
-
-        let mut body = column![
-            text("Dernières parties")
-                .size(16)
-                .font(style::FONT_SEMIBOLD),
-            list
-        ]
-        .spacing(14);
-        let id = &self.world().info.id;
-        let missed = self.progress.most_missed(|s| &s.atlas == id, 10);
-        if !missed.is_empty() {
-            let names = missed
-                .iter()
-                .filter_map(|(code, _)| self.world().countries.iter().find(|c| &c.code == code))
-                .map(|c| {
-                    container(text(c.name.clone()).size(12))
-                        .padding([4, 10])
-                        .style(style::chip(style::ORANGE))
-                        .into()
-                });
-            body = body.push(rule::horizontal(1).style(|_: &Theme| rule::Style {
-                color: style::BORDER,
-                radius: 0.0.into(),
-                fill_mode: rule::FillMode::Full,
-                snap: true,
-            }));
-            body = body.push(text("À revoir").size(14).font(style::FONT_SEMIBOLD));
-            body = body.push(
-                Row::with_children(names)
-                    .spacing(6)
-                    .wrap()
-                    .vertical_spacing(6),
-            );
         }
         container(body)
             .padding(18)
@@ -1751,7 +1527,7 @@ impl App {
             reveal_all: quiz.is_finished(),
             clickable: quiz.mode() == Mode::Locate && !quiz.is_finished(),
             preview: false,
-            marker: None,
+            situation: None,
             cache: &game.cache,
         };
         let map: Element<'a, MapEvent> = canvas(map_view).width(Fill).height(Fill).into();
@@ -2210,17 +1986,6 @@ impl App {
                     .padding([10, 16])
                     .style(style::secondary)
                     .on_press(Message::BackToMenu),
-                button(
-                    row![
-                        icon(Icon::Chart, 14.0, style::TEXT),
-                        text("Progression").size(14)
-                    ]
-                    .spacing(8)
-                    .align_y(Center)
-                )
-                .padding([10, 16])
-                .style(style::secondary)
-                .on_press(Message::ShowProgress),
                 button(text("Rejouer").size(14).font(style::FONT_SEMIBOLD))
                     .padding([10, 20])
                     .style(style::primary)
@@ -2528,5 +2293,10 @@ mod tests {
             let _ = Preview::new(0, ATLASES[0].region(region).unwrap());
             println!("{region} : {:?}", start.elapsed());
         }
+        // Miniatures de l'accueil, construites au démarrage.
+        let _ = &*ATLASES;
+        let start = Instant::now();
+        let _: Vec<Preview> = (0..ATLASES.len()).map(|i| Preview::new(i, 0)).collect();
+        println!("miniatures : {:?}", start.elapsed());
     }
 }

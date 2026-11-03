@@ -134,21 +134,6 @@ impl Progress {
         runs
     }
 
-    /// Séries jouées dans un atlas : (mode, zone, nombre de parties).
-    pub fn series(&self, atlas: &str) -> Vec<(Mode, &str, usize)> {
-        let mut list: Vec<(Mode, &str, usize)> = Vec::new();
-        for s in self.sessions.iter().filter(|s| s.atlas == atlas) {
-            match list
-                .iter_mut()
-                .find(|(m, r, _)| *m == s.mode && *r == s.region)
-            {
-                Some(entry) => entry.2 += 1,
-                None => list.push((s.mode, &s.region, 1)),
-            }
-        }
-        list
-    }
-
     /// Lieux les plus souvent ratés dans les parties retenues (code, nombre d'échecs).
     pub fn most_missed(
         &self,
@@ -209,20 +194,12 @@ mod tests {
     }
 
     #[test]
-    fn series_runs_and_removal() {
+    fn runs_and_removal() {
         let mut p = Progress::default();
         p.sessions.push(session(Mode::Free, "europe", 0.5, 100));
         p.sessions.push(session(Mode::Free, "afrique", 0.6, 100));
         p.sessions.push(session(Mode::Free, "europe", 0.7, 100));
         p.sessions.push(session(Mode::Locate, "europe", 0.8, 100));
-        assert_eq!(
-            p.series("monde"),
-            [
-                (Mode::Free, "europe", 2),
-                (Mode::Free, "afrique", 1),
-                (Mode::Locate, "europe", 1)
-            ]
-        );
         let runs: Vec<usize> = p
             .runs("monde", Mode::Free, "europe")
             .iter()
