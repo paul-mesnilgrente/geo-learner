@@ -11,7 +11,7 @@ use crate::chart::{Chart, Unit};
 use crate::dates::DateTime;
 use crate::i18n::Lang;
 use crate::icons::{Icon, icon};
-use crate::progress::Session;
+use crate::progress::{Level, Mastery, Session};
 use crate::style;
 use crate::tr;
 use crate::words::{Words, capitalize};
@@ -20,6 +20,8 @@ use crate::words::{Words, capitalize};
 const RECENT: usize = 5;
 /// Parties listées avant « Afficher les N parties ».
 const RECENT_RUNS: usize = 5;
+/// Lieux « à revoir » affichés au plus.
+const MAX_WEAK: usize = 12;
 
 impl App {
     /// Section « Progression » de la page du quiz, pour le mode et la zone choisis.
@@ -338,40 +340,108 @@ impl App {
     pub(super) fn series_missed_card(&self) -> Element<'_, Message> {
         let world = self.world();
         let zone = &world.regions[self.region];
-        let id = &world.info.id;
-        // Lieux encore présents dans l'atlas (les codes inconnus sont ignorés).
-        let missed: Vec<(&str, usize)> = self
-            .progress
-            .most_missed(|s| s.is(id, self.mode, &zone.id), 12)
-            .into_iter()
-            .filter_map(|(code, n)| {
-                let place = world.countries.iter().find(|c| c.code == code)?;
-                Some((place.name.get(self.lang), n))
+        // Maîtrise dans ce mode, toutes zones confondues, restreinte aux lieux de la zone.
+        let mastery = self.progress.mastery(&world.info.id, self.mode);
+        let levels: Vec<Option<&Mastery>> = zone
+            .members
+            .iter()
+            .map(|&c| mastery.get(&world.countries[c].code))
+            .collect();
+        let count = |level: Option<Level>| {
+            levels
+                .iter()
+                .filter(|m| m.map(|m| m.level) == level)
+                .count()
+        };
+        // Lieux ratés la dernière fois : les plus souvent ratés d'abord, puis les plus récents.
+        let mut weak: Vec<(&str, &Mastery)> = zone
+            .members
+            .iter()
+            .zip(&levels)
+            .filter_map(|(&c, m)| {
+                let m = m.filter(|m| m.level == Level::Weak)?;
+                Some((world.countries[c].name.get(self.lang), m))
             })
             .collect();
+        weak.sort_by(|a, b| {
+            (b.1.missed.cmp(&a.1.missed))
+                .then(b.1.last.cmp(&a.1.last))
+                .then(a.0.cmp(b.0))
+        });
+        let more = weak.len().saturating_sub(MAX_WEAK);
+        weak.truncate(MAX_WEAK);
+
+        let lang = self.lang;
+        let tally = |n: usize, label: String, color: iced::Color| {
+            row![
+                container(space())
+                    .width(8)
+                    .height(8)
+                    .style(move |_: &Theme| container::Style {
+                        background: Some(color.into()),
+                        border: iced::border::rounded(4),
+                        ..container::Style::default()
+                    }),
+                text(format!("{n} {label}")).size(12).color(style::MUTED),
+            ]
+            .spacing(6)
+            .align_y(Center)
+            .into()
+        };
+        let mut tallies: Vec<Element<'_, Message>> = vec![
+            tally(
+                count(Some(Level::Known)),
+                tr!(lang, "acquis", "known"),
+                style::SUCCESS,
+            ),
+            tally(
+                count(Some(Level::Learning)),
+                tr!(lang, "en cours", "learning"),
+                style::WARNING,
+            ),
+            tally(
+                count(Some(Level::Weak)),
+                tr!(lang, "à revoir", "to review"),
+                style::ORANGE,
+            ),
+        ];
+        if count(None) > 0 {
+            tallies.push(tally(
+                count(None),
+                tr!(lang, "jamais joués", "not played yet"),
+                style::BORDER,
+            ));
+        }
         let mut body = column![
-            text(tr!(self.lang, "À revoir", "To review"))
+            text(tr!(lang, "À revoir", "To review"))
                 .size(16)
                 .font(style::FONT_SEMIBOLD),
             text(tr!(
-                self.lang,
-                "Les plus souvent ratés dans cette série.",
-                "Most often missed in this series."
+                lang,
+                "Ratés la dernière fois, dans ce mode.",
+                "Missed last time, in this mode."
             ))
             .size(12)
             .color(style::MUTED),
+            container(
+                Row::with_children(tallies)
+                    .spacing(14)
+                    .wrap()
+                    .vertical_spacing(6)
+            )
+            .padding(iced::Padding::ZERO.top(8)),
         ]
         .spacing(4);
-        if missed.is_empty() {
+        if weak.is_empty() {
             body = body.push(
                 container(
-                    text(if self.progress.runs(id, self.mode, &zone.id).is_empty() {
-                        tr!(self.lang, "Rien pour l'instant.", "Nothing yet.")
+                    text(if count(None) == levels.len() {
+                        tr!(lang, "Rien pour l'instant.", "Nothing yet.")
                     } else {
                         tr!(
-                            self.lang,
-                            "Aucune erreur, bravo !",
-                            "No mistakes, well done!"
+                            lang,
+                            "Rien à revoir, bravo !",
+                            "Nothing to review, well done!"
                         )
                     })
                     .size(13)
@@ -380,18 +450,28 @@ impl App {
                 .padding(iced::Padding::ZERO.top(8)),
             );
         } else {
-            let chips = missed.into_iter().map(|(name, n)| {
-                container(
-                    row![
-                        text(name).size(12),
-                        text(format!("×{n}")).size(11).color(style::MUTED),
-                    ]
-                    .spacing(6),
-                )
-                .padding([4, 10])
-                .style(style::chip(style::ORANGE))
-                .into()
-            });
+            let mut chips: Vec<Element<'_, Message>> = weak
+                .into_iter()
+                .map(|(name, m)| {
+                    container(
+                        row![
+                            text(name).size(12),
+                            text(format!("×{}", m.missed)).size(11).color(style::MUTED),
+                        ]
+                        .spacing(6),
+                    )
+                    .padding([4, 10])
+                    .style(style::chip(style::ORANGE))
+                    .into()
+                })
+                .collect();
+            if more > 0 {
+                chips.push(
+                    container(text(format!("+{more}")).size(12).color(style::MUTED))
+                        .padding([4, 6])
+                        .into(),
+                );
+            }
             body = body.push(
                 container(
                     Row::with_children(chips)

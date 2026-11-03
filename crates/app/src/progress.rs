@@ -1,5 +1,6 @@
 //! Historique des parties, enregistré localement en JSON.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use geo_core::Mode;
@@ -34,6 +35,56 @@ pub struct Session {
     /// Durée du minuteur (secondes), s'il était activé.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub limit: Option<u32>,
+    /// Détail par lieu, dans l'ordre du jeu (absent des parties enregistrées avant son ajout).
+    /// Il vit dans la partie : la supprimer l'efface aussi de la maîtrise.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub answers: Vec<Attempt>,
+}
+
+/// Bilan d'un lieu dans une partie.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Attempt {
+    pub code: String,
+    /// Essai de la bonne réponse (1 = du premier coup) ; absent si raté.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tries: Option<u8>,
+    /// Temps de réponse en millisecondes (mode libre : moment où le lieu a été cité).
+    pub ms: u32,
+    /// Lieux donnés à tort à la place de celui-ci.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub wrong: Vec<String>,
+}
+
+/// Résultat d'un lieu lors d'une partie.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Trial {
+    /// Trouvé du premier coup.
+    Clean,
+    /// Trouvé après une ou deux erreurs.
+    Shaky,
+    Missed,
+}
+
+/// Niveau de maîtrise d'un lieu, d'après ses dernières parties.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Level {
+    /// Raté la dernière fois.
+    Weak,
+    /// Trouvé la dernière fois, mais pas encore deux fois de suite du premier coup.
+    Learning,
+    /// Trouvé du premier coup lors des deux dernières parties.
+    Known,
+}
+
+/// Ce qu'on sait d'un lieu dans un atlas et un mode, toutes zones confondues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Mastery {
+    pub level: Level,
+    /// Parties où le lieu a été joué, et parmi elles celles où il a été raté.
+    pub seen: u32,
+    pub missed: u32,
+    /// Date de la dernière partie où il a été joué.
+    pub last: u64,
 }
 
 impl Session {
@@ -97,6 +148,63 @@ impl Progress {
         }
     }
 
+    /// Maîtrise de chaque lieu déjà joué dans un atlas et un mode. Toutes les zones comptent :
+    /// la France jouée dans « Europe » ou dans « Tous les pays », c'est le même savoir.
+    /// Les parties d'avant le détail par lieu ne comptent que par leurs lieux ratés.
+    pub fn mastery(&self, atlas: &str, mode: Mode) -> HashMap<String, Mastery> {
+        let mut sessions: Vec<&Session> = self
+            .sessions
+            .iter()
+            .filter(|s| s.atlas == atlas && s.mode == mode)
+            .collect();
+        sessions.sort_by_key(|s| s.when);
+        // Résultats successifs de chaque lieu, du plus ancien au plus récent.
+        let mut history: HashMap<&str, (Vec<Trial>, u64)> = HashMap::new();
+        for s in sessions {
+            let results: Vec<(&str, Trial)> = if s.answers.is_empty() {
+                s.missed
+                    .iter()
+                    .map(|c| (c.as_str(), Trial::Missed))
+                    .collect()
+            } else {
+                s.answers
+                    .iter()
+                    .map(|a| {
+                        let trial = match a.tries {
+                            Some(1) => Trial::Clean,
+                            Some(_) => Trial::Shaky,
+                            None => Trial::Missed,
+                        };
+                        (a.code.as_str(), trial)
+                    })
+                    .collect()
+            };
+            for (code, trial) in results {
+                let entry = history.entry(code).or_default();
+                entry.0.push(trial);
+                entry.1 = s.when;
+            }
+        }
+        history
+            .into_iter()
+            .map(|(code, (results, last))| {
+                let level = match results.as_slice() {
+                    [.., Trial::Missed] => Level::Weak,
+                    [.., Trial::Clean, Trial::Clean] => Level::Known,
+                    _ => Level::Learning,
+                };
+                let missed = results.iter().filter(|&&r| r == Trial::Missed).count();
+                let mastery = Mastery {
+                    level,
+                    seen: results.len() as u32,
+                    missed: missed as u32,
+                    last,
+                };
+                (code.to_owned(), mastery)
+            })
+            .collect()
+    }
+
     fn save(&self) -> std::io::Result<()> {
         let Some(path) = &self.path else {
             return Ok(());
@@ -105,7 +213,8 @@ impl Progress {
             std::fs::create_dir_all(dir)?;
         }
         let tmp = path.with_extension("json.tmp");
-        std::fs::write(&tmp, serde_json::to_vec_pretty(self)?)?;
+        // Compact : le détail par lieu rendrait le fichier très long en format indenté.
+        std::fs::write(&tmp, serde_json::to_vec(self)?)?;
         std::fs::rename(tmp, path)
     }
 
@@ -133,25 +242,6 @@ impl Progress {
         runs.sort_by_key(|(_, s)| s.when);
         runs
     }
-
-    /// Lieux les plus souvent ratés dans les parties retenues (code, nombre d'échecs).
-    pub fn most_missed(
-        &self,
-        keep: impl Fn(&Session) -> bool,
-        count: usize,
-    ) -> Vec<(String, usize)> {
-        let mut tally: std::collections::HashMap<&str, usize> = Default::default();
-        for s in self.sessions.iter().filter(|s| keep(s)) {
-            for code in &s.missed {
-                *tally.entry(code).or_default() += 1;
-            }
-        }
-        let mut list: Vec<(String, usize)> =
-            tally.into_iter().map(|(c, n)| (c.to_owned(), n)).collect();
-        list.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
-        list.truncate(count);
-        list
-    }
 }
 
 pub fn now() -> u64 {
@@ -178,7 +268,79 @@ mod tests {
             seconds,
             missed: vec![],
             limit: None,
+            answers: vec![],
         }
+    }
+
+    fn attempt(code: &str, tries: Option<u8>) -> Attempt {
+        Attempt {
+            code: code.into(),
+            tries,
+            ms: 1000,
+            wrong: vec![],
+        }
+    }
+
+    #[test]
+    fn mastery_follows_latest_runs_across_zones() {
+        let mut p = Progress::default();
+        let mut run = |when: u64, region: &str, answers: Vec<Attempt>| {
+            let mut s = session(Mode::Locate, region, 0.5, 100);
+            s.when = when;
+            s.answers = answers;
+            p.sessions.push(s);
+        };
+        // Ajoutées dans le désordre : seule la date compte.
+        run(
+            3,
+            "europe",
+            vec![attempt("FRA", Some(1)), attempt("SVN", Some(2))],
+        );
+        run(
+            1,
+            "monde",
+            vec![attempt("FRA", Some(1)), attempt("SVN", None)],
+        );
+        run(
+            2,
+            "monde",
+            vec![attempt("SVN", Some(1)), attempt("SVK", None)],
+        );
+        // Autre mode : ignoré.
+        p.sessions.push(Session {
+            answers: vec![attempt("SVK", Some(1))],
+            ..session(Mode::Free, "europe", 1.0, 10)
+        });
+        // Partie d'avant le détail par lieu : seuls ses ratés comptent.
+        p.sessions.push(Session {
+            when: 0,
+            missed: vec!["BTN".into()],
+            ..session(Mode::Locate, "asie", 0.5, 100)
+        });
+        let m = p.mastery("monde", Mode::Locate);
+        assert_eq!(m["FRA"].level, Level::Known);
+        assert_eq!(m["SVN"].level, Level::Learning);
+        assert_eq!((m["SVN"].seen, m["SVN"].missed, m["SVN"].last), (3, 1, 3));
+        assert_eq!(m["SVK"].level, Level::Weak);
+        assert_eq!(m["BTN"].level, Level::Weak);
+        assert_eq!(m.len(), 4);
+        // Supprimer une partie retire son détail : la Slovaquie n'a plus été jouée.
+        let index = p.sessions.iter().position(|s| s.when == 2).unwrap();
+        p.remove(index);
+        let m = p.mastery("monde", Mode::Locate);
+        assert!(!m.contains_key("SVK"));
+        assert_eq!(m["SVN"].level, Level::Learning);
+    }
+
+    #[test]
+    fn attempts_serialize_compactly() {
+        let a = Attempt {
+            wrong: vec!["SVK".into()],
+            ..attempt("SVN", None)
+        };
+        let json = serde_json::to_string(&a).unwrap();
+        assert_eq!(json, r#"{"code":"SVN","ms":1000,"wrong":["SVK"]}"#);
+        assert_eq!(serde_json::from_str::<Attempt>(&json).unwrap(), a);
     }
 
     #[test]

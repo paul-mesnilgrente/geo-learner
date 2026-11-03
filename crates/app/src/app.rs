@@ -395,6 +395,12 @@ impl App {
         }
         if let Some(count) = demo.progress {
             let world = self.world();
+            let codes = |members: &[usize]| -> Vec<String> {
+                members
+                    .iter()
+                    .map(|&c| world.countries[c].code.clone())
+                    .collect()
+            };
             let zone = &world.regions[self.region];
             let id = &world.info.id;
             for (mode, region, n) in [
@@ -403,11 +409,12 @@ impl App {
                 (Mode::Locate, 1, 1),
             ] {
                 let r = &world.regions[region];
-                let runs = crate::dev::fake_runs(id, mode, &r.id, r.members.len() as u32, n);
+                let codes = codes(&r.members);
+                let runs = crate::dev::fake_runs(id, mode, &r.id, &codes, n);
                 self.progress.sessions.extend(runs);
             }
             let runs =
-                crate::dev::fake_runs(id, Mode::Free, &zone.id, zone.members.len() as u32, count);
+                crate::dev::fake_runs(id, Mode::Free, &zone.id, &codes(&zone.members), count);
             self.progress.sessions.extend(runs);
             if demo.delete {
                 let last = self.progress.sessions.len() - 1;
@@ -1204,6 +1211,20 @@ impl App {
                 .map(|&c| game.world.countries[c].code.clone())
                 .collect(),
             limit: game.limit.map(|d| d.as_secs() as u32),
+            answers: quiz
+                .answers()
+                .iter()
+                .map(|a| progress::Attempt {
+                    code: game.world.countries[a.country].code.clone(),
+                    tries: a.tries,
+                    ms: a.time.as_millis().min(u128::from(u32::MAX)) as u32,
+                    wrong: a
+                        .wrong
+                        .iter()
+                        .map(|&c| game.world.countries[c].code.clone())
+                        .collect(),
+                })
+                .collect(),
         };
         game.new_record = match self
             .progress

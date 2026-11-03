@@ -1,5 +1,7 @@
 //! Déroulement d'une partie, indépendamment de l'interface.
 
+use std::time::{Duration, Instant};
+
 use serde::{Deserialize, Serialize};
 
 /// Nombre d'essais avant de révéler la réponse (modes « Nommer » et « Localiser »).
@@ -53,6 +55,19 @@ pub enum Outcome {
     Ignored,
 }
 
+/// Bilan d'un lieu une fois joué : trouvé (et au bout de combien d'essais) ou raté.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Answer {
+    pub country: usize,
+    /// Essai de la bonne réponse (1 = du premier coup) ; `None` si raté.
+    pub tries: Option<u8>,
+    /// Mauvaises réponses données à la place (modes Nommer et Localiser), dans l'ordre.
+    pub wrong: Vec<usize>,
+    /// Modes Nommer et Localiser : temps de réponse depuis l'apparition de la question.
+    /// Mode libre : moment où le lieu a été cité, depuis le début de la partie.
+    pub time: Duration,
+}
+
 #[derive(Debug, Clone)]
 pub struct Quiz {
     mode: Mode,
@@ -64,6 +79,13 @@ pub struct Quiz {
     wrong_tries: u8,
     mistakes: u32,
     finished: bool,
+    /// Lieux joués, dans l'ordre où ils ont été tranchés.
+    answers: Vec<Answer>,
+    /// Mauvaises réponses données sur la question en cours.
+    wrong: Vec<usize>,
+    started: Instant,
+    /// Apparition de la question en cours.
+    asked: Instant,
 }
 
 impl Quiz {
@@ -76,6 +98,7 @@ impl Quiz {
         }
         let mut queue = order;
         queue.reverse();
+        let now = Instant::now();
         let mut quiz = Self {
             mode,
             marks,
@@ -85,6 +108,10 @@ impl Quiz {
             wrong_tries: 0,
             mistakes: 0,
             finished: false,
+            answers: Vec::new(),
+            wrong: Vec::new(),
+            started: now,
+            asked: now,
         };
         if mode != Mode::Free {
             quiz.advance();
@@ -115,6 +142,12 @@ impl Quiz {
 
     pub fn mistakes(&self) -> u32 {
         self.mistakes
+    }
+
+    /// Lieux joués, dans l'ordre. En modes Nommer et Localiser, les questions jamais posées
+    /// (partie abandonnée avant) n'y figurent pas.
+    pub fn answers(&self) -> &[Answer] {
+        &self.answers
     }
 
     pub fn is_finished(&self) -> bool {
@@ -169,6 +202,12 @@ impl Quiz {
                 None => Outcome::OutOfScope(country),
                 Some(Mark::Pending) => {
                     self.marks[country] = Some(Mark::Found { tries: 1 });
+                    self.answers.push(Answer {
+                        country,
+                        tries: Some(1),
+                        wrong: Vec::new(),
+                        time: self.started.elapsed(),
+                    });
                     if self.done() == self.total() {
                         self.finished = true;
                     }
@@ -183,13 +222,16 @@ impl Quiz {
                 if country == target {
                     let tries = self.wrong_tries + 1;
                     self.marks[target] = Some(Mark::Found { tries });
+                    self.settle(target, Some(tries));
                     self.advance();
                     return Outcome::Correct { country, tries };
                 }
                 self.wrong_tries += 1;
                 self.mistakes += 1;
+                self.wrong.push(country);
                 if self.wrong_tries >= MAX_TRIES {
                     self.marks[target] = Some(Mark::Missed);
+                    self.settle(target, None);
                     self.advance();
                     Outcome::Revealed {
                         guess: country,
@@ -209,12 +251,37 @@ impl Quiz {
     pub fn skip(&mut self) -> Option<usize> {
         let target = self.target?;
         self.marks[target] = Some(Mark::Missed);
+        self.settle(target, None);
         self.advance();
         Some(target)
     }
 
     /// Termine la partie : tous les pays restants sont comptés comme ratés.
+    ///
+    /// Bilan : en mode libre, les lieux non cités sont ratés. En modes Nommer et Localiser, la
+    /// question en cours compte comme ratée si une mauvaise réponse a déjà été donnée ; sinon,
+    /// comme les questions jamais posées, elle ne compte pas.
     pub fn give_up(&mut self) {
+        if self.finished {
+            return;
+        }
+        match (self.mode, self.target) {
+            (Mode::Free, _) => {
+                let time = self.started.elapsed();
+                for &c in &self.members {
+                    if self.marks[c] == Some(Mark::Pending) {
+                        self.answers.push(Answer {
+                            country: c,
+                            tries: None,
+                            wrong: Vec::new(),
+                            time,
+                        });
+                    }
+                }
+            }
+            (_, Some(target)) if !self.wrong.is_empty() => self.settle(target, None),
+            _ => {}
+        }
         for &c in &self.members {
             if self.marks[c] == Some(Mark::Pending) {
                 self.marks[c] = Some(Mark::Missed);
@@ -225,12 +292,24 @@ impl Quiz {
         self.finished = true;
     }
 
+    /// Note le bilan de la question en cours.
+    fn settle(&mut self, target: usize, tries: Option<u8>) {
+        self.answers.push(Answer {
+            country: target,
+            tries,
+            wrong: std::mem::take(&mut self.wrong),
+            time: self.asked.elapsed(),
+        });
+    }
+
     fn advance(&mut self) {
         self.wrong_tries = 0;
+        self.wrong.clear();
         self.target = None;
         while let Some(next) = self.queue.pop() {
             if self.marks[next] == Some(Mark::Pending) {
                 self.target = Some(next);
+                self.asked = Instant::now();
                 return;
             }
         }
@@ -315,6 +394,59 @@ mod tests {
         assert!(q.is_finished());
         assert_eq!(q.perfect(), 1);
         assert_eq!(q.score(), 0.75);
+    }
+
+    /// Résumé des bilans : (lieu, essais, mauvaises réponses).
+    fn answers(q: &Quiz) -> Vec<(usize, Option<u8>, Vec<usize>)> {
+        q.answers()
+            .iter()
+            .map(|a| (a.country, a.tries, a.wrong.clone()))
+            .collect()
+    }
+
+    #[test]
+    fn answers_record_tries_and_confusions() {
+        let mut q = Quiz::new(Mode::Locate, 5, vec![0, 1, 2, 3], vec![0, 1, 2, 3]);
+        q.submit(0);
+        q.submit(4); // 1 confondu avec 4
+        q.submit(1);
+        q.submit(3);
+        q.submit(4);
+        q.submit(3); // 2 révélé
+        q.skip(); // 3 passé
+        assert_eq!(
+            answers(&q),
+            [
+                (0, Some(1), vec![]),
+                (1, Some(2), vec![4]),
+                (2, None, vec![3, 4, 3]),
+                (3, None, vec![]),
+            ]
+        );
+    }
+
+    #[test]
+    fn give_up_records_only_asked_questions() {
+        // Question en cours sans erreur, puis jamais posées : rien n'est noté.
+        let mut q = Quiz::new(Mode::Identify, 3, vec![0, 1, 2], vec![0, 1, 2]);
+        q.submit(0);
+        q.give_up();
+        assert_eq!(answers(&q), [(0, Some(1), vec![])]);
+        // Question en cours avec une erreur : ratée.
+        let mut q = Quiz::new(Mode::Identify, 3, vec![0, 1, 2], vec![0, 1, 2]);
+        q.submit(2);
+        q.give_up();
+        assert_eq!(answers(&q), [(0, None, vec![2])]);
+        q.give_up();
+        assert_eq!(q.answers().len(), 1);
+        // Mode libre : les lieux non cités sont ratés.
+        let mut q = Quiz::new(Mode::Free, 3, vec![0, 1, 2], vec![]);
+        q.submit(1);
+        q.give_up();
+        assert_eq!(
+            answers(&q),
+            [(1, Some(1), vec![]), (0, None, vec![]), (2, None, vec![])]
+        );
     }
 
     #[test]

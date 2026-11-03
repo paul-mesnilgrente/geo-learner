@@ -54,14 +54,16 @@ pub struct Demo {
     pub lang: Option<geo_core::Lang>,
 }
 
-/// Parties fictives d'une série : scores en progrès, temps en baisse, un minuteur dépassé.
+/// Parties fictives d'une série : scores en progrès, temps en baisse, un minuteur dépassé,
+/// et un détail par lieu où chaque lieu s'améliore au fil des parties.
 pub fn fake_runs(
     atlas: &str,
     mode: Mode,
     region: &str,
-    total: u32,
+    codes: &[String],
     count: usize,
 ) -> Vec<crate::progress::Session> {
+    let total = codes.len() as u32;
     let now = crate::progress::now();
     (0..count)
         .map(|i| {
@@ -83,6 +85,28 @@ pub fn fake_runs(
                 missed: vec!["SVN".into(), "GNB".into(), "TUV".into(), "BTN".into()][..(i % 4) + 1]
                     .to_vec(),
                 limit,
+                answers: codes
+                    .iter()
+                    .enumerate()
+                    .map(|(j, code)| {
+                        // Difficulté propre au lieu, qui baisse avec les parties.
+                        let hard = (j * 37 % 100) as f32 / 100.0 - 0.6 * t;
+                        let roll = ((i * 53 + j * 29) % 100) as f32 / 100.0;
+                        let tries = if roll < hard {
+                            None
+                        } else if roll < hard + 0.15 {
+                            Some(2)
+                        } else {
+                            Some(1)
+                        };
+                        crate::progress::Attempt {
+                            code: code.clone(),
+                            tries,
+                            ms: 2000 + (j as u32 * 397) % 6000,
+                            wrong: Vec::new(),
+                        }
+                    })
+                    .collect(),
             }
         })
         .collect()

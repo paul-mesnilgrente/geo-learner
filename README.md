@@ -103,6 +103,19 @@ interrompue) : la corbeille demande confirmation dans la ligne même (Échap pou
 un bouton « Annuler » (ou Ctrl+Z) permet encore de revenir en arrière. Les records et les lieux
 « à revoir » en tiennent compte.
 
+Chaque partie garde aussi le **détail par lieu** : trouvé du premier coup, après des erreurs ou
+raté, le temps de réponse et, en modes « Nommer » et « Localiser », les lieux donnés à tort. On en
+tire un **niveau de maîtrise** par lieu, dans un quiz et un mode, toutes zones confondues (la
+France jouée dans « Europe » ou dans « Monde », c'est le même savoir) :
+- **à revoir** : raté la dernière fois ;
+- **acquis** : trouvé du premier coup lors des deux dernières parties ;
+- **en cours** : entre les deux.
+
+La carte « À revoir » de la page du quiz compte les lieux de la zone par niveau et liste ceux à
+revoir. Le détail vit dans la partie : la supprimer l'efface aussi de la maîtrise. Les parties
+enregistrées avant ce détail ne comptent que par leurs lieux ratés. En abandonnant une partie
+« Nommer » ou « Localiser », les questions jamais posées ne comptent pas.
+
 Sur la carte, les archipels (Maldives, Kiribati, Fidji, Cap-Vert…) sont entourés d'une **bulle**
 cliquable, comme sur JetPunk, pour être repérables malgré leur taille. Il y a une bulle par
 groupe d'îles proches : leur enveloppe, lissée, avec une marge de quelques pixels qui se réduit
@@ -165,7 +178,7 @@ Pour le diagnostic :
 | Windows | `%APPDATA%\geo-learner\` |
 
 Contenu :
-- `progress.json` : historique des parties ;
+- `progress.json` : historique des parties, avec le détail par lieu (JSON compact) ;
 - `settings.json` : minuteur (activé ou non, durées personnalisées) ;
 - `models/` : modèle vocal.
 
