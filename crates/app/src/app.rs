@@ -94,6 +94,8 @@ pub enum Message {
     ResetTimer,
     Start,
     Restart,
+    /// Partie de révision limitée à ces lieux (zone et mode choisis), sans minuteur.
+    Review(Vec<usize>),
     BackToMenu,
     Map(MapEvent),
     Input(String),
@@ -212,6 +214,8 @@ struct Game {
     history: Vec<usize>,
     /// Carte de situation d'un encart (outre-mer, Alaska…), ouverte par sa pastille.
     locator: Option<Locator>,
+    /// Partie de révision : les lieux révisés, à rejouer tels quels avec « Rejouer ».
+    review: Option<Vec<usize>>,
 }
 
 /// Carte de l'écran d'accueil : la zone choisie, ses pays mis en évidence.
@@ -444,6 +448,13 @@ impl App {
             self.mode,
             self.time_limit(),
             self.lang,
+            Some(
+                demo.review
+                    .iter()
+                    .filter_map(|code| self.world().countries.iter().position(|c| &c.code == code))
+                    .collect::<Vec<usize>>(),
+            )
+            .filter(|r| !r.is_empty()),
         );
         if let Some(first) = demo
             .target
@@ -460,6 +471,9 @@ impl App {
                 let outcome = game.quiz.submit(c);
                 game.apply(outcome);
             }
+        }
+        for _ in 0..demo.skips {
+            game.quiz.skip();
         }
         if let Some((lon, lat, zoom)) = demo.zoom {
             let [x, y] =
@@ -705,19 +719,32 @@ impl App {
                 self.settings
                     .reset_duration(&self.world().info.id, self.mode, &zone.id);
             }
-            Message::Start | Message::Restart => {
+            Message::Start | Message::Restart | Message::Review(_) => {
                 self.explorer = None;
+                let mut review = None;
                 if let Some(game) = &self.game {
                     self.atlas = game.atlas;
                     self.region = game.region;
                     self.mode = game.quiz.mode();
+                    if matches!(message, Message::Restart) {
+                        review = game.review.clone();
+                    }
                 }
+                if let Message::Review(members) = message {
+                    review = Some(members);
+                }
+                let limit = if review.is_some() {
+                    None
+                } else {
+                    self.time_limit()
+                };
                 self.game = Some(Game::new(
                     self.atlas,
                     self.region,
                     self.mode,
-                    self.time_limit(),
+                    limit,
                     self.lang,
+                    review,
                 ));
                 return operation::focus(ANSWER_INPUT);
             }
@@ -1211,6 +1238,7 @@ impl App {
                 .map(|&c| game.world.countries[c].code.clone())
                 .collect(),
             limit: game.limit.map(|d| d.as_secs() as u32),
+            review: game.review.is_some(),
             answers: quiz
                 .answers()
                 .iter()
@@ -1230,6 +1258,7 @@ impl App {
             .progress
             .best(&session.atlas, session.mode, &session.region)
         {
+            _ if session.review => false,
             Some(best) => {
                 session.score > best.score
                     || (session.score == best.score && session.seconds < best.seconds)
@@ -1716,7 +1745,6 @@ impl App {
 
     fn top_bar<'a>(&'a self, game: &'a Game) -> Element<'a, Message> {
         let quiz = &game.quiz;
-        let region = &game.world.regions[game.region];
         let counted = if quiz.mode() == Mode::Free {
             quiz.found()
         } else {
@@ -1782,7 +1810,7 @@ impl App {
             .style(style::ghost)
             .on_press(Message::BackToMenu),
             column![
-                text(region.name.get(self.lang))
+                text(game.title(self.lang))
                     .size(16)
                     .font(style::FONT_SEMIBOLD),
                 text(mode_title(quiz.mode(), &game.world.info, self.lang))
@@ -1966,6 +1994,9 @@ impl App {
                         .color(style::ORANGE),
                     );
                 }
+                if quiz.retrying() {
+                    card = card.push(second_chance(self.lang));
+                }
                 column![
                     container(card)
                         .padding([32, 56])
@@ -2048,6 +2079,9 @@ impl App {
                 .size(12)
                 .color(style::ORANGE),
             );
+        }
+        if quiz.retrying() {
+            content = content.push(second_chance(self.lang));
         }
         Some(
             container(content.align_x(Horizontal::Center).spacing(2))
@@ -2361,7 +2395,6 @@ impl App {
 
     fn summary<'a>(&'a self, game: &'a Game) -> Element<'a, Message> {
         let quiz = &game.quiz;
-        let region = &game.world.regions[game.region];
         let title = if quiz.score() >= 1.0 {
             tr!(self.lang, "Parfait !", "Perfect!")
         } else if game.timed_out {
@@ -2393,7 +2426,7 @@ impl App {
             text(title).size(28).font(style::FONT_BOLD),
             text(format!(
                 "{} · {}",
-                region.name.get(self.lang),
+                game.title(self.lang),
                 mode_title(quiz.mode(), &game.world.info, self.lang)
             ))
             .size(14)
@@ -2445,6 +2478,49 @@ impl App {
                 .color(style::MUTED),
             );
         }
+        if quiz.recovered() > 0 {
+            let n = quiz.recovered();
+            content = content.push(
+                text(match self.lang {
+                    Lang::Fr => format!(
+                        "{n} {} en seconde chance.",
+                        Words::of(&game.world.info, self.lang)
+                            .agree(if n > 1 { "retrouvés" } else { "retrouvé" }, "")
+                    ),
+                    Lang::En => format!("{n} got right on the second chance."),
+                })
+                .size(13)
+                .color(style::ACCENT),
+            );
+        }
+        // Lieux ratés de cette partie, à réviser aussitôt.
+        let missed: Vec<usize> = quiz
+            .members()
+            .iter()
+            .copied()
+            .filter(|&c| quiz.mark(c) == Some(Mark::Missed))
+            .collect();
+        if !missed.is_empty() {
+            content = content.push(
+                button(
+                    row![
+                        icon(Icon::Target, 14.0, style::TEXT),
+                        text(tr!(
+                            self.lang,
+                            "Réviser les erreurs ({})",
+                            "Review mistakes ({})",
+                            missed.len()
+                        ))
+                        .size(14),
+                    ]
+                    .spacing(8)
+                    .align_y(Center),
+                )
+                .padding([10, 16])
+                .style(style::secondary)
+                .on_press(Message::Review(missed)),
+            );
+        }
         content = content.push(
             row![
                 button(
@@ -2489,13 +2565,24 @@ impl App {
 }
 
 impl Game {
-    fn new(atlas: usize, region: usize, mode: Mode, limit: Option<Duration>, lang: Lang) -> Self {
+    /// Partie sur une zone ; `review` la limite à certains de ses lieux, cadrés de près.
+    fn new(
+        atlas: usize,
+        region: usize,
+        mode: Mode,
+        limit: Option<Duration>,
+        lang: Lang,
+        review: Option<Vec<usize>>,
+    ) -> Self {
         let world = &ATLASES[atlas];
         let zone = &world.regions[region];
-        let members = zone.members.clone();
+        let members = review.clone().unwrap_or_else(|| zone.members.clone());
         let mut order = members.clone();
         fastrand::shuffle(&mut order);
-        let view = map::view_rect(zone.view, zone.center);
+        let view = match &review {
+            Some(places) => map::view_rect(crate::members_view(world, places), zone.center),
+            None => map::view_rect(zone.view, zone.center),
+        };
         let now = Instant::now();
         Self {
             lang,
@@ -2524,6 +2611,16 @@ impl Game {
             new_record: false,
             history: Vec::new(),
             locator: None,
+            review,
+        }
+    }
+
+    /// Titre de la partie : la zone, précédée de « Révision » le cas échéant.
+    fn title(&self, lang: Lang) -> String {
+        let zone = self.world.regions[self.region].name.get(lang);
+        match self.review {
+            Some(_) => tr!(lang, "Révision · {zone}", "Review · {zone}"),
+            None => zone.to_owned(),
         }
     }
 
@@ -2691,10 +2788,28 @@ impl Game {
                 self.flash(target, style::DANGER, 2000);
                 self.history.push(target);
             }
+            Outcome::Recovered(c) => {
+                self.input.clear();
+                self.say(
+                    tr!(lang, "✓ Retrouvé : {}", "✓ Got it this time: {}", name(c)),
+                    style::ACCENT,
+                );
+                self.flash(c, style::ACCENT, 900);
+                self.history.push(c);
+            }
             Outcome::Ignored => {}
         }
         self.after_answer();
     }
+}
+
+/// Mention d'une question posée une seconde fois, après un échec plus tôt dans la partie.
+fn second_chance<'a>(lang: Lang) -> Element<'a, Message> {
+    text(tr!(lang, "Seconde chance", "Second chance"))
+        .size(12)
+        .font(style::FONT_SEMIBOLD)
+        .color(style::lighten(style::ACCENT, 0.2))
+        .into()
 }
 
 /// La saisie vocale a-t-elle un sens ? Pas pour taper des numéros.

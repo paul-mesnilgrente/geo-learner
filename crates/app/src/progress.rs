@@ -35,6 +35,10 @@ pub struct Session {
     /// Durée du minuteur (secondes), s'il était activé.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub limit: Option<u32>,
+    /// Partie de révision (quelques lieux de la zone) : elle compte pour la maîtrise, pas dans
+    /// les séries ni les records.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub review: bool,
     /// Détail par lieu, dans l'ordre du jeu (absent des parties enregistrées avant son ajout).
     /// Il vit dans la partie : la supprimer l'efface aussi de la maîtrise.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -93,8 +97,9 @@ impl Session {
         self.limit.is_some_and(|limit| self.seconds >= limit)
     }
 
+    /// La partie fait partie de la série (atlas, mode, zone) ; les révisions n'en font pas partie.
     pub fn is(&self, atlas: &str, mode: Mode, region: &str) -> bool {
-        self.atlas == atlas && self.mode == mode && self.region == region
+        !self.review && self.atlas == atlas && self.mode == mode && self.region == region
     }
 }
 
@@ -268,6 +273,7 @@ mod tests {
             seconds,
             missed: vec![],
             limit: None,
+            review: false,
             answers: vec![],
         }
     }
@@ -330,6 +336,21 @@ mod tests {
         let m = p.mastery("monde", Mode::Locate);
         assert!(!m.contains_key("SVK"));
         assert_eq!(m["SVN"].level, Level::Learning);
+    }
+
+    #[test]
+    fn reviews_count_for_mastery_only() {
+        let mut p = Progress::default();
+        p.sessions.push(session(Mode::Locate, "europe", 0.5, 100));
+        p.sessions.push(Session {
+            when: 1,
+            review: true,
+            answers: vec![attempt("SVN", None)],
+            ..session(Mode::Locate, "europe", 1.0, 10)
+        });
+        assert_eq!(p.runs("monde", Mode::Locate, "europe").len(), 1);
+        assert_eq!(p.best("monde", Mode::Locate, "europe").unwrap().score, 0.5);
+        assert_eq!(p.mastery("monde", Mode::Locate)["SVN"].level, Level::Weak);
     }
 
     #[test]

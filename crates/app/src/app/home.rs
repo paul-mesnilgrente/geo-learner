@@ -159,7 +159,15 @@ impl App {
                     .height(8)
                     .style(style::dot(score_color(session.score))),
                 column![
-                    text(atlas.regions[region].name.get(self.lang)).size(14),
+                    text({
+                        let zone = atlas.regions[region].name.get(self.lang);
+                        if session.review {
+                            tr!(self.lang, "Révision · {zone}", "Review · {zone}")
+                        } else {
+                            zone.to_owned()
+                        }
+                    })
+                    .size(14),
                     text(format!(
                         "{} · {}",
                         atlas.info.title.get(self.lang),

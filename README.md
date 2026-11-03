@@ -116,6 +116,16 @@ revoir. Le détail vit dans la partie : la supprimer l'efface aussi de la maîtr
 enregistrées avant ce détail ne comptent que par leurs lieux ratés. En abandonnant une partie
 « Nommer » ou « Localiser », les questions jamais posées ne comptent pas.
 
+Deux façons de s'améliorer s'appuient dessus :
+- **Révision** : « Réviser ces N pays » (carte « À revoir », jusqu'à 20 lieux, les plus souvent
+  ratés d'abord) ou « Réviser les erreurs » (bilan de fin de partie) lance une partie courte
+  limitée à ces lieux, cadrée sur eux, sans minuteur. Elle compte pour la maîtrise mais pas dans
+  les séries ni les records ; l'historique de l'accueil la marque « Révision ».
+- **Seconde chance** (modes « Nommer » et « Localiser ») : un lieu raté ou passé revient trois
+  questions plus tard, affiché comme « à trouver » pour que la carte ne souffle pas la réponse.
+  Le score et le bilan du lieu restent ceux d'un raté ; le bilan de fin compte les lieux
+  retrouvés. Pas de seconde chance s'il ne reste plus de question après le lieu raté.
+
 Sur la carte, les archipels (Maldives, Kiribati, Fidji, Cap-Vert…) sont entourés d'une **bulle**
 cliquable, comme sur JetPunk, pour être repérables malgré leur taille. Il y a une bulle par
 groupe d'îles proches : leur enveloppe, lissée, avec une marge de quelques pixels qui se réduit
@@ -258,6 +268,9 @@ Paramètres de `GEO_DEMO`, séparés par `;` :
 - `globe=N` : carte de situation de l'encart n° N ouverte ;
 - `explore` : exploration ouverte, avec un lieu choisi (`explore=CA-PE`) ;
 - `lang=en` : langue imposée, sans l'enregistrer ;
+- `review=SVN,SVK` : partie de révision limitée à ces lieux ;
+- `skips=3` : questions passées après les réponses (`target=FRA;answers=DEU,DEU,DEU;skips=3`
+  amène la seconde chance de la France) ;
 - `home` : accueil affiché, même avec `atlas`, `region` ou `progress` (sinon page du quiz) ;
 - `flight=0.5` : zoom de la carte de situation figé à cet instant (0 à 1).
 

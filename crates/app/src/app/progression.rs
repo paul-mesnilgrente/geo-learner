@@ -22,6 +22,8 @@ const RECENT: usize = 5;
 const RECENT_RUNS: usize = 5;
 /// Lieux « à revoir » affichés au plus.
 const MAX_WEAK: usize = 12;
+/// Lieux d'une partie de révision au plus.
+const MAX_REVIEW: usize = 20;
 
 impl App {
     /// Section « Progression » de la page du quiz, pour le mode et la zone choisis.
@@ -354,20 +356,22 @@ impl App {
                 .count()
         };
         // Lieux ratés la dernière fois : les plus souvent ratés d'abord, puis les plus récents.
-        let mut weak: Vec<(&str, &Mastery)> = zone
+        let mut weak: Vec<(usize, &str, &Mastery)> = zone
             .members
             .iter()
             .zip(&levels)
             .filter_map(|(&c, m)| {
                 let m = m.filter(|m| m.level == Level::Weak)?;
-                Some((world.countries[c].name.get(self.lang), m))
+                Some((c, world.countries[c].name.get(self.lang), m))
             })
             .collect();
         weak.sort_by(|a, b| {
-            (b.1.missed.cmp(&a.1.missed))
-                .then(b.1.last.cmp(&a.1.last))
-                .then(a.0.cmp(b.0))
+            (b.2.missed.cmp(&a.2.missed))
+                .then(b.2.last.cmp(&a.2.last))
+                .then(a.1.cmp(b.1))
         });
+        // Révision : les plus souvent ratés, en nombre raisonnable pour une partie courte.
+        let review: Vec<usize> = weak.iter().take(MAX_REVIEW).map(|w| w.0).collect();
         let more = weak.len().saturating_sub(MAX_WEAK);
         weak.truncate(MAX_WEAK);
 
@@ -452,7 +456,7 @@ impl App {
         } else {
             let mut chips: Vec<Element<'_, Message>> = weak
                 .into_iter()
-                .map(|(name, m)| {
+                .map(|(_, name, m)| {
                     container(
                         row![
                             text(name).size(12),
@@ -480,6 +484,26 @@ impl App {
                         .vertical_spacing(6),
                 )
                 .padding(iced::Padding::ZERO.top(8)),
+            );
+            let words = Words::of(&world.info, lang);
+            let label = match (lang, review.len()) {
+                (Lang::Fr, 1) => format!("Réviser {}", words.this()),
+                (Lang::Fr, n) => format!("Réviser ces {n} {}", words.many()),
+                (Lang::En, 1) => format!("Review {}", words.this()),
+                (Lang::En, n) => format!("Review these {n} {}", words.many()),
+            };
+            body = body.push(
+                container(
+                    button(
+                        row![icon(Icon::Target, 14.0, style::TEXT), text(label).size(14)]
+                            .spacing(8)
+                            .align_y(Center),
+                    )
+                    .padding([9, 14])
+                    .style(style::secondary)
+                    .on_press(Message::Review(review)),
+                )
+                .padding(iced::Padding::ZERO.top(10)),
             );
         }
         container(body)

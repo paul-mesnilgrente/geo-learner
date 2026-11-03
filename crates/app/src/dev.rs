@@ -52,6 +52,10 @@ pub struct Demo {
     pub explore: Option<String>,
     /// Langue imposée, en mémoire seulement (`lang=en`).
     pub lang: Option<geo_core::Lang>,
+    /// Partie de révision limitée à ces lieux (`review=FRA,DEU`).
+    pub review: Vec<String>,
+    /// Questions passées après les réponses (`skips=3`).
+    pub skips: usize,
 }
 
 /// Parties fictives d'une série : scores en progrès, temps en baisse, un minuteur dépassé,
@@ -85,6 +89,7 @@ pub fn fake_runs(
                 missed: vec!["SVN".into(), "GNB".into(), "TUV".into(), "BTN".into()][..(i % 4) + 1]
                     .to_vec(),
                 limit,
+                review: false,
                 answers: codes
                     .iter()
                     .enumerate()
@@ -153,6 +158,8 @@ pub fn demo() -> Option<Demo> {
             "flight" => demo.flight = value.parse().ok(),
             "explore" => demo.explore = Some(value.to_owned()),
             "lang" => demo.lang = geo_core::Lang::from_locale(value),
+            "review" => demo.review = value.split(',').map(str::to_owned).collect(),
+            "skips" => demo.skips = value.parse().unwrap_or(0),
             "type" => demo.typed = value.split('|').map(str::to_owned).collect(),
             _ => {}
         }

@@ -7,6 +7,9 @@ use serde::{Deserialize, Serialize};
 /// Nombre d'essais avant de révéler la réponse (modes « Nommer » et « Localiser »).
 pub const MAX_TRIES: u8 = 3;
 
+/// Questions posées entre un lieu raté et sa seconde chance.
+pub const RETRY_GAP: usize = 3;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Mode {
     /// Citer tous les pays de la zone, dans n'importe quel ordre.
@@ -51,6 +54,8 @@ pub enum Outcome {
         guess: usize,
         target: usize,
     },
+    /// Seconde chance réussie : le lieu, raté plus tôt, est retrouvé. Le score n'en change pas.
+    Recovered(usize),
     /// Rien à faire (partie terminée…).
     Ignored,
 }
@@ -86,6 +91,10 @@ pub struct Quiz {
     started: Instant,
     /// Apparition de la question en cours.
     asked: Instant,
+    /// Lieux ratés qui attendent leur seconde chance (dont la question en cours, le cas échéant).
+    retry: Vec<usize>,
+    /// Lieux retrouvés lors de leur seconde chance.
+    recovered: usize,
 }
 
 impl Quiz {
@@ -112,6 +121,8 @@ impl Quiz {
             wrong: Vec::new(),
             started: now,
             asked: now,
+            retry: Vec::new(),
+            recovered: 0,
         };
         if mode != Mode::Free {
             quiz.advance();
@@ -127,8 +138,23 @@ impl Quiz {
         &self.members
     }
 
+    /// État affiché d'un lieu. Un lieu raté qui attend sa seconde chance apparaît « à trouver »,
+    /// pour que la carte ne souffle pas la réponse ; il reste compté comme raté.
     pub fn mark(&self, country: usize) -> Option<Mark> {
+        if self.retry.contains(&country) {
+            return Some(Mark::Pending);
+        }
         self.marks.get(country).copied().flatten()
+    }
+
+    /// La question en cours est une seconde chance.
+    pub fn retrying(&self) -> bool {
+        self.target.is_some_and(|t| self.retry.contains(&t))
+    }
+
+    /// Lieux retrouvés lors de leur seconde chance.
+    pub fn recovered(&self) -> usize {
+        self.recovered
     }
 
     pub fn target(&self) -> Option<usize> {
@@ -219,6 +245,9 @@ impl Quiz {
                 let Some(target) = self.target else {
                     return Outcome::Ignored;
                 };
+                if self.retrying() {
+                    return self.second_chance(target, country);
+                }
                 if country == target {
                     let tries = self.wrong_tries + 1;
                     self.marks[target] = Some(Mark::Found { tries });
@@ -232,6 +261,7 @@ impl Quiz {
                 if self.wrong_tries >= MAX_TRIES {
                     self.marks[target] = Some(Mark::Missed);
                     self.settle(target, None);
+                    self.requeue(target);
                     self.advance();
                     Outcome::Revealed {
                         guess: country,
@@ -247,13 +277,56 @@ impl Quiz {
         }
     }
 
-    /// Passe le pays en cours (compté comme raté).
+    /// Passe le pays en cours (compté comme raté ; il reviendra en seconde chance).
     pub fn skip(&mut self) -> Option<usize> {
         let target = self.target?;
-        self.marks[target] = Some(Mark::Missed);
-        self.settle(target, None);
+        if self.retrying() {
+            self.retry.retain(|&c| c != target);
+        } else {
+            self.marks[target] = Some(Mark::Missed);
+            self.settle(target, None);
+            self.requeue(target);
+        }
         self.advance();
         Some(target)
+    }
+
+    /// Réponse à une seconde chance : ni le score ni le bilan du lieu ne changent, et un nouvel
+    /// échec révèle la réponse sans autre essai.
+    fn second_chance(&mut self, target: usize, country: usize) -> Outcome {
+        if country == target {
+            self.retry.retain(|&c| c != target);
+            self.recovered += 1;
+            self.advance();
+            return Outcome::Recovered(target);
+        }
+        self.wrong_tries += 1;
+        if self.wrong_tries >= MAX_TRIES {
+            self.retry.retain(|&c| c != target);
+            self.advance();
+            Outcome::Revealed {
+                guess: country,
+                target,
+            }
+        } else {
+            Outcome::Wrong {
+                guess: country,
+                target,
+            }
+        }
+    }
+
+    /// Repropose un lieu raté quelques questions plus tard, s'il en reste.
+    fn requeue(&mut self, target: usize) {
+        let more = self
+            .queue
+            .iter()
+            .any(|&c| self.marks[c] == Some(Mark::Pending) || self.retry.contains(&c));
+        if more {
+            let at = self.queue.len().saturating_sub(RETRY_GAP);
+            self.queue.insert(at, target);
+            self.retry.push(target);
+        }
     }
 
     /// Termine la partie : tous les pays restants sont comptés comme ratés.
@@ -279,7 +352,9 @@ impl Quiz {
                     }
                 }
             }
-            (_, Some(target)) if !self.wrong.is_empty() => self.settle(target, None),
+            (_, Some(target)) if !self.wrong.is_empty() && !self.retrying() => {
+                self.settle(target, None);
+            }
             _ => {}
         }
         for &c in &self.members {
@@ -288,6 +363,7 @@ impl Quiz {
             }
         }
         self.queue.clear();
+        self.retry.clear();
         self.target = None;
         self.finished = true;
     }
@@ -307,7 +383,7 @@ impl Quiz {
         self.wrong.clear();
         self.target = None;
         while let Some(next) = self.queue.pop() {
-            if self.marks[next] == Some(Mark::Pending) {
+            if self.marks[next] == Some(Mark::Pending) || self.retry.contains(&next) {
                 self.target = Some(next);
                 self.asked = Instant::now();
                 return;
@@ -379,7 +455,9 @@ mod tests {
                 target: 0
             }
         );
-        assert_eq!(q.mark(0), Some(Mark::Missed));
+        // Raté, mais affiché « à trouver » en attendant sa seconde chance.
+        assert_eq!(q.mark(0), Some(Mark::Pending));
+        assert_eq!(q.missed(), 1);
         assert_eq!(q.target(), Some(1));
         assert_eq!(q.wrong_tries(), 0);
         assert_eq!(q.mistakes(), 3);
@@ -447,6 +525,61 @@ mod tests {
             answers(&q),
             [(1, Some(1), vec![]), (0, None, vec![]), (2, None, vec![])]
         );
+    }
+
+    #[test]
+    fn missed_places_come_back_later() {
+        let order: Vec<usize> = (0..6).collect();
+        let mut q = Quiz::new(Mode::Identify, 6, order.clone(), order);
+        assert_eq!(q.skip(), Some(0));
+        // Trois autres questions d'abord, puis la seconde chance.
+        for c in 1..4 {
+            assert_eq!(q.target(), Some(c));
+            assert!(!q.retrying());
+            q.submit(c);
+        }
+        assert_eq!(q.target(), Some(0));
+        assert!(q.retrying());
+        assert_eq!(q.submit(0), Outcome::Recovered(0));
+        assert_eq!(q.recovered(), 1);
+        // Toujours raté : le score et le bilan ne changent pas.
+        assert_eq!(q.mark(0), Some(Mark::Missed));
+        assert_eq!(q.answers()[0].tries, None);
+        assert_eq!(q.target(), Some(4));
+        // Le dernier lieu raté n'a plus de question après lui : pas de seconde chance.
+        q.submit(4);
+        q.skip();
+        assert!(q.is_finished());
+        assert_eq!((q.found(), q.missed(), q.mistakes()), (4, 2, 0));
+    }
+
+    #[test]
+    fn second_chance_failure_reveals_without_requeue() {
+        let order: Vec<usize> = (0..3).collect();
+        let mut q = Quiz::new(Mode::Locate, 3, order.clone(), order);
+        for _ in 0..MAX_TRIES {
+            q.submit(2);
+        }
+        assert_eq!(q.target(), Some(1));
+        q.submit(1);
+        q.submit(2);
+        assert_eq!(q.target(), Some(0));
+        assert!(q.retrying());
+        q.submit(1);
+        q.submit(1);
+        assert_eq!(
+            q.submit(1),
+            Outcome::Revealed {
+                guess: 1,
+                target: 0
+            }
+        );
+        assert!(q.is_finished());
+        assert_eq!(q.mark(0), Some(Mark::Missed));
+        // Les erreurs de la seconde chance ne s'ajoutent ni aux erreurs ni au bilan.
+        assert_eq!(q.mistakes(), 3);
+        assert_eq!(q.answers()[0].wrong, [2, 2, 2]);
+        assert_eq!(q.answers().len(), 3);
     }
 
     #[test]
