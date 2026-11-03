@@ -35,13 +35,86 @@ pub static ATLASES: LazyLock<Vec<World>> = LazyLock::new(|| {
     ]
 });
 
-/// Quiz « Numéros des départements » : mêmes lieux et mêmes zones, sans carte.
+/// Quiz « Numéros des départements » : mêmes lieux et mêmes zones, sans carte, plus une zone
+/// par dizaine (01–09, 10–19…) pour apprendre par petits paquets.
 fn numbers_quiz(departements: &World) -> World {
     let mut world = departements.clone();
     world.info.id = "fr-numeros".into();
     world.info.title = "Numéros des départements".into();
     world.info.numbers = true;
+
+    // Dizaine d'un département : la Corse (2A, 2B) reste dans les 20, l'outre-mer à part.
+    let tens = |c: &geo_core::Country| -> Option<u32> {
+        let number = number_of(c)?;
+        match number.as_str() {
+            "2A" | "2B" => Some(2),
+            n if n.len() == 3 => Some(97),
+            n => n.parse::<u32>().ok().map(|n| n / 10),
+        }
+    };
+    let mut groups: Vec<(u32, Vec<usize>)> = Vec::new();
+    for (i, c) in world.countries.iter().enumerate() {
+        let Some(t) = tens(c) else { continue };
+        match groups.iter_mut().find(|(k, _)| *k == t) {
+            Some((_, list)) => list.push(i),
+            None => groups.push((t, vec![i])),
+        }
+    }
+    groups.sort_by_key(|(k, _)| *k);
+
+    let all = &world.regions[0];
+    let parent = world.regions.len();
+    let continent = geo_core::Region {
+        id: "par-numero".into(),
+        name: "Par numéro".into(),
+        kind: geo_core::RegionKind::Continent,
+        parent: None,
+        members: all.members.clone(),
+        center: all.center,
+        view: all.view,
+        hidden: false,
+    };
+    world.regions.push(continent);
+    for (t, members) in groups {
+        let name = match t {
+            0 => "01–09".to_owned(),
+            9 => "90–95".to_owned(),
+            97 => "971–976".to_owned(),
+            t => format!("{t}0–{t}9"),
+        };
+        let view = members_view(&world, &members);
+        world.regions.push(geo_core::Region {
+            id: format!("numeros-{t}"),
+            name,
+            kind: geo_core::RegionKind::Group,
+            parent: Some(parent),
+            members,
+            center: world.regions[0].center,
+            view,
+            hidden: false,
+        });
+    }
     world
+}
+
+/// Cadrage (lon, lat) englobant le territoire principal de ces lieux, avec une marge.
+fn members_view(world: &World, members: &[usize]) -> [f32; 4] {
+    let mut b = [f32::MAX, f32::MAX, f32::MIN, f32::MIN];
+    for &m in members {
+        let shape = &world.countries[m].shape;
+        for (ring, _) in shape
+            .rings
+            .iter()
+            .zip(&shape.main)
+            .filter(|(_, main)| **main)
+        {
+            for &[x, y] in ring {
+                b = [b[0].min(x), b[1].min(y), b[2].max(x), b[3].max(y)];
+            }
+        }
+    }
+    let margin = 0.08 * (b[2] - b[0]).max(b[3] - b[1]);
+    [b[0] - margin, b[1] - margin, b[2] + margin, b[3] + margin]
 }
 
 /// Numéro d'un lieu (« 75 », « 2A », « 971 ») : sa première réponse qui contient un chiffre.
@@ -159,6 +232,37 @@ mod tests {
         assert_eq!(name("2A"), "Corse-du-Sud");
         assert_eq!(name("75"), "Paris");
         assert_eq!(name("976"), "Mayotte");
+    }
+
+    /// Les dizaines couvrent chaque département une fois : 01–09, …, 90–95, 971–976.
+    #[test]
+    fn numbers_quiz_has_one_zone_per_ten() {
+        let numbers = ATLASES.iter().find(|a| a.info.numbers).unwrap();
+        let tens: Vec<&geo_core::Region> = numbers
+            .regions
+            .iter()
+            .filter(|r| r.id.starts_with("numeros-"))
+            .collect();
+        let names: Vec<&str> = tens.iter().map(|r| r.name.as_str()).collect();
+        assert_eq!(
+            names,
+            [
+                "01–09",
+                "10–19",
+                "20–29",
+                "30–39",
+                "40–49",
+                "50–59",
+                "60–69",
+                "70–79",
+                "80–89",
+                "90–95",
+                "971–976"
+            ]
+        );
+        assert_eq!(tens.iter().map(|r| r.members.len()).sum::<usize>(), 101);
+        // La Corse avec les 20 : 2A, 2B et 21 à 29.
+        assert_eq!(tens[2].members.len(), 11);
     }
 
     #[test]

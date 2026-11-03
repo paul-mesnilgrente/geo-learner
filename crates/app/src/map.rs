@@ -581,6 +581,8 @@ pub struct MapView<'a> {
     pub situation: Option<&'a Situation>,
     /// Exploration, sans quiz : lieux de la zone en évidence, tous nommés (ou numérotés).
     pub explore: bool,
+    /// Lieux mis en avant (repères), d'une autre couleur.
+    pub emphasis: &'a [usize],
     pub cache: &'a Cache,
 }
 
@@ -640,10 +642,12 @@ enum Tint {
     Missed,
     /// Pays de la zone, dans l'aperçu.
     Highlight,
+    /// Repère mis en avant pendant l'exploration (départements des dizaines).
+    Emphasis,
 }
 
 impl Tint {
-    const ALL: [Tint; 7] = [
+    const ALL: [Tint; 8] = [
         Tint::Outside,
         Tint::Pending,
         Tint::Perfect,
@@ -651,6 +655,7 @@ impl Tint {
         Tint::Third,
         Tint::Missed,
         Tint::Highlight,
+        Tint::Emphasis,
     ];
 
     fn color(self) -> Color {
@@ -662,6 +667,7 @@ impl Tint {
             Tint::Third => style::ORANGE,
             Tint::Missed => style::DANGER,
             Tint::Highlight => style::mix(style::LAND, style::ACCENT, 0.6),
+            Tint::Emphasis => style::mix(style::LAND, style::WARNING, 0.7),
         }
     }
 }
@@ -685,6 +691,7 @@ impl MapView<'_> {
     /// Teinte d'un pays : son état dans la partie, ou sa présence dans la zone (aperçu).
     fn tint_of(&self, country: usize) -> Tint {
         match self.quiz.mark(country) {
+            Some(Mark::Pending) if self.emphasis.contains(&country) => Tint::Emphasis,
             Some(Mark::Pending) if self.preview || self.explore => Tint::Highlight,
             // Carte de situation : toutes les terres en gris neutre, aucune n'est à trouver.
             None if self.situation.is_some() => Tint::Pending,
@@ -1463,6 +1470,7 @@ mod tests {
             preview: false,
             situation: None,
             explore: false,
+            emphasis: &[],
             cache: &cache,
         };
         let bounds = rect(0.0, 0.0, 1000.0, 700.0);

@@ -21,6 +21,11 @@ micro). Les noms ne valident pas « Nom → numéro » et inversement. Ce quiz e
 l'exécution de l'atlas des départements : il n'ajoute rien à l'exécutable. En fin de partie,
 toutes les paires numéro · nom s'affichent, les ratées en rouge.
 
+Pour apprendre les numéros par petits paquets, ce quiz a aussi une zone par dizaine
+(« Par numéro » : 01–09, 10–19, …, 90–95, 971–976). L'exploration des départements rappelle la
+logique des numéros (l'ordre alphabétique des noms d'origine), met en jaune un repère par
+dizaine (01 Ain, 10 Aube, 21 Côte-d'Or… 90 Territoire de Belfort) et liste les exceptions.
+
 L'Australie compte six États et deux territoires continentaux (Territoire du Nord, Territoire de
 la capitale australienne) ; l'île Lord Howe est rattachée à la Nouvelle-Galles du Sud. Les
 contours du Canada sont un peu plus simplifiés que les autres (`tolerance` dans le fichier de

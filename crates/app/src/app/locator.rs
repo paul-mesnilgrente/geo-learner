@@ -140,6 +140,7 @@ impl Locator {
             preview: false,
             situation: Some(&self.situation),
             explore: false,
+            emphasis: &[],
             cache: &self.cache,
         };
         let map: Element<'_, MapEvent> = canvas(map_view)

@@ -66,6 +66,8 @@ pub enum Message {
     /// Zoom avant (`true`) ou arrière.
     ExploreZoom(bool),
     ExploreReset,
+    /// Repères des dizaines (numéros des départements) affichés ou masqués.
+    ExploreAnchors,
     /// Ouvre la page d'un quiz (index dans `ATLASES`).
     OpenQuiz(usize),
     /// Ouvre la page d'un quiz réglée sur un mode et une zone (dernières parties).
@@ -248,6 +250,7 @@ impl Preview {
             preview: true,
             situation: None,
             explore: false,
+            emphasis: &[],
             cache: &self.cache,
         };
         let map: Element<'_, MapEvent> = canvas(map_view).width(Fill).height(Fill).into();
@@ -584,6 +587,11 @@ impl App {
                     explorer.zoom(if zoom_in { 1.6 } else { 1.0 / 1.6 });
                 }
             }
+            Message::ExploreAnchors => {
+                if let Some(explorer) = &mut self.explorer {
+                    explorer.toggle_anchors();
+                }
+            }
             Message::ExploreReset => {
                 if let Some(explorer) = &mut self.explorer {
                     explorer.reset();
@@ -630,6 +638,22 @@ impl App {
                 self.clear_run_actions();
             }
             Message::SelectRegion(region) => {
+                // Un groupe qui couvre tout le quiz (« Par numéro ») n'est qu'un menu :
+                // on choisit sa première zone.
+                let world = self.world();
+                let zone = &world.regions[region];
+                let region = match zone.kind {
+                    RegionKind::Continent
+                        if zone.members.len() == world.regions[0].members.len() =>
+                    {
+                        world
+                            .regions
+                            .iter()
+                            .position(|r| r.parent == Some(region))
+                            .unwrap_or(region)
+                    }
+                    _ => region,
+                };
                 self.region = region;
                 self.clear_run_actions();
                 self.refresh_preview();
@@ -1237,10 +1261,10 @@ impl App {
             RegionKind::Sub | RegionKind::Group => selected.parent,
             RegionKind::World => None,
         };
-        let pill = |index: usize, label: &str| -> Element<'_, Message> {
+        let pill = |index: usize, label: &str, on: bool| -> Element<'_, Message> {
             button(text(label.to_owned()).size(14))
                 .padding([8, 16])
-                .style(style::pill(self.region == index))
+                .style(style::pill(on))
                 .on_press(Message::SelectRegion(index))
                 .into()
         };
@@ -1250,7 +1274,8 @@ impl App {
                 .iter()
                 .enumerate()
                 .filter(|(_, r)| matches!(r.kind, RegionKind::World | RegionKind::Continent))
-                .map(|(i, r)| pill(i, &r.name)),
+                // Le continent ouvert reste marqué quand une de ses zones est choisie.
+                .map(|(i, r)| pill(i, &r.name, self.region == i || open_continent == Some(i))),
         )
         .spacing(8)
         .wrap();
@@ -1262,12 +1287,15 @@ impl App {
                 .iter()
                 .enumerate()
                 .filter(|(_, r)| r.parent == Some(continent) && !r.hidden)
-                .map(|(i, r)| pill(i, &r.name));
-            let all = pill(continent, "Toute la zone");
+                .map(|(i, r)| pill(i, &r.name, self.region == i));
+            // « Toute la zone » ferait doublon si le groupe couvre tout le quiz (« Par numéro »).
+            let whole = self.world().regions[continent].members.len()
+                == self.world().regions[0].members.len();
+            let all = (!whole).then(|| pill(continent, "Toute la zone", self.region == continent));
             if subs.clone().count() > 0 {
                 zones = zones.push(
                     container(
-                        Row::with_children(std::iter::once(all).chain(subs))
+                        Row::with_children(all.into_iter().chain(subs))
                             .spacing(8)
                             .wrap(),
                     )
@@ -1667,6 +1695,7 @@ impl App {
             preview: false,
             situation: None,
             explore: false,
+            emphasis: &[],
             cache: &game.cache,
         };
         let map: Element<'a, MapEvent> = canvas(map_view).width(Fill).height(Fill).into();

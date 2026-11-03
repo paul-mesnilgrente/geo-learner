@@ -7,8 +7,8 @@ use geo_core::{Mode, Quiz, RegionKind, World};
 use iced::alignment::{Horizontal, Vertical};
 use iced::widget::canvas::Cache;
 use iced::widget::{
-    Column, button, canvas, column, container, mouse_area, opaque, row, scrollable, sensor, stack,
-    text,
+    Column, Row, button, canvas, column, container, mouse_area, opaque, row, scrollable, sensor,
+    stack, text,
 };
 use iced::{Center, Element, Fill, Point, Rectangle, Size, Theme};
 
@@ -21,6 +21,9 @@ use crate::style;
 
 /// Durée du déplacement vers un lieu choisi dans la liste.
 const FLIGHT: f32 = 0.6;
+
+/// Un repère par dizaine : les numéros suivent l'ordre alphabétique des noms d'origine.
+const ANCHORS: [&str; 10] = ["01", "10", "21", "30", "40", "50", "60", "70", "80", "90"];
 
 pub struct Explorer {
     world: &'static World,
@@ -36,6 +39,9 @@ pub struct Explorer {
     quiz: Quiz,
     cache: Cache,
     pub locator: Option<Locator>,
+    /// Départements repères (un par dizaine), s'il s'agit des départements.
+    anchors: Vec<usize>,
+    show_anchors: bool,
 }
 
 struct Flight {
@@ -68,7 +74,23 @@ impl Explorer {
             ),
             cache: Cache::new(),
             locator: None,
+            anchors: ANCHORS
+                .iter()
+                .filter_map(|&n| {
+                    world
+                        .countries
+                        .iter()
+                        .position(|c| crate::number_of(c).as_deref() == Some(n))
+                })
+                .collect(),
+            show_anchors: true,
         }
+    }
+
+    /// Repères des dizaines affichés ou non sur la carte.
+    pub fn toggle_anchors(&mut self) {
+        self.show_anchors = !self.show_anchors;
+        self.cache.clear();
     }
 
     pub fn animating(&self) -> bool {
@@ -246,6 +268,11 @@ impl Explorer {
             preview: false,
             situation: None,
             explore: true,
+            emphasis: if self.show_anchors {
+                &self.anchors
+            } else {
+                &[]
+            },
             cache: &self.cache,
         };
         let map: Element<'_, MapEvent> = canvas(map_view).width(Fill).height(Fill).into();
@@ -323,6 +350,10 @@ impl Explorer {
             );
         }
 
+        if self.anchors.len() == ANCHORS.len() {
+            body = body.push(self.anchors_tip());
+        }
+
         // Groupes dans l'ordre de l'atlas ; lieux par numéro s'ils en ont, sinon par nom.
         let mut groups: Vec<(usize, Vec<usize>)> = Vec::new();
         for &c in &zone.members {
@@ -338,9 +369,13 @@ impl Explorer {
             .countries
             .first()
             .is_some_and(|c| crate::number_of(c).is_some());
+        // Une seule liste pour une petite zone, ou une dizaine (dans l'ordre des numéros).
         let single = groups.len() == 1
-            || matches!(zone.kind, RegionKind::Sub)
+            || matches!(zone.kind, RegionKind::Sub | RegionKind::Group)
             || groups.iter().all(|(g, _)| *g == self.region);
+        if single {
+            groups = vec![(self.region, zone.members.clone())];
+        }
         for (g, mut list) in groups {
             if !numbered {
                 list.sort_by_key(|&c| geo_core::normalize(&self.world.countries[c].name));
@@ -375,5 +410,87 @@ impl Explorer {
             .height(Fill)
             .style(style::sidebar)
             .into()
+    }
+
+    /// Astuce pour les numéros des départements : l'ordre alphabétique et ses repères.
+    fn anchors_tip(&self) -> Element<'_, Message> {
+        let warm = style::WARNING;
+        let chips = self.anchors.iter().map(|&c| {
+            button(text(self.label(c)).size(12))
+                .padding([4, 10])
+                .style(move |_: &Theme, status| {
+                    let hovered =
+                        matches!(status, button::Status::Hovered | button::Status::Pressed);
+                    button::Style {
+                        background: Some(
+                            style::mix(style::SURFACE, warm, if hovered { 0.28 } else { 0.16 })
+                                .into(),
+                        ),
+                        text_color: style::lighten(warm, 0.3),
+                        border: iced::Border {
+                            color: style::with_alpha(warm, 0.4),
+                            width: 1.0,
+                            radius: 999.0.into(),
+                        },
+                        ..Default::default()
+                    }
+                })
+                .on_press(Message::ExploreSelect(c))
+                .into()
+        });
+        container(
+            column![
+                row![
+                    text("Astuce : l'ordre alphabétique")
+                        .size(14)
+                        .font(style::FONT_SEMIBOLD)
+                        .width(Fill),
+                    button(
+                        text(if self.show_anchors {
+                            "Masquer"
+                        } else {
+                            "Montrer"
+                        })
+                        .size(12)
+                    )
+                    .padding([3, 8])
+                    .style(style::ghost)
+                    .on_press(Message::ExploreAnchors),
+                ]
+                .align_y(Center),
+                text(
+                    "Les numéros suivent l'ordre alphabétique des noms d'origine : 01 Ain, \
+                     02 Aisne, 03 Allier… Retenez un repère par dizaine (en jaune sur la \
+                     carte) : le reste se déduit à quelques unités près."
+                )
+                .size(13),
+                Row::with_children(chips)
+                    .spacing(6)
+                    .wrap()
+                    .vertical_spacing(6),
+                text(
+                    "Exceptions : « Haute- » se classe au nom principal (42 Loire, \
+                     43 Haute-Loire). Noms changés depuis : 22 Côtes-d'Armor (Côtes-du-Nord), \
+                     64 Pyrénées-Atlantiques (Basses-Pyrénées), 76 Seine-Maritime \
+                     (Seine-Inférieure), 78 Yvelines (Seine-et-Oise). Les 91 à 95, autour de \
+                     Paris, datent de 1968. La Corse (20) est devenue 2A et 2B en 1976, et \
+                     l'outre-mer va de 971 à 976."
+                )
+                .size(12)
+                .color(style::MUTED),
+            ]
+            .spacing(10),
+        )
+        .padding([12, 14])
+        .width(Fill)
+        .style(|_: &Theme| container::Style {
+            background: Some(style::SURFACE_2.into()),
+            border: iced::Border {
+                radius: 12.0.into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .into()
     }
 }
