@@ -16,14 +16,14 @@
 
   <description>
     <p>
-      GeoLearner helps you learn the world map and more: all 197 countries, the 50 U.S. states,
-      the provinces and territories of Canada, the states and territories of Australia, and the
-      regions and departments of France.
+      GeoLearner helps you learn the world map and more: all 197 countries, the five oceans and
+      52 seas, the 50 U.S. states, the provinces and territories of Canada, the states and
+      territories of Australia, and the regions and departments of France.
     </p>
     <p xml:lang="fr">
-      GeoLearner vous aide à retenir la carte du monde, et bien plus : les 197 pays, les
-      départements et les régions de France, les 50 États des États-Unis, les provinces et
-      territoires du Canada, les États et territoires d’Australie.
+      GeoLearner vous aide à retenir la carte du monde, et bien plus : les 197 pays, les cinq
+      océans et 52 mers, les départements et les régions de France, les 50 États des États-Unis,
+      les provinces et territoires du Canada, les États et territoires d’Australie.
     </p>
     <p>Three ways to play:</p>
     <p xml:lang="fr">Trois façons de jouer :</p>
@@ -157,6 +157,15 @@
   </screenshots>
 
   <releases>
+    <release version="0.3.0" date="2026-11-04">
+      <description>
+        <ul>
+          <li>New quiz: the five oceans, with their limits drawn on the map</li>
+          <li>New quiz: 52 seas of the world, by ocean and by region</li>
+          <li>Available as a snap</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.2.1" date="2026-11-04">
       <description>
         <ul>
