@@ -1,0 +1,9 @@
+What's new in version 0.2:
+• English interface: GeoLearner follows the system language, which you can change on the home screen. Voice input is available in English too.
+• Three new quizzes: provinces and territories of Canada, states and territories of Australia, and French department numbers (no map, both ways).
+• "By number" zones to learn the French departments ten at a time.
+• New home screen with quiz cards; each quiz has its own page with your progress.
+• Explore the map freely, without a quiz, with every place named.
+• Mastery of each place (learned, in progress, to review), mastery map and review games.
+• Second chance in Name and Find modes: a missed place comes back a few questions later (can be turned off).
+• Locator map for the insets (French overseas departments, Alaska, Hawaii).

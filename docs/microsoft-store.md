@@ -232,9 +232,30 @@ README), dans `docs/store/fr/` et `docs/store/en/` :
 
 ## 7. Mises à jour
 
+Publiées par la CI (`.github/workflows/msix.yml`, job `store`) :
+
 1. Augmenter `version` dans `Cargo.toml` (le Store refuse une version égale ou inférieure ; le
    4ᵉ chiffre du paquet reste 0, il est réservé au Store).
-2. Pousser le tag `vX.Y.Z` : le workflow construit le `.msix`.
-3. Partner Center → *Update* : la soumission reprend les réponses précédentes. Remplacer le
-   paquet, remplir *What's new in this version* dans chaque fiche, changer les captures si
-   l'interface a changé, puis *Submit for certification*.
+2. Écrire les nouveautés dans `packaging/windows/release-notes/fr-fr.txt` et `en-us.txt`. Elles
+   doivent mentionner la version (« 0.3 ») : sinon la CI s'arrête, pour ne pas republier les
+   notes de la version précédente.
+3. Pousser le tag `vX.Y.Z`. La CI construit le `.msix`, crée la soumission avec le nouveau paquet
+   et les nouvelles notes, et la soumet à la certification (`scripts/store-publish.ps1`). Les
+   textes, captures et mots-clés restent ceux de la version en ligne.
+4. Suivre la certification dans Partner Center.
+
+Captures, descriptions ou mots-clés se changent toujours dans Partner Center (mots-clés : par
+import CSV, voir plus haut). Une seule soumission peut être en cours : attendre la publication
+de la précédente avant de pousser un nouveau tag.
+
+Le workflow lancé à la main avec `store: check` vérifie seulement que les identifiants
+fonctionnent.
+
+### Accès de la CI au Store (une fois)
+
+- Partner Center → *Account settings → Tenants* : tenant Microsoft Entra associé (créé le
+  2026-11-04, compte administrateur `…onmicrosoft.com`, distinct du compte outlook.com).
+- *User management → Microsoft Entra applications* : application de la CI, rôle **Manager**,
+  avec une clé (secret client, à renouveler à son expiration).
+- Secrets GitHub (`gh secret set NOM`) : `AZURE_AD_TENANT_ID`, `AZURE_AD_APPLICATION_CLIENT_ID`,
+  `AZURE_AD_APPLICATION_SECRET`, `SELLER_ID` (97087780, *Account settings → Legal info*).

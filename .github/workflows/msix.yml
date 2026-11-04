@@ -1,13 +1,23 @@
 name: Paquet Microsoft Store
 
 # Construit le paquet MSIX (non signé : le Store le signe) sur un tag de version ou à la demande.
+# Sur un tag, le paquet est ensuite envoyé au Store et soumis à la certification
+# (scripts/store-publish.ps1). Lancé à la main avec « check », le workflow vérifie seulement
+# l'accès au Store, sans rien soumettre.
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      store:
+        description: "Store : none (paquet seul), check (vérifier l'accès), publish (soumettre)"
+        type: choice
+        options: [none, check, publish]
+        default: none
 
 env:
   CARGO_TERM_COLOR: always
+  STORE_PRODUCT_ID: 9N1C5KFNMV7H
 
 jobs:
   msix:
@@ -32,3 +42,45 @@ jobs:
           name: geo-learner-msix
           path: target/msix/*.msix
           if-no-files-found: error
+
+  store:
+    needs: msix
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.store == 'check' || inputs.store == 'publish'
+    runs-on: windows-latest
+    # Une seule soumission à la fois : le Store n'en accepte qu'une en cours.
+    concurrency: microsoft-store
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: geo-learner-msix
+          path: target/msix
+
+      - name: CLI du Microsoft Store
+        uses: microsoft/microsoft-store-apppublisher@v1.4
+        with:
+          version: v0.4.4
+
+      - name: Identifiants Partner Center
+        shell: pwsh
+        run: |
+          msstore settings --enableTelemetry false
+          msstore reconfigure `
+            --tenantId "${{ secrets.AZURE_AD_TENANT_ID }}" `
+            --sellerId "${{ secrets.SELLER_ID }}" `
+            --clientId "${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}" `
+            --clientSecret "${{ secrets.AZURE_AD_APPLICATION_SECRET }}"
+          if ($LASTEXITCODE -ne 0) { throw "identifiants refusés" }
+
+      - name: Vérification de l'accès
+        if: inputs.store == 'check'
+        shell: pwsh
+        run: msstore submission status $env:STORE_PRODUCT_ID
+
+      - name: Soumission au Store
+        if: inputs.store != 'check'
+        shell: pwsh
+        run: |
+          $package = (Get-ChildItem target/msix/*.msix | Select-Object -First 1).FullName
+          ./scripts/store-publish.ps1 -Package $package -ProductId $env:STORE_PRODUCT_ID
