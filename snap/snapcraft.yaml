@@ -23,6 +23,9 @@ apps:
     command: bin/geo-learner
     environment:
       LD_LIBRARY_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/pulseaudio
+      # Tables de clavier et données de locale X11 : absentes de la base core24.
+      XKB_CONFIG_ROOT: $SNAP/usr/share/X11/xkb
+      XLOCALEDIR: $SNAP/usr/share/X11/locale
     plugs:
       - desktop
       - wayland
@@ -68,6 +71,7 @@ parts:
       - libxi6
       - libxrandr2
       - libvulkan1
+      - xkb-data
       # Téléchargement du modèle vocal (l'appli appelle le curl du système).
       - curl
     override-pull: |
