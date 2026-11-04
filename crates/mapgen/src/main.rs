@@ -4,6 +4,7 @@
 //! ```sh
 //! mapgen world <admin0.geojson> <sortie>                          # pays du monde
 //! mapgen atlas <atlas.toml> <admin0.geojson> <admin1.geojson> <sortie>  # subdivisions
+//! mapgen water <atlas.toml> <admin0.geojson> <sortie>             # océans
 //! ```
 //! (voir `scripts/build-map.sh`).
 
@@ -64,6 +65,9 @@ struct CountryDef {
     /// Atlas : entités Natural Earth réunies en un seul lieu (départements d'une région).
     #[serde(default)]
     parts: Vec<String>,
+    /// Atlas d'eau : contour (lon, lat) dessiné sous les terres, en un ou plusieurs anneaux.
+    #[serde(default)]
+    rings: Vec<Ring>,
 }
 
 #[derive(Deserialize)]
@@ -131,10 +135,16 @@ struct AtlasDef {
     #[serde(default = "default_levels_en")]
     levels_en: [String; 2],
     /// Pays (code ADM0_A3) dont les subdivisions sont lues dans Natural Earth admin-1.
+    #[serde(default)]
     country: String,
     /// Les terres des autres pays dans ce cadre [lon_min, lat_min, lon_max, lat_max] sont
     /// dessinées en gris, pour situer la carte.
+    #[serde(default)]
     context: [f32; 4],
+    /// Atlas d'eau : terres (codes ADM0_A3) embarquées, en plus de celles du monde reprises à
+    /// l'exécution (l'Antarctique, absent de l'atlas du monde).
+    #[serde(default)]
+    land: Vec<String>,
     /// Simplification des contours, en degrés (`{ hi = 0.01, lo = 0.08 }`) : plus forte pour
     /// un grand pays vu de loin (Canada).
     tolerance: Option<Tolerance>,
@@ -173,8 +183,8 @@ struct Source {
 
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
-    let usage =
-        "usage : mapgen world <admin0> <sortie> | mapgen atlas <toml> <admin0> <admin1> <sortie>";
+    let usage = "usage : mapgen world <admin0> <sortie> | mapgen atlas <toml> <admin0> <admin1> <sortie> \
+         | mapgen water <toml> <admin0> <sortie>";
     let read_json = |path: &str| -> Result<Value> {
         Ok(serde_json::from_str(&std::fs::read_to_string(path)?)?)
     };
@@ -199,6 +209,12 @@ fn main() -> Result<()> {
                 build_atlas(&atlas, &admin0, &admin1)?,
                 args.get(5).ok_or(usage)?,
             )
+        }
+        Some("water") => {
+            let atlas: AtlasFile =
+                toml::from_str(&std::fs::read_to_string(args.get(2).ok_or(usage)?)?)?;
+            let admin0 = read_json(args.get(3).ok_or(usage)?)?;
+            (build_water(&atlas, &admin0)?, args.get(4).ok_or(usage)?)
         }
         _ => return Err(usage.into()),
     };
@@ -308,6 +324,7 @@ fn build_world(defs: &CountriesFile, zones: &RegionsFile, features: &Value) -> R
         ),
         insets: Vec::new(),
         numbers: false,
+        water: false,
     };
     assemble(info, &defs.countries, zones, source, WORLD_TOLERANCE)
 }
@@ -506,8 +523,85 @@ fn build_atlas(file: &AtlasFile, admin0: &Value, admin1: &Value) -> Result<World
         levels: levels(&def.levels, &def.levels_en),
         insets,
         numbers: false,
+        water: false,
     };
     assemble(info, &file.items, &file.zones, source, tolerance)
+}
+
+/// Atlas d'eau (océans) : chaque lieu est un grand polygone tracé à la main dans le fichier,
+/// dont les bords ne comptent qu'en mer (le reste passe sous les terres, qui le recouvrent).
+/// Les terres du monde sont reprises à l'exécution ; seules celles de `land` sont embarquées.
+fn build_water(file: &AtlasFile, admin0: &Value) -> Result<World> {
+    let def = &file.atlas;
+    let n = file.items.len();
+    let mut source = Source {
+        rings: Vec::with_capacity(n),
+        labels: vec![None; n],
+        english: vec![None; n],
+        territories: Vec::new(),
+    };
+    for item in &file.items {
+        if item.rings.is_empty() {
+            return Err(format!("{} : aucun contour (`rings`)", item.name).into());
+        }
+        source
+            .rings
+            .push(item.rings.iter().map(|r| densify(r, 1.0)).collect());
+    }
+    for feature in admin0["features"].as_array().ok_or("GeoJSON invalide")? {
+        let props = &feature["properties"];
+        let code = props["ADM0_A3"].as_str().unwrap_or("");
+        if def.land.iter().any(|c| c == code) {
+            // Densifiée : l'Antarctique longe le pôle d'un bord à l'autre de la carte en un seul
+            // segment, que la projection doit suivre.
+            let polygons = read_rings(&feature["geometry"])?
+                .iter()
+                .map(|r| densify(r, 1.0))
+                .collect();
+            source
+                .territories
+                .push(territory(props, code, None, polygons, WORLD_TOLERANCE));
+        }
+    }
+    let info = Info {
+        id: def.id.clone(),
+        title: Text::new(&def.title, &def.title_en),
+        category: Text::new(&def.category, &def.category_en),
+        one: Text::new(&def.one, &def.one_en),
+        many: Text::new(&def.many, &def.many_en),
+        feminine: def.feminine,
+        zoom_sub: false,
+        levels: levels(&def.levels, &def.levels_en),
+        insets: Vec::new(),
+        numbers: false,
+        water: true,
+    };
+    let rings: Vec<Vec<Ring>> = source.rings.clone();
+    let mut world = assemble(info, &file.items, &file.zones, source, ATLAS_TOLERANCE)?;
+    // Contours gardés tels quels, densifiés : simplifiés, les bords suivant un méridien ou le
+    // bord de la carte redeviendraient des cordes, et laisseraient des jours le long des terres.
+    for (country, rings) in world.countries.iter_mut().zip(rings) {
+        country.shape.main = vec![true; rings.len()];
+        country.shape.rings_lo = rings.clone();
+        country.shape.rings = rings;
+    }
+    Ok(world)
+}
+
+/// Ajoute des points le long des côtés d'un anneau (fermé implicitement), tous les `step` degrés
+/// au plus, pour que la projection les courbe.
+fn densify(ring: &[[f32; 2]], step: f32) -> Ring {
+    let mut out = Vec::new();
+    for (i, &a) in ring.iter().enumerate() {
+        let b = ring[(i + 1) % ring.len()];
+        let length = (b[0] - a[0]).abs().max((b[1] - a[1]).abs());
+        let parts = (length / step).ceil().max(1.0) as usize;
+        for k in 0..parts {
+            let t = k as f32 / parts as f32;
+            out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+        }
+    }
+    out
 }
 
 /// Déplacement d'un encart : translation vers `to` et mise à l'échelle, en corrigeant

@@ -11,6 +11,15 @@ pcm_type.pulse { lib "$lib/libasound_module_pcm_pulse.so" }
 ctl_type.pulse { lib "$lib/libasound_module_ctl_pulse.so" }
 EOF
 export ALSA_CONFIG_PATH="$conf"
-# Le XDG_RUNTIME_DIR d'un snap est un sous-dossier de celui de la session.
-export PULSE_SERVER="${PULSE_SERVER:-unix:$XDG_RUNTIME_DIR/../pulse/native}"
+# Le XDG_RUNTIME_DIR d'un snap est un sous-dossier de celui de la session : les sockets de la
+# session (son, Wayland) sont un niveau au-dessus.
+mkdir -p "$XDG_RUNTIME_DIR"
+session_runtime="$(dirname "$XDG_RUNTIME_DIR")"
+export PULSE_SERVER="${PULSE_SERVER:-unix:$session_runtime/pulse/native}"
+# Wayland cherche un WAYLAND_DISPLAY relatif (« wayland-0 ») dans XDG_RUNTIME_DIR : on lui
+# donne le chemin complet du socket de la session.
+case "${WAYLAND_DISPLAY:-}" in
+  "" | /*) ;;
+  *) export WAYLAND_DISPLAY="$session_runtime/$WAYLAND_DISPLAY" ;;
+esac
 exec "$@"

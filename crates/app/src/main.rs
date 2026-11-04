@@ -21,13 +21,17 @@ use geo_core::World;
 
 /// Quiz du catalogue, dans l'ordre de l'accueil : un atlas intégré à l'exécutable chacun, sauf
 /// les numéros des départements, dérivés des départements (sans carte, rien de plus à stocker).
+/// Les océans reprennent les terres de l'atlas du monde.
 pub static ATLASES: LazyLock<Vec<World>> = LazyLock::new(|| {
     let load = |bytes: &[u8]| World::from_bytes(bytes).expect("atlas invalide");
+    let world = load(include_bytes!("../../../assets/world.bin"));
+    let oceans = oceans_quiz(load(include_bytes!("../../../assets/oceans.bin")), &world);
     let mut departements = load(include_bytes!("../../../assets/fr-departements.bin"));
     add_number_zones(&mut departements);
     let numbers = numbers_quiz(&departements);
     vec![
-        load(include_bytes!("../../../assets/world.bin")),
+        world,
+        oceans,
         departements,
         numbers,
         load(include_bytes!("../../../assets/fr-regions.bin")),
@@ -45,6 +49,31 @@ fn numbers_quiz(departements: &World) -> World {
     world.info.title = geo_core::Text::new("Numéros des départements", "Department numbers");
     world.info.numbers = true;
     world
+}
+
+/// Quiz des océans : ses océans, sous les terres du monde (pays et territoires de l'atlas du
+/// monde, sans noms à taper), plus l'Antarctique qu'il embarque.
+fn oceans_quiz(mut oceans: World, world: &World) -> World {
+    let land = world
+        .countries
+        .iter()
+        .map(|c| geo_core::Territory {
+            name: c.name.clone(),
+            answers: Vec::new(),
+            owner: None,
+            label: c.label,
+            shape: c.shape.clone(),
+        })
+        .chain(world.territories.iter().map(|t| geo_core::Territory {
+            answers: Vec::new(),
+            owner: None,
+            ..t.clone()
+        }));
+    oceans.territories.extend(land);
+    for t in &mut oceans.territories {
+        t.answers.clear();
+    }
+    oceans
 }
 
 /// Zones « Par numéro » des départements : une par dizaine (01–09, 10–19…, 971–976), pour
@@ -308,6 +337,56 @@ mod tests {
         assert_eq!(ids(departements), ids(numbers));
     }
 
+    /// Océan qui contient un point (lon, lat) : règle pair-impair sur tous ses anneaux.
+    fn ocean_at(oceans: &geo_core::World, [x, y]: [f32; 2]) -> Option<&str> {
+        let inside = |ring: &[[f32; 2]]| {
+            let mut c = false;
+            for (i, &[xi, yi]) in ring.iter().enumerate() {
+                let [xj, yj] = ring[(i + ring.len() - 1) % ring.len()];
+                if (yi > y) != (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi {
+                    c = !c;
+                }
+            }
+            c
+        };
+        oceans
+            .countries
+            .iter()
+            .find(|o| o.shape.rings.iter().filter(|r| inside(r)).count() % 2 == 1)
+            .map(|o| o.code.as_str())
+    }
+
+    #[test]
+    fn seas_belong_to_their_ocean() {
+        let oceans = ATLASES.iter().find(|a| a.info.water).unwrap();
+        for (sea, point, ocean) in [
+            ("Méditerranée", [18.0, 35.0], Some("ATL")),
+            ("mer Noire", [34.0, 43.0], Some("ATL")),
+            ("Baltique", [19.0, 57.0], Some("ATL")),
+            ("Caraïbes", [-75.0, 15.0], Some("ATL")),
+            ("mer de Norvège", [2.0, 66.0], Some("ATL")),
+            ("passage de Drake, à l'est du cap Horn", [-62.0, -58.0], Some("ATL")),
+            ("mer Rouge", [38.0, 20.0], Some("IND")),
+            ("golfe Persique", [51.0, 27.0], Some("IND")),
+            ("mer de Timor", [126.0, -11.0], Some("IND")),
+            ("mer d'Andaman", [96.0, 10.0], Some("IND")),
+            ("mer de Béring", [-178.0, 58.0], Some("PAC")),
+            ("mer de Java", [110.0, -5.0], Some("PAC")),
+            ("mer de Corail", [155.0, -15.0], Some("PAC")),
+            ("mer d'Arafura", [135.0, -9.5], Some("PAC")),
+            ("golfe de Thaïlande", [101.5, 10.0], Some("PAC")),
+            ("passage de Drake, à l'ouest du cap Horn", [-70.0, -58.0], Some("PAC")),
+            ("baie d'Hudson", [-85.0, 60.0], Some("ARC")),
+            ("mer de Barents", [40.0, 73.0], Some("ARC")),
+            ("mer du Groenland", [-5.0, 75.0], Some("ARC")),
+            ("mer des Tchouktches", [-170.0, 70.0], Some("ARC")),
+            ("mer de Weddell", [-40.0, -70.0], Some("SOU")),
+            ("Caspienne", [51.0, 42.0], None),
+        ] {
+            assert_eq!(ocean_at(oceans, point), ocean, "{sea}");
+        }
+    }
+
     #[test]
     fn atlases_are_complete() {
         let counts: Vec<(String, usize)> = ATLASES
@@ -318,6 +397,7 @@ mod tests {
             counts,
             [
                 ("monde".to_owned(), 197),
+                ("oceans".to_owned(), 5),
                 ("fr-departements".to_owned(), 101),
                 ("fr-numeros".to_owned(), 101),
                 ("fr-regions".to_owned(), 18),

@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # Régénère les atlas (assets/*.bin) à partir de Natural Earth et des fichiers de data/ :
-# pays du monde (admin-0, 1:50m) et subdivisions de data/atlases/ (admin-1, 1:10m).
+# pays du monde (admin-0, 1:50m), océans (data/oceans.toml) et subdivisions de data/atlases/
+# (admin-1, 1:10m).
 set -eu
 cd "$(dirname "$0")/.."
 
@@ -12,6 +13,7 @@ mkdir -p .cache
 [ -f "$ADMIN1" ] || curl -fL -o "$ADMIN1" "$NE/ne_10m_admin_1_states_provinces.geojson"
 
 cargo run --release -p mapgen -- world "$ADMIN0" assets/world.bin
+cargo run --release -p mapgen -- water data/oceans.toml "$ADMIN0" assets/oceans.bin
 for atlas in data/atlases/*.toml; do
     name=$(basename "$atlas" .toml)
     cargo run --release -p mapgen -- atlas "$atlas" "$ADMIN0" "$ADMIN1" "assets/$name.bin"

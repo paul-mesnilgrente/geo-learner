@@ -1,6 +1,6 @@
 //! Carte interactive : projection des contours, caméra (zoom / déplacement), rendu et clics.
 
-use geo_core::projection::{project, project_ring, project_view};
+use geo_core::projection::{project, project_ring, project_unwrapped, project_view};
 use geo_core::{Lang, Mark, Quiz, Shape, World};
 use iced::alignment::Vertical;
 use iced::mouse::{self, ScrollDelta};
@@ -58,12 +58,12 @@ impl Projection {
         let countries: Vec<ProjShape> = world
             .countries
             .iter()
-            .map(|c| ProjShape::new(&c.shape, c.label, center))
+            .map(|c| ProjShape::new(&c.shape, c.label, center, world.info.water))
             .collect();
         let territories: Vec<ProjShape> = world
             .territories
             .iter()
-            .map(|t| ProjShape::new(&t.shape, t.label, center))
+            .map(|t| ProjShape::new(&t.shape, t.label, center, world.info.water))
             .collect();
         let bubbles = world
             .countries
@@ -102,9 +102,21 @@ impl Projection {
 }
 
 impl ProjShape {
-    fn new(shape: &Shape, [lon, lat]: [f32; 2], center: f32) -> Self {
+    /// `fixed` : chaque point reste où il est tracé, sans être rapproché du point d'étiquette ni
+    /// replié à ±180° (les deux moitiés du Pacifique, l'Antarctique d'un bord à l'autre).
+    fn new(shape: &Shape, [lon, lat]: [f32; 2], center: f32, fixed: bool) -> Self {
         let mut buf = Vec::new();
         let mut project_one = |ring: &[[f32; 2]], shift: f32| {
+            if fixed {
+                let points: Vec<Point> = ring
+                    .iter()
+                    .map(|&[x, y]| {
+                        let [px, py] = project_unwrapped(x, y, center);
+                        Point::new(px, py)
+                    })
+                    .collect();
+                return (points, [-180.0, 180.0]);
+            }
             let range = project_ring(ring, center, lon, shift, &mut buf);
             let points: Vec<Point> = buf.iter().map(|&[x, y]| Point::new(x, y)).collect();
             (points, range)
@@ -678,6 +690,17 @@ impl Tint {
     }
 }
 
+/// Teinte d'un lieu d'eau (océan) : la couleur de l'état, fondue dans la mer.
+fn water_color(k: Tint) -> Color {
+    let water = color!(0x8fbfff);
+    match k {
+        Tint::Outside => style::OCEAN,
+        Tint::Pending => style::mix(style::OCEAN, water, 0.22),
+        Tint::Highlight => style::mix(style::OCEAN, style::ACCENT, 0.6),
+        k => style::mix(style::OCEAN, k.color(), 0.6),
+    }
+}
+
 pub fn mark_color(mark: Option<Mark>) -> Color {
     tint(mark).color()
 }
@@ -694,9 +717,25 @@ fn tint(mark: Option<Mark>) -> Tint {
 }
 
 impl MapView<'_> {
+    /// Lieux d'eau, dessinés sous les terres (océans).
+    fn water(&self) -> bool {
+        self.world.info.water
+    }
+
+    /// Couleur de remplissage d'une teinte, selon que les lieux sont des terres ou de l'eau.
+    fn fill_color(&self, k: Tint) -> Color {
+        if self.water() {
+            water_color(k)
+        } else {
+            k.color()
+        }
+    }
+
     /// Teinte d'un pays : son état dans la partie, ou sa présence dans la zone (aperçu).
     fn tint_of(&self, country: usize) -> Tint {
         match self.quiz.mark(country) {
+            // Océan à nommer : en évidence dans le fond de carte, les terres le recouvrent.
+            Some(Mark::Pending) if self.water() && self.target == Some(country) => Tint::Highlight,
             Some(Mark::Pending) if self.emphasis.contains(&country) => Tint::Emphasis,
             // Mêmes couleurs que la carte « À revoir » ; gris si jamais joué.
             Some(Mark::Pending) if let Some(levels) = self.mastery => {
@@ -744,6 +783,12 @@ impl MapView<'_> {
         }
         let p = t.to_world(screen);
         let inside = |shape: &ProjShape| shape.bbox.contains(p) && contains(&shape.hi, p);
+        // Océans : ils passent sous les terres, qui l'emportent donc au clic.
+        if self.water()
+            && let Some(land) = self.projection.territories.iter().position(inside)
+        {
+            return Some(Place::Territory(land));
+        }
         self.projection
             .countries
             .iter()
@@ -761,6 +806,9 @@ impl MapView<'_> {
 
     /// Couleur d'un territoire : celle de son pays une fois celui-ci joué, un peu assombrie.
     fn territory_color(&self, territory: usize) -> Color {
+        if self.water() {
+            return style::LAND;
+        }
         let owner = self.world.territories[territory].owner;
         match owner.and_then(|o| self.quiz.mark(o)) {
             Some(mark @ (Mark::Found { .. } | Mark::Missed)) => {
@@ -898,32 +946,37 @@ impl MapView<'_> {
             }
         }
 
-        // Territoires, regroupés par couleur.
-        let mut groups: Vec<(Color, Builder)> = Vec::new();
-        for (i, shape) in self.projection.territories.iter().enumerate() {
-            if !shape.bbox.intersects(&visible) {
-                continue;
-            }
-            let color = self.territory_color(i);
-            let index = match groups.iter().position(|(c, _)| *c == color) {
-                Some(index) => index,
-                None => {
-                    groups.push((color, Builder::new()));
-                    groups.len() - 1
+        // Territoires, regroupés par couleur (après les océans, qu'ils recouvrent).
+        let draw_land = |frame: &mut Frame, coast: &mut Builder| {
+            let mut groups: Vec<(Color, Builder)> = Vec::new();
+            for (i, shape) in self.projection.territories.iter().enumerate() {
+                if !shape.bbox.intersects(&visible) {
+                    continue;
                 }
-            };
-            let rings = if detailed { &shape.hi } else { &shape.lo };
-            Self::add_rings(&mut groups[index].1, rings, t);
-            Self::add_rings(&mut coast, rings, t);
-        }
-        for (color, builder) in groups {
-            frame.fill(
-                &builder.build(),
-                Fill {
-                    style: color.into(),
-                    rule: Rule::EvenOdd,
-                },
-            );
+                let color = self.territory_color(i);
+                let index = match groups.iter().position(|(c, _)| *c == color) {
+                    Some(index) => index,
+                    None => {
+                        groups.push((color, Builder::new()));
+                        groups.len() - 1
+                    }
+                };
+                let rings = if detailed { &shape.hi } else { &shape.lo };
+                Self::add_rings(&mut groups[index].1, rings, t);
+                Self::add_rings(coast, rings, t);
+            }
+            for (color, builder) in groups {
+                frame.fill(
+                    &builder.build(),
+                    Fill {
+                        style: color.into(),
+                        rule: Rule::EvenOdd,
+                    },
+                );
+            }
+        };
+        if !self.water() {
+            draw_land(frame, &mut coast);
         }
 
         let mut buckets: Vec<(Tint, Builder)> =
@@ -942,10 +995,21 @@ impl MapView<'_> {
             frame.fill(
                 &builder.build(),
                 Fill {
-                    style: k.color().into(),
+                    style: self.fill_color(k).into(),
                     rule: Rule::EvenOdd,
                 },
             );
+        }
+        if self.water() {
+            // Limites entre océans, discrètes, puis les terres et leurs côtes par-dessus.
+            frame.stroke(
+                &coast.build(),
+                Stroke::default()
+                    .with_color(style::with_alpha(style::MUTED, 0.35))
+                    .with_width(1.0),
+            );
+            coast = Builder::new();
+            draw_land(frame, &mut coast);
         }
         frame.stroke(
             &coast.build(),
@@ -1141,7 +1205,8 @@ impl MapView<'_> {
 
     fn draw_overlay(&self, frame: &mut Frame, t: &Transform, cursor: Option<Point>) {
         self.draw_situation(frame, t);
-        if let Some(target) = self.target {
+        // Océans : la cible est mise en évidence dans le fond de carte (sous les terres).
+        if let Some(target) = self.target.filter(|_| !self.water()) {
             let pulse = 0.5 + 0.5 * (self.pulse * std::f32::consts::TAU).sin();
             let bubbled = !self.projection.bubbles[target].is_empty();
             if bubbled {
@@ -1188,16 +1253,19 @@ impl MapView<'_> {
                 );
                 self.draw_bubble(frame, flash.country, t, color);
             }
-            let mut b = Builder::new();
-            Self::add_rings(&mut b, self.rings(flash.country, t), t);
-            let path = b.build();
-            frame.fill(
-                &path,
-                Fill {
-                    style: style::with_alpha(flash.color, 0.9 * flash.strength).into(),
-                    rule: Rule::EvenOdd,
-                },
-            );
+            // Océans : pas de remplissage, il passerait sur les terres ; la teinte du fond suffit.
+            if !self.water() {
+                let mut b = Builder::new();
+                Self::add_rings(&mut b, self.rings(flash.country, t), t);
+                let path = b.build();
+                frame.fill(
+                    &path,
+                    Fill {
+                        style: style::with_alpha(flash.color, 0.9 * flash.strength).into(),
+                        rule: Rule::EvenOdd,
+                    },
+                );
+            }
             let center = t.to_screen(self.projection.label(flash.country));
             if !bubbled && self.is_tiny(flash.country, t) {
                 frame.stroke(
@@ -1234,12 +1302,15 @@ impl MapView<'_> {
                     },
                 );
             }
-            frame.stroke(
-                &path,
-                Stroke::default()
-                    .with_color(style::with_alpha(Color::WHITE, 0.85))
-                    .with_width(1.6),
-            );
+            // Le contour d'un océan passe sous les terres : pas de liseré.
+            if !(self.water() && matches!(place, Place::Country(_))) {
+                frame.stroke(
+                    &path,
+                    Stroke::default()
+                        .with_color(style::with_alpha(Color::WHITE, 0.85))
+                        .with_width(1.6),
+                );
+            }
             if let Place::Country(hover) = place
                 && self.projection.bubbles[hover].is_empty()
                 && self.is_tiny(hover, t)

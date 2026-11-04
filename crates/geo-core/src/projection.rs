@@ -11,6 +11,12 @@ pub fn project(lon: f32, lat: f32, center: f32) -> [f32; 2] {
     project_raw(wrap(lon, center), lat)
 }
 
+/// Projette sans ramener la longitude dans [-180, 180[ autour du méridien central : un point
+/// à 180° reste au bord est (polygones des océans, qui s'arrêtent aux deux bords de la carte).
+pub fn project_unwrapped(lon: f32, lat: f32, center: f32) -> [f32; 2] {
+    project_raw(lon - center, lat)
+}
+
 fn project_raw(lon: f32, lat: f32) -> [f32; 2] {
     let l = lon.to_radians();
     let p = lat.to_radians();

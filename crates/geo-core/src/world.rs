@@ -148,6 +148,9 @@ pub struct Info {
     /// Quiz sans carte, sur les numéros des lieux (départements) : « Numéro → nom » et
     /// « Nom → numéro ».
     pub numbers: bool,
+    /// Lieux d'eau (océans) : de grands polygones dessinés sous les terres, qui les recouvrent
+    /// le long des côtes.
+    pub water: bool,
 }
 
 /// Encart, en (lon, lat) : `[lon_min, lat_min, lon_max, lat_max]`.

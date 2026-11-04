@@ -1471,6 +1471,7 @@ impl App {
                 .iter()
                 .enumerate()
                 .filter(|(_, r)| matches!(r.kind, RegionKind::World | RegionKind::Continent))
+                .filter(|(_, r)| !r.hidden)
                 // Le continent ouvert reste marqué quand une de ses zones est choisie.
                 .map(|(i, r)| {
                     let on = self.region == i || open_continent == Some(i);
