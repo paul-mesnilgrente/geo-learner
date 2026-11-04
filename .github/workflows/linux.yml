@@ -5,7 +5,8 @@ name: Paquets Linux
 #   glibc du système de compilation (2.35 ici), il tourne donc sur les distributions de 2022
 #   et après ;
 # - le paquet .flatpak (fichier unique), qui va chercher son runtime sur Flathub ;
-# - le snap (snap/snapcraft.yaml), avant sa publication sur le Snap Store.
+# - le snap (snap/snapcraft.yaml), publié aussi sur le Snap Store si le secret
+#   SNAPCRAFT_STORE_CREDENTIALS existe.
 on:
   push:
     tags: ["v*"]
@@ -96,6 +97,9 @@ jobs:
 
   snap:
     runs-on: ubuntu-24.04
+    env:
+      # Jeton du Snap Store (snapcraft export-login) ; sans lui, la publication est sautée.
+      SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
     steps:
       - uses: actions/checkout@v5
 
@@ -119,3 +123,10 @@ jobs:
         run: |
           gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --verify-tag --title "GeoLearner ${TAG#v}" --notes ""
           gh release upload "$TAG" "$SNAP_FILE" --clobber
+
+      - name: Publication sur le Snap Store (canal stable)
+        if: env.SNAPCRAFT_STORE_CREDENTIALS != '' && (github.ref_type == 'tag' || inputs.tag != '')
+        uses: snapcore/action-publish@v1
+        with:
+          snap: ${{ steps.build.outputs.snap }}
+          release: stable
