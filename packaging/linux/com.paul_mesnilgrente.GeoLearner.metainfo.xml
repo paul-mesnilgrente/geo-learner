@@ -157,6 +157,14 @@
   </screenshots>
 
   <releases>
+    <release version="0.2.1" date="2026-11-04">
+      <description>
+        <ul>
+          <li>New app icon, without a background plate</li>
+          <li>Linux release: Flatpak and a .tar.gz archive</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.2.0" date="2026-11-03">
       <description>
         <ul>
