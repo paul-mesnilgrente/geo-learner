@@ -1,4 +1,4 @@
-# Publier GeoLearner sur Flathub
+# GeoLearner en Flatpak (et Flathub)
 
 Ce qui est prêt dans le dépôt :
 
@@ -40,32 +40,33 @@ flatpak run --command=flatpak-builder-lint org.flatpak.Builder appstream packagi
 
 Dans la sandbox, les données vont dans `~/.var/app/com.paul_mesnilgrente.GeoLearner/data/geo-learner/`.
 
-## 3. Soumission
+## 3. Soumission : à faire soi-même
 
-1. Pousser un tag de version (`vX.Y.Z`) contenant le manifeste et `cargo-sources.json` à jour.
-2. Forker [flathub/flathub](https://github.com/flathub/flathub) et créer une branche **à partir
-   de la branche `new-pr`**.
-3. À la racine de cette branche, ajouter `com.paul_mesnilgrente.GeoLearner.yml` (copie du
-   manifeste où la source `dir` est remplacée par le tag) et `cargo-sources.json` :
+La [politique de Flathub sur l'IA générative](https://docs.flathub.org/docs/for-app-authors/requirements#generative-ai-policy)
+s'applique à GeoLearner :
 
-   ```yaml
-       sources:
-         - type: git
-           url: https://github.com/paul-mesnilgrente/geo-learner.git
-           tag: vX.Y.Z
-           commit: <hash complet du commit du tag>
-         - cargo-sources.json
-   ```
+- le manifeste soumis à Flathub ne doit contenir **aucun contenu écrit ou assisté par une IA**,
+  même déclaré : celui de `packaging/flatpak/` ne peut pas être envoyé tel quel, il faut écrire
+  le sien ;
+- la PR de soumission (description, commits, réponses aux relecteurs) doit être faite
+  **sans IA**, et il est interdit de demander une relecture par un agent IA ;
+- le code, la documentation et le packaging générés par IA doivent être **déclarés** (parties
+  concernées, ampleur) ; les relecteurs peuvent refuser selon cette ampleur ;
+- les applis à l'historique très court sont généralement refusées, et les traductions
+  automatiques ne sont pas acceptées.
 
-4. Ouvrir la PR vers la branche `new-pr` de `flathub/flathub`, titre
-   « Add com.paul_mesnilgrente.GeoLearner ». Le modèle de PR contient une liste à cocher.
-5. Répondre aux relecteurs. Commenter `bot, build` relance une compilation d'essai.
-   Permission à justifier : `--share=network`, uniquement pour télécharger le modèle vocal Vosk
-   à la demande de l'utilisateur ; la reconnaissance elle-même est locale.
+La marche à suivre (fork de `flathub/flathub`, branche `new-pr`, liste à cocher) est décrite dans
+le [guide de soumission](https://docs.flathub.org/docs/for-app-authors/submission).
 
-Une fois la PR fusionnée, Flathub crée le dépôt `flathub/com.paul_mesnilgrente.GeoLearner` et
-t'en donne l'accès : les mises à jour se font ensuite par PR sur ce dépôt (nouveau tag, nouveau
-commit, `cargo-sources.json` régénéré).
+En attendant, chaque release GitHub contient un paquet `.flatpak` construit avec le manifeste du
+dépôt (workflow *Paquets Linux*) :
+
+```sh
+flatpak install --user geo-learner-<version>-x86_64.flatpak
+```
+
+Le runtime freedesktop est téléchargé depuis Flathub au besoin. Ce paquet ne se met pas à jour
+tout seul : il faut installer le fichier de la nouvelle version.
 
 ## 4. Vérification du domaine
 

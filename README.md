@@ -232,7 +232,7 @@ L'identifiant de l'application est `com.paul_mesnilgrente.GeoLearner` (domaine
 l'icône (`packaging/linux/`), et la fenêtre le déclare (`APP_ID` dans `crates/app/src/main.rs`)
 pour que le bureau lui associe son icône.
 
-Chaque tag `v*` déclenche le workflow *Archive Linux* : compilation sur Ubuntu 22.04 (le binaire
+Chaque tag `v*` déclenche le workflow *Paquets Linux* : compilation sur Ubuntu 22.04 (le binaire
 tourne donc avec une glibc ≥ 2.35), puis `scripts/package-linux.sh`, qui joint
 `geo-learner-<version>-x86_64-linux.tar.gz` à la release GitHub. Installation dans le dossier
 utilisateur :
@@ -244,8 +244,9 @@ tar -xzf geo-learner-<version>-x86_64-linux.tar.gz -C ~/.local --strip-component
 Le binaire arrive dans `~/.local/bin` (qui doit être dans le `PATH`), le lanceur et l'icône dans
 `~/.local/share`. Seule dépendance système : `libasound.so.2` (ALSA), présente partout.
 
-Le paquet Flatpak (`packaging/flatpak/`) se construit et se soumet à Flathub comme décrit dans
-[`docs/flathub.md`](docs/flathub.md). Après chaque changement de `Cargo.lock`, relancer
+Le workflow joint aussi à la release un paquet Flatpak autonome
+(`flatpak install --user geo-learner-<version>-x86_64.flatpak`), construit avec le manifeste de
+`packaging/flatpak/`. Construction locale et conditions de Flathub : [`docs/flathub.md`](docs/flathub.md). Après chaque changement de `Cargo.lock`, relancer
 `python3 scripts/flatpak-cargo-sources.py` pour régénérer les sources Cargo hors ligne.
 
 ## Intégration continue

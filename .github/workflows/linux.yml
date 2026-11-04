@@ -1,15 +1,17 @@
-name: Archive Linux
+name: Paquets Linux
 
-# Construit l'archive Linux (.tar.gz) et la joint à la release GitHub du tag.
-# Compilé sur la plus ancienne Ubuntu disponible : le binaire exige la glibc du système de
-# compilation (2.35 ici), il tourne donc sur les distributions de 2022 et après.
+# Construit les paquets Linux et les joint à la release GitHub du tag :
+# - l'archive .tar.gz, compilée sur la plus ancienne Ubuntu disponible : le binaire exige la
+#   glibc du système de compilation (2.35 ici), il tourne donc sur les distributions de 2022
+#   et après ;
+# - le paquet .flatpak (fichier unique), qui va chercher son runtime sur Flathub.
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag existant auquel joindre l'archive, par exemple v0.2.0 (vide : simple artefact). Le code compilé est celui de la branche choisie, pas celui du tag."
+        description: "Tag existant auquel joindre les paquets, par exemple v0.2.0 (vide : simple artefact). Le code compilé est celui de la branche choisie, pas celui du tag."
         required: false
 
 env:
@@ -52,3 +54,41 @@ jobs:
         run: |
           gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --verify-tag --title "GeoLearner ${TAG#v}" --notes ""
           gh release upload "$TAG" target/linux/*.tar.gz --clobber
+
+  flatpak:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Flatpak et dépôt Flathub
+        run: |
+          sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Compilation
+        run: |
+          flatpak-builder --user --force-clean --disable-rofiles-fuse --install-deps-from=flathub \
+            --default-branch=stable --repo=target/flatpak-repo \
+            target/flatpak packaging/flatpak/com.paul_mesnilgrente.GeoLearner.yml
+
+      - name: Paquet .flatpak
+        run: |
+          VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
+          flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo \
+            target/flatpak-repo "target/geo-learner-$VERSION-x86_64.flatpak" com.paul_mesnilgrente.GeoLearner stable
+
+      - name: Artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: geo-learner-flatpak
+          path: target/*.flatpak
+          if-no-files-found: error
+
+      - name: Release GitHub
+        if: github.ref_type == 'tag' || inputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --verify-tag --title "GeoLearner ${TAG#v}" --notes ""
+          gh release upload "$TAG" target/*.flatpak --clobber
