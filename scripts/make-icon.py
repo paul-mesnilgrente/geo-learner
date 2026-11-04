@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
-"""Génère l'icône de l'application (globe en projection orthographique) à partir des contours
-Natural Earth, puis ses déclinaisons PNG (Microsoft Store, fenêtre).
+"""Génère l'icône de l'application (piste « Orbite » : un G corail autour d'un globe en
+projection orthographique, tiré des contours Natural Earth), puis ses déclinaisons PNG
+(Microsoft Store, Linux, fenêtre).
+
+L'icône n'a pas de plaque de fond : sous Windows 11 et GNOME, c'est l'objet lui-même qui fait
+l'icône, sur fond transparent.
 
 Usage : python3 scripts/make-icon.py   (nécessite Inkscape et ImageMagick)
 """
@@ -17,14 +21,17 @@ STORE = ROOT / "packaging" / "windows" / "Assets"
 
 # Point de vue : Europe et Afrique de face.
 LON0, LAT0 = 12.0, 28.0
-SIZE, CENTER, RADIUS = 512, 256, 188
+SIZE, CENTER, RADIUS = 512, 256, 132
 FOUND = {"FRA", "ESP", "DZA", "EGY", "NGA", "COD", "SAU", "IRN"}  # pays « trouvés », en vert
 
-BACKGROUND = ("#1f2a3b", "#0d1117")
 OCEAN = ("#5b98ff", "#2c5fd1")
-LAND = "#e3eaf2"
+LAND = "#eef3f8"
 GREEN = "#2fbf71"
-BORDER = "#9fb0c4"
+CORAL = ("#ff8a5c", "#e8481c")
+
+# Le G : arc autour du globe, de sa pointe haute jusqu'à la barre, qui rentre vers le centre.
+G_RADIUS, G_START, G_SPAN = 188, -42.0, 306.0
+G_WIDTH, G_HALO, G_BAR_END = 44, 60, 340
 
 
 def project(lon, lat):
@@ -48,13 +55,25 @@ def rings(geometry):
 
 
 def path_for(feature):
+    """Contours visibles d'un pays ; les îlots de moins de 1,5 px sont omis."""
     parts = []
     for ring in rings(feature["geometry"]):
         points = [project(lon, lat) for lon, lat in ring[::2]]
         if not any(v for _, _, v in points):
             continue
+        xs, ys = [x for x, _, _ in points], [y for _, y, _ in points]
+        if max(max(xs) - min(xs), max(ys) - min(ys)) < 1.5:
+            continue
         parts.append("M" + "L".join(f"{x:.1f},{y:.1f}" for x, y, _ in points) + "Z")
     return "".join(parts)
+
+
+def g_path():
+    """Tracé du G : grand arc dans le sens antihoraire, puis barre horizontale vers le globe."""
+    a0, a1 = math.radians(G_START), math.radians(G_START - G_SPAN)
+    x0, y0 = CENTER + G_RADIUS * math.cos(a0), CENTER + G_RADIUS * math.sin(a0)
+    x1, y1 = CENTER + G_RADIUS * math.cos(a1), CENTER + G_RADIUS * math.sin(a1)
+    return f"M{x0:.1f},{y0:.1f} A{G_RADIUS},{G_RADIUS} 0 1 0 {x1:.1f},{y1:.1f} H{G_BAR_END}", y1
 
 
 def svg():
@@ -67,27 +86,30 @@ def svg():
         d = path_for(f)
         if d:
             (found if code in FOUND else land).append(d)
+    g, bar_y = g_path()
+    stroke = 'fill="none" stroke-linecap="round" stroke-linejoin="round"'
     return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {SIZE} {SIZE}">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="{BACKGROUND[0]}"/><stop offset="1" stop-color="{BACKGROUND[1]}"/>
-    </linearGradient>
-    <radialGradient id="ocean" cx="0.36" cy="0.3" r="0.85">
+    <radialGradient id="ocean" cx="0.35" cy="0.3" r="0.9">
       <stop offset="0" stop-color="{OCEAN[0]}"/><stop offset="1" stop-color="{OCEAN[1]}"/>
     </radialGradient>
-    <radialGradient id="shade" cx="0.36" cy="0.3" r="0.9">
-      <stop offset="0.55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.35"/>
+    <radialGradient id="shade" cx="0.35" cy="0.3" r="0.95">
+      <stop offset="0.55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#0a1430" stop-opacity="0.4"/>
     </radialGradient>
+    <linearGradient id="coral" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="{CORAL[0]}"/><stop offset="1" stop-color="{CORAL[1]}"/>
+    </linearGradient>
     <clipPath id="globe"><circle cx="{CENTER}" cy="{CENTER}" r="{RADIUS}"/></clipPath>
   </defs>
-  <rect x="16" y="16" width="{SIZE - 32}" height="{SIZE - 32}" rx="112" fill="url(#bg)"/>
   <circle cx="{CENTER}" cy="{CENTER}" r="{RADIUS}" fill="url(#ocean)"/>
-  <g clip-path="url(#globe)" stroke="{BORDER}" stroke-width="0.8" stroke-linejoin="round">
-    <path fill="{LAND}" fill-rule="evenodd" d="{''.join(land)}"/>
-    <path fill="{GREEN}" fill-rule="evenodd" d="{''.join(found)}"/>
+  <g clip-path="url(#globe)">
+    <path fill="{LAND}" d="{''.join(land)}"/>
+    <path fill="{GREEN}" d="{''.join(found)}"/>
   </g>
   <circle cx="{CENTER}" cy="{CENTER}" r="{RADIUS}" fill="url(#shade)"/>
-  <circle cx="{CENTER}" cy="{CENTER}" r="{RADIUS}" fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="5"/>
+  <path d="{g}" {stroke} stroke="#ffffff" stroke-width="{G_HALO}"/>
+  <path d="{g}" {stroke} stroke="url(#coral)" stroke-width="{G_WIDTH}"/>
+  <circle cx="{G_BAR_END}" cy="{bar_y:.1f}" r="18" fill="#ffffff"/>
 </svg>
 """
 
@@ -125,6 +147,8 @@ def main():
     png(master, 150, STORE / "Wide310x150Logo.png", width=310)
     png(master, 50, STORE / "StoreLogo.png")
     png(master, 512, ROOT / "assets" / "icon-512.png")
+    # Logo de la fiche du Store (Partner Center), à renvoyer à la main après un changement.
+    png(master, 300, ROOT / "docs" / "store" / "logo-300.png")
     # Icône de la fenêtre : RGBA brut 64×64, chargé tel quel par l'application.
     subprocess.run(
         ["magick", str(master), "-resize", "64x64", "-depth", "8", f"rgba:{ROOT / 'assets' / 'icon-64.rgba'}"],
