@@ -1,0 +1,179 @@
+# Fleuves du monde (`mapgen rivers`) : 55 grands fleuves (cours d'eau qui se jettent dans la mer
+# ou dans une mer fermée), tracés d'après Natural Earth 1:10m (`ne_10m_rivers_lake_centerlines`).
+#
+# Natural Earth découpe un fleuve selon ses noms locaux : `river` réunit ses tronçons (Yangtsé =
+# Tongtian + Jinsha + Chang Jiang + Yangtze). Les tronçons « Lake Centerline » du même nom (lacs
+# de barrage : Nasser, Kariba, réservoirs de la Volga) sont repris aussi. `within` écarte les
+# homonymes (Colorado d'Argentine, Mackenzie d'Australie) : seuls les tronçons entièrement dans ce
+# cadre comptent. Le Saint-Laurent, presque absent des données, est tracé à la main (`rings`).
+#
+# Les affluents (Missouri, Madeira, Irtych…) ne sont pas des fleuves et n'y figurent pas.
+#
+# `say` : formes orales approchées, faites de mots que le modèle vocal français connaît, pour les
+# noms absents de son vocabulaire (« brahma poutre », « tôt cantine »).
+
+items = [
+  # Europe
+  { code = "volga", name = "Volga", en = "Volga", sub = "europe", river = ["Volga"] },
+  { code = "danube", name = "Danube", en = "Danube", sub = "europe", aka = ["Donau", "Duna", "Dunarea"], river = ["Danube", "Donau"] },
+  { code = "dniepr", name = "Dniepr", en = "Dnieper", sub = "europe", aka = ["Dnipro", "Dnepr"], say = ["dnieper"], river = ["Dnipro", "Dnepre"] },
+  { code = "don", name = "Don", en = "Don", sub = "europe", river = ["Don"], within = [30.0, 40.0, 50.0, 60.0] },
+  { code = "oural", name = "Oural", en = "Ural", sub = "europe", aka = ["Ural"], say = ["ou râle"], river = ["Ural"] },
+  { code = "rhin", name = "Rhin", en = "Rhine", sub = "europe", aka = ["Rhein", "Rijn"], river = ["Rhine", "Rhin", "Rhein"] },
+  { code = "elbe", name = "Elbe", en = "Elbe", sub = "europe", aka = ["Labe"], say = ["èl be", "el bé"], river = ["Elbe"] },
+  { code = "vistule", name = "Vistule", en = "Vistula", sub = "europe", aka = ["Wisła"], say = ["vis tulle"], river = ["Vistula"] },
+  { code = "oder", name = "Oder", en = "Oder", sub = "europe", aka = ["Odra"], river = ["Oder"] },
+  { code = "loire", name = "Loire", en = "Loire", sub = "europe", river = ["Loire"] },
+  { code = "rhone", name = "Rhône", en = "Rhône", sub = "europe", river = ["Rhône"] },
+  { code = "seine", name = "Seine", en = "Seine", sub = "europe", river = ["Seine"] },
+  { code = "po", name = "Pô", en = "Po", sub = "europe", river = ["Po"], within = [6.0, 43.0, 14.0, 47.0] },
+  { code = "ebre", name = "Èbre", en = "Ebro", sub = "europe", say = ["è bre", "hé bre"], river = ["Ebro"] },
+
+  # Asie
+  { code = "yangtse", name = "Yangtsé", en = "Yangtze", sub = "asie", aka = ["Yangzi", "Yangzi Jiang", "Yang-Tsé-Kiang", "Chang Jiang", "fleuve Bleu", "Yangtse"], river = ["Tongtian", "Jinsha", "Chang Jiang", "Yangtze"] },
+  { code = "huang-he", name = "Huang He", en = "Yellow River", sub = "asie", aka = ["fleuve Jaune", "Huang Ho", "Hoang Ho", "Huanghe"], say_en = ["huang he"], river = ["Huang"] },
+  { code = "mekong", name = "Mékong", en = "Mekong", sub = "asie", aka = ["Lancang"], river = ["Lancang", "Mekong"] },
+  { code = "amour", name = "Amour", en = "Amur", sub = "asie", aka = ["Amur", "Heilong Jiang"], river = ["Heilong Jiang", "Amur"] },
+  { code = "lena", name = "Léna", en = "Lena", sub = "asie", river = ["Lena"] },
+  { code = "ienissei", name = "Ienisseï", en = "Yenisei", sub = "asie", aka = ["Iénisseï", "Yenisseï", "Enisseï", "Yenisey"], say = ["yé ni seille", "yé ni sé"], river = ["Verkhniy Yenisey", "Yenisey"] },
+  { code = "ob", name = "Ob", en = "Ob", sub = "asie", river = ["Ob"] },
+  { code = "gange", name = "Gange", en = "Ganges", sub = "asie", aka = ["Ganga"], river = ["Ganges"] },
+  { code = "brahmapoutre", name = "Brahmapoutre", en = "Brahmaputra", sub = "asie", aka = ["Yarlung Tsangpo"], say = ["brahma poutre"], river = ["Yarlung", "Dihang", "Brahmaputra"] },
+  { code = "indus", name = "Indus", en = "Indus", sub = "asie", river = ["Indus"] },
+  { code = "irrawaddy", name = "Irrawaddy", en = "Irrawaddy", sub = "asie", aka = ["Ayeyarwady", "Irraouaddi"], say = ["ira wadi"], river = ["Ayeyarwady"] },
+  { code = "salouen", name = "Salouen", en = "Salween", sub = "asie", aka = ["Thanlwin", "Nu Jiang"], river = ["Nu", "Salween"] },
+  { code = "tigre", name = "Tigre", en = "Tigris", sub = "asie", aka = ["Dicle"], river = ["Dicle", "Tigris"] },
+  { code = "euphrate", name = "Euphrate", en = "Euphrates", sub = "asie", aka = ["Firat"], say = ["œuf rate"], river = ["Firat", "Al Furat", "Euphrates"] },
+  { code = "amou-daria", name = "Amou-Daria", en = "Amu Darya", sub = "asie", aka = ["Amou Darya", "Oxus"], say = ["a mou daria"], river = ["Amu  Darya"] },
+  { code = "syr-daria", name = "Syr-Daria", en = "Syr Darya", sub = "asie", aka = ["Syr Darya", "Iaxarte"], say = ["sir daria", "cyr daria"], river = ["Syr  Darya"] },
+
+  # Afrique
+  { code = "nil", name = "Nil", en = "Nile", sub = "afrique", river = ["Victoria Nile", "Albert Nile", "Bahr el Jebel", "El Bahr el Abyad", "Nile"] },
+  { code = "congo", name = "Congo", en = "Congo", sub = "afrique", aka = ["Zaïre", "fleuve Congo"], river = ["Lualaba", "Congo"] },
+  { code = "niger", name = "Niger", en = "Niger", sub = "afrique", river = ["Niger"] },
+  { code = "zambeze", name = "Zambèze", en = "Zambezi", sub = "afrique", aka = ["Zambeze"], say = ["sans bèze"], river = ["Zambezi"] },
+  { code = "orange", name = "Orange", en = "Orange", sub = "afrique", river = ["Orange"], within = [14.0, -32.0, 30.0, -27.0] },
+  { code = "limpopo", name = "Limpopo", en = "Limpopo", sub = "afrique", say = ["lin popo", "lim popo"], river = ["Limpopo"] },
+  { code = "senegal", name = "Sénégal", en = "Senegal", sub = "afrique", river = ["Bafing", "Sénégal"] },
+  { code = "volta", name = "Volta", en = "Volta", sub = "afrique", river = ["Mouhoun", "Volta"] },
+
+  # Amérique du Nord
+  { code = "mississippi", name = "Mississippi", en = "Mississippi", sub = "amerique-nord", river = ["Mississippi"] },
+  { code = "mackenzie", name = "Mackenzie", en = "Mackenzie", sub = "amerique-nord", river = ["Mackenzie"], within = [-140.0, 55.0, -100.0, 72.0] },
+  { code = "yukon", name = "Yukon", en = "Yukon", sub = "amerique-nord", river = ["Yukon"] },
+  { code = "saint-laurent", name = "Saint-Laurent", en = "St. Lawrence", sub = "amerique-nord", aka = ["fleuve Saint-Laurent", "Saint Lawrence"], river = ["St. Lawrence"], rings = [
+    # Du lac Ontario au tronçon de Natural Earth (Brockville), puis jusqu'à l'estuaire (Tadoussac).
+    [[-76.35, 44.15], [-75.95, 44.35], [-75.79, 44.5]],
+    [[-74.71, 45.01], [-74.3, 45.2], [-73.9, 45.38], [-73.55, 45.52], [-73.4, 45.75], [-73.15, 46.0],
+     [-72.85, 46.2], [-72.54, 46.34], [-72.1, 46.52], [-71.6, 46.67], [-71.2, 46.81], [-70.85, 46.95],
+     [-70.6, 47.1], [-70.4, 47.3], [-70.1, 47.6], [-69.75, 47.95]],
+  ] },
+  { code = "rio-grande", name = "Rio Grande", en = "Rio Grande", sub = "amerique-nord", aka = ["Río Bravo", "Rio Bravo"], river = ["Rio Grande"], within = [-110.0, 24.0, -95.0, 40.0] },
+  { code = "colorado", name = "Colorado", en = "Colorado", sub = "amerique-nord", river = ["Colorado"], within = [-120.0, 25.0, -100.0, 45.0] },
+  { code = "columbia", name = "Columbia", en = "Columbia", sub = "amerique-nord", river = ["Columbia"], within = [-124.0, 45.5, -115.0, 53.0] },
+  { code = "fraser", name = "Fraser", en = "Fraser", sub = "amerique-nord", river = ["Fraser"], within = [-130.0, 45.0, -115.0, 56.0] },
+
+  # Amérique du Sud
+  { code = "amazone", name = "Amazone", en = "Amazon", sub = "amerique-sud", aka = ["Amazonas", "Solimões"], river = ["Ucayali", "Amazonas"] },
+  { code = "parana", name = "Paraná", en = "Paraná", sub = "amerique-sud", say = ["para na"], river = ["Paraná"] },
+  { code = "orenoque", name = "Orénoque", en = "Orinoco", sub = "amerique-sud", aka = ["Orinoco"], say = ["o ré noc", "au ré noc"], river = ["Orinoco"] },
+  { code = "sao-francisco", name = "São Francisco", en = "São Francisco", sub = "amerique-sud", say = ["san francisco"], river = ["São  Francisco"] },
+  { code = "magdalena", name = "Magdalena", en = "Magdalena", sub = "amerique-sud", river = ["Magdalena"], within = [-80.0, 0.0, -70.0, 12.0] },
+  { code = "tocantins", name = "Tocantins", en = "Tocantins", sub = "amerique-sud", say = ["tôt cantine", "taux cantine"], river = ["Tocantins"] },
+
+  # Océanie
+  { code = "murray", name = "Murray", en = "Murray", sub = "oceanie", river = ["Murray"], within = [135.0, -40.0, 150.0, -30.0] },
+  { code = "fly", name = "Fly", en = "Fly", sub = "oceanie", river = ["Fly"], within = [139.0, -10.0, 145.0, -3.0] },
+  { code = "sepik", name = "Sepik", en = "Sepik", sub = "oceanie", say = ["sé pic", "cé pic"], river = ["Sepik"] },
+]
+
+[atlas]
+id = "fleuves"
+title = "Fleuves du monde"
+category = "Monde"
+one = "fleuve"
+many = "fleuves"
+title_en = "Rivers of the world"
+category_en = "World"
+one_en = "river"
+many_en = "rivers"
+# Terres reprises de l'atlas du monde à l'exécution ; grands lacs embarqués.
+
+[world]
+name = "Monde entier"
+en = "Whole world"
+view = [-169, -50, 191, 76]
+center = 11
+
+[[continent]]
+id = "europe"
+name = "Europe"
+en = "Europe"
+
+[[continent]]
+id = "asie"
+name = "Asie"
+en = "Asia"
+
+[[continent]]
+id = "afrique"
+name = "Afrique"
+en = "Africa"
+
+[[continent]]
+id = "amerique-nord"
+name = "Amérique du Nord"
+en = "North America"
+
+[[continent]]
+id = "amerique-sud"
+name = "Amérique du Sud"
+en = "South America"
+
+[[continent]]
+id = "oceanie"
+name = "Océanie"
+en = "Oceania"
+
+# Un seul niveau de zones : une sous-région technique par continent, masquée.
+[[sub]]
+id = "europe"
+name = "Europe"
+en = "Europe"
+continent = "europe"
+hidden = true
+
+[[sub]]
+id = "asie"
+name = "Asie"
+en = "Asia"
+continent = "asie"
+hidden = true
+
+[[sub]]
+id = "afrique"
+name = "Afrique"
+en = "Africa"
+continent = "afrique"
+hidden = true
+
+[[sub]]
+id = "amerique-nord"
+name = "Amérique du Nord"
+en = "North America"
+continent = "amerique-nord"
+hidden = true
+
+[[sub]]
+id = "amerique-sud"
+name = "Amérique du Sud"
+en = "South America"
+continent = "amerique-sud"
+hidden = true
+
+[[sub]]
+id = "oceanie"
+name = "Océanie"
+en = "Oceania"
+continent = "oceanie"
+hidden = true

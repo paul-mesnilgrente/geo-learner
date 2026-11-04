@@ -108,6 +108,8 @@ impl App {
             column![
                 if atlas.info.numbers {
                     numbers_thumbnail()
+                } else if atlas.info.flags {
+                    flags_thumbnail()
                 } else {
                     self.thumbnails[index].view(130.0, self.lang)
                 },
@@ -224,6 +226,32 @@ impl App {
     }
 }
 
+/// Miniature du quiz des drapeaux : quelques drapeaux.
+fn flags_thumbnail<'a>() -> Element<'a, Message> {
+    let flags = ["FRA", "BRA", "JPN", "CAN"]
+        .iter()
+        .filter_map(|code| crate::flags::find(code))
+        .map(|flag| crate::flags::view(flag, 52.0, 36.0));
+    thumbnail_frame(Row::with_children(flags).spacing(10).align_y(Center).into())
+}
+
+/// Fond et cadre des miniatures sans carte.
+fn thumbnail_frame(content: Element<'_, Message>) -> Element<'_, Message> {
+    container(content)
+        .center_x(Fill)
+        .center_y(130)
+        .style(|_: &iced::Theme| container::Style {
+            background: Some(style::OCEAN.into()),
+            border: iced::Border {
+                color: style::BORDER,
+                width: 1.0,
+                radius: 14.0.into(),
+            },
+            ..Default::default()
+        })
+        .into()
+}
+
 /// Miniature d'un quiz sans carte : quelques numéros en grand.
 fn numbers_thumbnail<'a>() -> Element<'a, Message> {
     let number = |n: &'a str, alpha: f32| {
@@ -232,7 +260,7 @@ fn numbers_thumbnail<'a>() -> Element<'a, Message> {
             .font(style::FONT_BOLD)
             .color(style::with_alpha(style::lighten(style::ACCENT, 0.2), alpha))
     };
-    container(
+    thumbnail_frame(
         row![
             number("01", 0.55),
             number("2A", 0.8),
@@ -240,18 +268,7 @@ fn numbers_thumbnail<'a>() -> Element<'a, Message> {
             number("971", 0.65),
         ]
         .spacing(16)
-        .align_y(Center),
+        .align_y(Center)
+        .into(),
     )
-    .center_x(Fill)
-    .center_y(130)
-    .style(|_: &iced::Theme| container::Style {
-        background: Some(style::OCEAN.into()),
-        border: iced::Border {
-            color: style::BORDER,
-            width: 1.0,
-            radius: 14.0.into(),
-        },
-        ..Default::default()
-    })
-    .into()
 }

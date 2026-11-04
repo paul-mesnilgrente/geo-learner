@@ -5,11 +5,17 @@
 //! mapgen world <admin0.geojson> <sortie>                          # pays du monde
 //! mapgen atlas <atlas.toml> <admin0.geojson> <admin1.geojson> <sortie>  # subdivisions
 //! mapgen water <atlas.toml> <admin0.geojson> <marine.geojson> <sortie>  # océans, mers
+//! mapgen rivers <atlas.toml> <rivers.geojson> <lakes.geojson> <sortie>  # fleuves
+//! mapgen flags <admin0.geojson> <dossier svg> <world.bin> <sortie>     # drapeaux
+//! mapgen flag-sheet <flags.bin> <admin0.geojson> <dossier svg> <png>   # planche de contrôle
 //! ```
 //! (voir `scripts/build-map.sh`).
 
+mod flags;
+
 use std::collections::HashMap;
 use std::error::Error;
+use std::path::Path;
 
 use geo_core::world::{
     Country, Info, Inset, Lang, Region, RegionKind, Ring, Shape, Territory, Text, World,
@@ -71,6 +77,13 @@ struct CountryDef {
     /// Atlas d'eau : entités marines de Natural Earth (par leur nom anglais) qui forment le lieu.
     #[serde(default)]
     marine: Vec<String>,
+    /// Fleuves : tronçons de Natural Earth (par leur nom) qui forment le cours ; avec `rings`, des
+    /// tracés ajoutés à la main là où les données manquent.
+    #[serde(default)]
+    river: Vec<String>,
+    /// Fleuves : ne garder que les tronçons compris dans ce cadre [lon_min, lat_min, lon_max,
+    /// lat_max] (homonymes : Colorado des États-Unis et d'Argentine).
+    within: Option<[f32; 4]>,
 }
 
 #[derive(Deserialize)]
@@ -187,10 +200,57 @@ struct Source {
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
     let usage = "usage : mapgen world <admin0> <sortie> | mapgen atlas <toml> <admin0> <admin1> <sortie> \
-         | mapgen water <toml> <admin0> <marine> <sortie>";
+         | mapgen water <toml> <admin0> <marine> <sortie> | mapgen rivers <toml> <rivers> <lakes> <sortie> \
+         | mapgen flags <admin0> <svg> <world.bin> <sortie> | mapgen flag-sheet <flags.bin> <admin0> <svg> <png>";
     let read_json = |path: &str| -> Result<Value> {
         Ok(serde_json::from_str(&std::fs::read_to_string(path)?)?)
     };
+    let arg = |i: usize| -> Result<&str> { Ok(args.get(i).ok_or(usage)?.as_str()) };
+    match args.get(1).map(String::as_str) {
+        Some("flags") => {
+            let admin0 = read_json(arg(2)?)?;
+            let world = World::from_bytes(&std::fs::read(arg(4)?)?)?;
+            let list = flags::build(&admin0, Path::new(arg(3)?), &world)?;
+            let bytes = geo_core::Flag::list_to_bytes(&list)?;
+            std::fs::write(arg(5)?, &bytes)?;
+            let mut sizes: Vec<(usize, &str)> = list
+                .iter()
+                .map(|f| {
+                    (
+                        postcard::to_allocvec(f).map_or(0, |b| b.len()),
+                        f.code.as_str(),
+                    )
+                })
+                .collect();
+            sizes.sort_unstable_by(|a, b| b.cmp(a));
+            println!(
+                "Drapeaux : {} → {} ({} Ko) ; les plus lourds : {:?}",
+                list.len(),
+                arg(5)?,
+                bytes.len() / 1024,
+                &sizes[..8.min(sizes.len())]
+            );
+            return Ok(());
+        }
+        Some("flag-sheet") => {
+            let list = geo_core::Flag::list_from_bytes(&std::fs::read(arg(2)?)?)?;
+            let admin0 = read_json(arg(3)?)?;
+            let iso = |code: &str| -> Option<String> {
+                if code == "KOS" {
+                    return Some("xk".into());
+                }
+                admin0["features"].as_array()?.iter().find_map(|f| {
+                    let p = &f["properties"];
+                    (p["ADM0_A3"].as_str() == Some(code))
+                        .then(|| p["ISO_A2_EH"].as_str().map(str::to_lowercase))
+                        .flatten()
+                })
+            };
+            flags::sheet(&list, Path::new(arg(4)?), &iso, Path::new(arg(5)?))?;
+            return Ok(());
+        }
+        _ => {}
+    }
     let (world, output) = match args.get(1).map(String::as_str) {
         Some("world") => {
             let countries: CountriesFile =
@@ -210,6 +270,16 @@ fn main() -> Result<()> {
             let admin1 = read_json(args.get(4).ok_or(usage)?)?;
             (
                 build_atlas(&atlas, &admin0, &admin1)?,
+                args.get(5).ok_or(usage)?,
+            )
+        }
+        Some("rivers") => {
+            let atlas: AtlasFile =
+                toml::from_str(&std::fs::read_to_string(args.get(2).ok_or(usage)?)?)?;
+            let rivers = read_json(args.get(3).ok_or(usage)?)?;
+            let lakes = read_json(args.get(4).ok_or(usage)?)?;
+            (
+                build_rivers(&atlas, &rivers, &lakes)?,
                 args.get(5).ok_or(usage)?,
             )
         }
@@ -238,6 +308,15 @@ fn main() -> Result<()> {
             .map(Vec::len)
             .sum()
     };
+    if !world.lakes.is_empty() {
+        let lake_points: usize = world
+            .lakes
+            .iter()
+            .flat_map(|s| s.rings.iter().chain(&s.rings_lo))
+            .map(Vec::len)
+            .sum();
+        println!("{} lacs, {lake_points} points", world.lakes.len());
+    }
     println!(
         "{} : {} {}, {} terres voisines, {} zones, {} points (détaillé) / {} (simplifié) → {} ({} Ko)",
         world.info.title.get(Lang::Fr),
@@ -332,6 +411,8 @@ fn build_world(defs: &CountriesFile, zones: &RegionsFile, features: &Value) -> R
         insets: Vec::new(),
         numbers: false,
         water: false,
+        lines: false,
+        flags: false,
     };
     assemble(info, &defs.countries, zones, source, WORLD_TOLERANCE)
 }
@@ -531,6 +612,8 @@ fn build_atlas(file: &AtlasFile, admin0: &Value, admin1: &Value) -> Result<World
         insets,
         numbers: false,
         water: false,
+        lines: false,
+        flags: false,
     };
     assemble(info, &file.items, &file.zones, source, tolerance)
 }
@@ -596,6 +679,8 @@ fn build_water(file: &AtlasFile, admin0: &Value, marine: &Value) -> Result<World
         insets: Vec::new(),
         numbers: false,
         water: true,
+        lines: false,
+        flags: false,
     };
     let rings: Vec<Vec<Ring>> = source.rings.clone();
     let mut world = assemble(info, &file.items, &file.zones, source, WORLD_TOLERANCE)?;
@@ -611,6 +696,151 @@ fn build_water(file: &AtlasFile, admin0: &Value, marine: &Value) -> Result<World
         country.shape.rings = rings;
     }
     Ok(world)
+}
+
+/// Tracés des fleuves (Natural Earth 1:10m) : plus simplifiés que les côtes, un fleuve se lit
+/// de loin.
+const RIVER_TOLERANCE: Tolerance = Tolerance { hi: 0.02, lo: 0.05 };
+/// Lacs : leurs rives comptent moins que celles des pays.
+const LAKE_TOLERANCE: Tolerance = Tolerance { hi: 0.03, lo: 0.1 };
+
+/// Lacs plus petits que cette emprise (en degrés², corrigée de la latitude) écartés.
+const MIN_LAKE: f32 = 1.0;
+
+/// Atlas de fleuves : chaque lieu est un ensemble de tracés ouverts (tronçons de Natural Earth
+/// réunis sous le nom du fleuve, et tracés à la main). Les terres du monde sont reprises à
+/// l'exécution ; les grands lacs sont embarqués.
+fn build_rivers(file: &AtlasFile, rivers: &Value, lakes: &Value) -> Result<World> {
+    let def = &file.atlas;
+    let n = file.items.len();
+    let mut source = Source {
+        rings: Vec::with_capacity(n),
+        labels: vec![None; n],
+        english: vec![None; n],
+        territories: Vec::new(),
+    };
+    let features = rivers["features"].as_array().ok_or("GeoJSON invalide")?;
+    for (i, item) in file.items.iter().enumerate() {
+        let mut lines = item.rings.clone();
+        let within = |line: &Ring| match item.within {
+            Some([x0, y0, x1, y1]) => line
+                .iter()
+                .all(|&[x, y]| (x0..=x1).contains(&x) && (y0..=y1).contains(&y)),
+            None => true,
+        };
+        for name in &item.river {
+            let before = lines.len();
+            for feature in features
+                .iter()
+                .filter(|f| f["properties"]["name"].as_str() == Some(name.as_str()))
+            {
+                lines.extend(
+                    read_lines(&feature["geometry"])?
+                        .into_iter()
+                        .filter(&within),
+                );
+            }
+            if lines.len() == before {
+                return Err(format!("{} : tronçon « {name} » introuvable", item.name).into());
+            }
+        }
+        if lines.is_empty() {
+            return Err(format!("{} : aucun tracé (`river` ou `rings`)", item.name).into());
+        }
+        source.labels[i] = Some(midpoint(&lines));
+        source.rings.push(lines);
+    }
+    let info = Info {
+        id: def.id.clone(),
+        title: Text::new(&def.title, &def.title_en),
+        category: Text::new(&def.category, &def.category_en),
+        one: Text::new(&def.one, &def.one_en),
+        many: Text::new(&def.many, &def.many_en),
+        feminine: def.feminine,
+        zoom_sub: false,
+        levels: levels(&def.levels, &def.levels_en),
+        insets: Vec::new(),
+        numbers: false,
+        water: false,
+        lines: true,
+        flags: false,
+    };
+    let mut world = assemble(info, &file.items, &file.zones, source, RIVER_TOLERANCE)?;
+    for country in &mut world.countries {
+        country.shape.main = vec![true; country.shape.rings.len()];
+    }
+    for feature in lakes["features"].as_array().ok_or("GeoJSON invalide")? {
+        let rings = read_rings(&feature["geometry"])?;
+        let Some(outer) = rings.iter().max_by(|a, b| area(a).total_cmp(&area(b))) else {
+            continue;
+        };
+        let [x0, y0, x1, y1] = bounds_f32(outer);
+        let extent = (x1 - x0) * (y1 - y0) * ((y0 + y1) / 2.0).to_radians().cos();
+        if extent >= MIN_LAKE {
+            world.lakes.push(make_shape(rings, LAKE_TOLERANCE));
+        }
+    }
+    Ok(world)
+}
+
+/// Tracés d'une géométrie GeoJSON linéaire.
+fn read_lines(geometry: &Value) -> Result<Vec<Ring>> {
+    let coords = &geometry["coordinates"];
+    let lines: Vec<&Value> = match geometry["type"].as_str() {
+        Some("LineString") => vec![coords],
+        Some("MultiLineString") => coords
+            .as_array()
+            .ok_or("MultiLineString invalide")?
+            .iter()
+            .collect(),
+        other => return Err(format!("géométrie non gérée : {other:?}").into()),
+    };
+    Ok(lines
+        .into_iter()
+        .filter_map(Value::as_array)
+        .map(|line| {
+            line.iter()
+                .map(|p| {
+                    [
+                        p[0].as_f64().unwrap_or(0.0) as f32,
+                        p[1].as_f64().unwrap_or(0.0) as f32,
+                    ]
+                })
+                .collect::<Ring>()
+        })
+        .filter(|line| line.len() >= 2)
+        .collect())
+}
+
+/// Milieu (en longueur) du plus long tracé d'un fleuve : point d'ancrage de son nom.
+fn midpoint(lines: &[Ring]) -> [f32; 2] {
+    let length = |line: &Ring| -> f32 {
+        line.windows(2)
+            .map(|w| {
+                let k = w[0][1].to_radians().cos();
+                ((w[1][0] - w[0][0]) * k).hypot(w[1][1] - w[0][1])
+            })
+            .sum()
+    };
+    let longest = lines
+        .iter()
+        .max_by(|a, b| length(a).total_cmp(&length(b)))
+        .expect("fleuve sans tracé");
+    let half = length(longest) / 2.0;
+    let mut walked = 0.0;
+    for w in longest.windows(2) {
+        let k = w[0][1].to_radians().cos();
+        let step = ((w[1][0] - w[0][0]) * k).hypot(w[1][1] - w[0][1]);
+        if walked + step >= half && step > 0.0 {
+            let t = (half - walked) / step;
+            return [
+                w[0][0] + (w[1][0] - w[0][0]) * t,
+                w[0][1] + (w[1][1] - w[0][1]) * t,
+            ];
+        }
+        walked += step;
+    }
+    longest[0]
 }
 
 /// Point d'un lieu le plus éloigné de ses bords (approché sur une grille), pour son étiquette :
@@ -994,6 +1224,7 @@ fn assemble(
         countries,
         territories: source.territories,
         regions,
+        lakes: Vec::new(),
     })
 }
 
@@ -1043,6 +1274,7 @@ fn check_answers(countries: &[Country]) -> Result<()> {
         countries: countries.to_vec(),
         territories: vec![],
         regions: vec![],
+        lakes: vec![],
     };
     let matcher = Matcher::new(&world);
     for (i, c) in countries.iter().enumerate() {

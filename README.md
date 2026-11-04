@@ -30,8 +30,10 @@ compilateur signale les oublis), les noms dans les données, et le modèle Vosk 
 | Catégorie | Quiz | Lieux | Zones |
 |---|---|---|---|
 | Monde | Pays du monde | 197 pays | continents, sous-régions, regroupements |
+| Monde | Drapeaux du monde | 197 drapeaux | comme les pays du monde |
 | Monde | Océans | 5 océans | monde entier |
 | Monde | Mers du monde | 52 mers | océans (Atlantique, Pacifique, Indien, Arctique, Austral) et régions |
+| Monde | Fleuves du monde | 55 fleuves | continents |
 | France | Départements français | 101 départements | métropole, outre-mer, régions |
 | France | Numéros des départements (sans carte) | 101 départements | métropole, outre-mer, régions |
 | France | Régions françaises | 18 régions | métropole, outre-mer |
@@ -92,6 +94,32 @@ dans « Monde entier ». Chaque zone a son méridien central : la mer de Béring
 coupées à l'antiméridien, y sont d'un seul tenant. En voix française, 48 mers sur 52 sont
 reconnues (des prononciations approchées comme « mer de lap tev » pallient les noms inconnus du
 modèle) ; Tyrrhénienne, Okhotsk, Bellingshausen et Amundsen se tapent.
+
+**Drapeaux du monde** : les 197 pays, reconnus à leur drapeau, dans les mêmes zones. Deux modes :
+« Drapeau → pays » (le drapeau s'affiche en grand, sans carte ; on tape ou dit le nom du pays) et
+« Drapeau → carte » (le drapeau remplace le nom dans la question ; on clique sur le pays). En fin
+de partie sans carte, chaque drapeau s'affiche au-dessus de son pays, les ratés en rouge.
+L'exploration des pays du monde montre aussi le drapeau du pays choisi. Ce quiz est dérivé à
+l'exécution de l'atlas du monde ; seuls les drapeaux sont stockés (`assets/flags.bin`, 276 Ko).
+Ils viennent des SVG de [hampusborgos/country-flags](https://github.com/hampusborgos/country-flags)
+(d'après Wikimedia Commons, domaine public), aux proportions officielles (Suisse carrée,
+Qatar 28:11, Népal), et sont convertis par `mapgen flags` en **calques de polygones** : courbes
+aplaties, traits changés en surfaces, `clipPath` appliqués (croix de Saint-Patrick de l'Union
+Jack), dégradés remplacés par leur couleur moyenne, puis coordonnées entières codées par
+différences. L'application les peint sur un canvas, nets à toute taille, sans moteur SVG.
+`mapgen flag-sheet` produit une planche de contrôle (original rendu par resvg à côté de chaque
+drapeau converti).
+
+**Fleuves du monde** : 55 grands fleuves (qui se jettent dans la mer ou une mer fermée ; pas
+d'affluents comme le Missouri), par continent : Europe (14), Asie (16), Afrique (8), Amérique du
+Nord (8), Amérique du Sud (6), Océanie (3). Les tracés viennent de Natural Earth 1:10m : un fleuve
+y est découpé selon ses noms locaux, que `data/rivers.toml` réunit (Yangtsé = Tongtian + Jinsha +
+Chang Jiang + Yangtze) en écartant les homonymes (Colorado d'Argentine) ; le Saint-Laurent, presque
+absent des données, est tracé à la main. Les fleuves sont dessinés **par-dessus** les terres, en
+cyan, avec les 50 plus grands lacs (Natural Earth 1:50m : Grands Lacs, Victoria, Nasser…) ; un
+clic ou le survol désigne le fleuve le plus proche, à 8 pixels près. Le fleuve à nommer est
+épaissi, avec un halo. Toutes les formes orales sont reconnues en français, dont des
+prononciations approchées pour les noms inconnus du modèle (« brahma poutre », « tôt cantine »).
 
 ### Ajouter un quiz
 
@@ -292,8 +320,9 @@ cargo clippy --workspace --all-targets --target x86_64-pc-windows-msvc
 ```
 crates/geo-core   données, normalisation des réponses, logique de quiz, projection (sans interface)
 crates/app        application Iced : carte (canvas), écrans, saisie vocale, sauvegarde
-crates/mapgen     génération des atlas (assets/*.bin) depuis Natural Earth (admin-0 et admin-1)
-                  et des océans et mers (data/oceans.toml, data/seas.toml, `mapgen water`)
+crates/mapgen     génération des atlas (assets/*.bin) depuis Natural Earth (admin-0 et admin-1),
+                  des océans et mers (data/oceans.toml, data/seas.toml, `mapgen water`), des
+                  fleuves (data/rivers.toml, `mapgen rivers`) et des drapeaux (`mapgen flags`)
 data/             pays du monde et zones ; data/atlases/ : départements, régions, États
 assets/           carte générée et police Inter (sous-ensemble latin)
 ```
@@ -341,5 +370,7 @@ Paramètres de `GEO_DEMO`, séparés par `;` :
   des zones mal redessinées au survol des boutons.
 - **Carte** : Natural Earth 1:50m (domaine public), en projection Natural Earth. Elle existe en
   deux niveaux de détail selon le zoom. Les micro-États sont signalés par des pastilles cliquables.
+- **Drapeaux** : polygones précalculés (voir « Drapeaux du monde »), sans dépendance SVG dans
+  l'application ; `resvg` et `i_overlay` ne servent qu'à `mapgen`.
 - **Audio** : `cpal` (ALSA ou PipeWire sous Linux, WASAPI sous Windows).
 - **Polices** : Inter (licence OFL, voir `assets/fonts/LICENSE-Inter.txt`).

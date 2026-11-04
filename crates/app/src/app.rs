@@ -1823,7 +1823,7 @@ impl App {
     }
 
     fn game_view<'a>(&'a self, game: &'a Game) -> Element<'a, Message> {
-        let main = if game.world.info.numbers {
+        let main = if card_mode(game) {
             self.card_area(game)
         } else {
             self.map_area(game)
@@ -2092,7 +2092,11 @@ impl App {
         let body: Element<'a, Message> = match quiz.target().filter(|_| !quiz.is_finished()) {
             Some(target) => {
                 let place = &game.world.countries[target];
+                let flag = crate::flags::find(&place.code).filter(|_| info.flags);
                 let (question, shown, size) = match quiz.mode() {
+                    _ if flag.is_some() => {
+                        (Words::of(info, self.lang).which_is_this(), String::new(), 0)
+                    }
                     Mode::Locate => (
                         tr!(
                             self.lang,
@@ -2108,13 +2112,15 @@ impl App {
                         110,
                     ),
                 };
-                let mut card = column![
-                    text(question).size(16).color(style::MUTED),
-                    text(shown).size(size).font(style::FONT_BOLD),
-                ]
-                .spacing(6)
-                .width(Fill)
-                .align_x(Center);
+                let mut card = column![text(question).size(16).color(style::MUTED)]
+                    .spacing(6)
+                    .width(Fill)
+                    .align_x(Center);
+                card = match flag {
+                    Some(flag) => card
+                        .push(container(crate::flags::view(flag, 420.0, 260.0)).padding([10, 0])),
+                    None => card.push(text(shown).size(size).font(style::FONT_BOLD)),
+                };
                 if quiz.wrong_tries() > 0 {
                     card = card.push(
                         text(tr!(
@@ -2146,10 +2152,23 @@ impl App {
             None => {
                 let chips = quiz.members().iter().map(|&c| {
                     let color = map::mark_color(quiz.mark(c));
-                    container(text(place_label(game.world, c, self.lang)).size(13))
+                    let label = container(text(place_label(game.world, c, self.lang)).size(13))
                         .padding([5, 12])
-                        .style(style::chip(color))
-                        .into()
+                        .style(style::chip(color));
+                    match crate::flags::find(&game.world.countries[c].code).filter(|_| info.flags) {
+                        // Drapeau au-dessus de son pays.
+                        Some(flag) => column![
+                            container(crate::flags::view(flag, 120.0, 72.0))
+                                .center_x(120)
+                                .center_y(72),
+                            label
+                        ]
+                        .spacing(6)
+                        .width(150)
+                        .align_x(Center)
+                        .into(),
+                        None => label.into(),
+                    }
                 });
                 scrollable(
                     container(
@@ -2158,9 +2177,9 @@ impl App {
                                 .size(18)
                                 .font(style::FONT_SEMIBOLD),
                             Row::with_children(chips)
-                                .spacing(6)
+                                .spacing(if info.flags { 12 } else { 6 })
                                 .wrap()
-                                .vertical_spacing(6),
+                                .vertical_spacing(if info.flags { 14 } else { 6 }),
                         ]
                         .spacing(14),
                     )
@@ -2185,7 +2204,19 @@ impl App {
         let quiz = &game.quiz;
         let target = quiz.target()?;
         let tries = quiz.wrong_tries();
+        let flag = crate::flags::find(&game.world.countries[target].code)
+            .filter(|_| game.world.info.flags);
         let mut content = match quiz.mode() {
+            Mode::Locate if let Some(flag) = flag => column![
+                text(tr!(
+                    self.lang,
+                    "Où se trouve le pays de ce drapeau ?",
+                    "Where is this flag's country?"
+                ))
+                .size(13)
+                .color(style::MUTED),
+                container(crate::flags::view(flag, 168.0, 104.0)).padding([6, 0]),
+            ],
             Mode::Locate => column![
                 text(tr!(self.lang, "Où se trouve…", "Where is…"))
                     .size(13)
@@ -2238,7 +2269,9 @@ impl App {
         let numbers = game.world.info.numbers;
         let placeholder = match game.quiz.mode() {
             Mode::Locate if numbers => tr!(self.lang, "Numéro {}…", "Number {}…", words.of_the()),
-            Mode::Identify if numbers => tr!(self.lang, "Nom {}…", "Name {}…", words.of_the()),
+            Mode::Identify if numbers || game.world.info.flags => {
+                tr!(self.lang, "Nom {}…", "Name {}…", words.of_the())
+            }
             Mode::Identify => match self.lang {
                 Lang::Fr => format!("Nom {} en surbrillance…", words.of_the()),
                 Lang::En => format!("Name the highlighted {}…", words.one()),
@@ -2609,7 +2642,7 @@ impl App {
             content = content.push(
                 text({
                     let words = Words::of(&game.world.info, self.lang);
-                    let numbers = game.world.info.numbers;
+                    let numbers = card_mode(game);
                     match (self.lang, numbers) {
                         (Lang::Fr, _) => format!(
                             "Les {} {} sont en rouge {}.",
@@ -2675,7 +2708,7 @@ impl App {
         content = content.push(
             row![
                 button(
-                    text(if game.world.info.numbers {
+                    text(if card_mode(game) {
                         tr!(self.lang, "Voir les réponses", "See the answers")
                     } else {
                         tr!(self.lang, "Voir la carte", "See the map")
@@ -2963,6 +2996,12 @@ fn second_chance<'a>(lang: Lang) -> Element<'a, Message> {
         .into()
 }
 
+/// Partie sans carte, sur une fiche : numéros des départements, et drapeau → pays.
+fn card_mode(game: &Game) -> bool {
+    let info = &game.world.info;
+    info.numbers || (info.flags && game.quiz.mode() == Mode::Identify)
+}
+
 /// La saisie vocale a-t-elle un sens ? Pas pour taper des numéros.
 fn voice_allowed(game: &Game) -> bool {
     !(game.world.info.numbers && game.quiz.mode() == Mode::Locate)
@@ -3011,7 +3050,7 @@ fn section_title<'a>(label: &str) -> Element<'a, Message> {
 
 /// Modes proposés par un quiz : sans carte, seulement les deux sens numéro ↔ nom.
 pub fn modes(info: &Info) -> &'static [Mode] {
-    if info.numbers {
+    if info.numbers || info.flags {
         &[Mode::Identify, Mode::Locate]
     } else {
         &Mode::ALL
@@ -3021,6 +3060,12 @@ pub fn modes(info: &Info) -> &'static [Mode] {
 /// « Tous les pays », « Nommer la région », « Numéro → nom » ; « All countries »…
 pub fn mode_title(mode: Mode, info: &Info, lang: Lang) -> String {
     let w = Words::of(info, lang);
+    if info.flags {
+        return match mode {
+            Mode::Locate => tr!(lang, "Drapeau → carte", "Flag → map"),
+            _ => tr!(lang, "Drapeau → pays", "Flag → country"),
+        };
+    }
     match (info.numbers, mode) {
         (true, Mode::Locate) => tr!(lang, "Nom → numéro", "Name → number"),
         (true, _) => tr!(lang, "Numéro → nom", "Number → name"),
@@ -3032,6 +3077,20 @@ pub fn mode_title(mode: Mode, info: &Info, lang: Lang) -> String {
 
 fn mode_description(mode: Mode, info: &Info, lang: Lang) -> String {
     let w = Words::of(info, lang);
+    if info.flags {
+        return match mode {
+            Mode::Locate => tr!(
+                lang,
+                "Un drapeau s'affiche : cliquer sur son pays sur la carte.",
+                "A flag appears: click its country on the map."
+            ),
+            _ => tr!(
+                lang,
+                "Un drapeau s'affiche : donner le nom du pays. Au clavier ou à la voix.",
+                "A flag appears: name the country. By keyboard or voice."
+            ),
+        };
+    }
     match (info.numbers, mode) {
         (true, Mode::Locate) => tr!(
             lang,

@@ -1,12 +1,14 @@
 //! Cœur de GeoLearner : données, reconnaissance des réponses et logique de quiz,
 //! sans dépendance à l'interface graphique.
 
+pub mod flag;
 pub mod matcher;
 pub mod normalize;
 pub mod projection;
 pub mod quiz;
 pub mod world;
 
+pub use flag::{Flag, Layer};
 pub use matcher::Matcher;
 pub use normalize::normalize;
 pub use quiz::{Answer, Mark, Mode, Outcome, Quiz};
@@ -39,6 +41,7 @@ mod testing {
                 .collect(),
             territories: vec![],
             regions: vec![],
+            lakes: vec![],
         }
     }
 }

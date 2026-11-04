@@ -397,25 +397,35 @@ impl Explorer {
         }
         if let Some(c) = self.selected {
             let group = &self.world.regions[self.group_of(c)];
+            let names = column![
+                text(self.label(c)).size(20).font(style::FONT_BOLD),
+                text(group.name.get(self.lang)).size(13).color(style::MUTED),
+            ]
+            .spacing(4);
+            // Pays du monde : son drapeau à côté de son nom.
+            let flag = (self.world.info.id == "monde" || self.world.info.flags)
+                .then(|| crate::flags::find(&self.world.countries[c].code))
+                .flatten();
+            let card: Element<'_, Message> = match flag {
+                Some(flag) => row![crate::flags::view(flag, 72.0, 48.0), names]
+                    .spacing(14)
+                    .align_y(Center)
+                    .into(),
+                None => names.into(),
+            };
             body = body.push(
-                container(
-                    column![
-                        text(self.label(c)).size(20).font(style::FONT_BOLD),
-                        text(group.name.get(self.lang)).size(13).color(style::MUTED),
-                    ]
-                    .spacing(4),
-                )
-                .padding([12, 14])
-                .width(Fill)
-                .style(|_: &Theme| container::Style {
-                    background: Some(style::ACCENT_SOFT.into()),
-                    border: iced::Border {
-                        color: style::ACCENT,
-                        width: 1.0,
-                        radius: 12.0.into(),
-                    },
-                    ..Default::default()
-                }),
+                container(card)
+                    .padding([12, 14])
+                    .width(Fill)
+                    .style(|_: &Theme| container::Style {
+                        background: Some(style::ACCENT_SOFT.into()),
+                        border: iced::Border {
+                            color: style::ACCENT,
+                            width: 1.0,
+                            radius: 12.0.into(),
+                        },
+                        ..Default::default()
+                    }),
             );
         }
 

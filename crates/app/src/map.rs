@@ -26,6 +26,8 @@ const BUBBLE_PX: f32 = 5.0;
 const BUBBLE_MIN_PX: f32 = 2.0;
 /// Écart maximal (coordonnées projetées, environ 7°) entre deux groupes d'îles d'une même bulle.
 const BUBBLE_GAP: f32 = 0.12;
+/// Distance (en pixels) jusqu'à laquelle un clic ou le survol désigne un fleuve.
+const LINE_HIT_PX: f32 = 8.0;
 pub const MIN_ZOOM: f32 = 0.6;
 pub const MAX_ZOOM: f32 = 600.0;
 
@@ -35,6 +37,8 @@ pub struct Projection {
     center: f32,
     countries: Vec<ProjShape>,
     territories: Vec<ProjShape>,
+    /// Grands lacs, peints sur les terres (atlas des fleuves).
+    lakes: Vec<ProjShape>,
     /// Bulles des archipels : une ellipse par groupe d'îles (vide pour les autres pays).
     bubbles: Vec<Vec<Bubble>>,
 }
@@ -55,10 +59,24 @@ struct ProjShape {
 
 impl Projection {
     pub fn new(world: &World, center: f32) -> Self {
-        let countries: Vec<ProjShape> = world
+        let mut countries: Vec<ProjShape> = world
             .countries
             .iter()
             .map(|c| ProjShape::new(&c.shape, c.label, center, world.info.water))
+            .collect();
+        // Un fleuve se mesure et se cadre sur tout son cours, pas sur un tronçon.
+        if world.info.lines {
+            for shape in &mut countries {
+                shape.core = shape.bbox;
+            }
+        }
+        let lakes = world
+            .lakes
+            .iter()
+            .map(|shape| {
+                let anchor = shape.rings.first().and_then(|r| r.first()).copied();
+                ProjShape::new(shape, anchor.unwrap_or_default(), center, false)
+            })
             .collect();
         let territories: Vec<ProjShape> = world
             .territories
@@ -88,6 +106,7 @@ impl Projection {
             center,
             countries,
             territories,
+            lakes,
             bubbles,
         }
     }
@@ -753,6 +772,22 @@ fn water_color(k: Tint) -> Color {
     }
 }
 
+/// Couleur du tracé d'un fleuve : cyan à trouver, la couleur de l'état une fois joué.
+fn line_color(k: Tint) -> Color {
+    let river = color!(0x5cc8e8);
+    match k {
+        Tint::Outside => style::mix(style::LAND, river, 0.35),
+        Tint::Pending => river,
+        Tint::Highlight => style::lighten(style::ACCENT, 0.1),
+        k => k.color(),
+    }
+}
+
+/// Épaisseur d'un fleuve, en pixels : plus épais de près.
+fn line_width(t: &Transform) -> f32 {
+    (1.2 + t.scale / 600.0).clamp(1.6, 3.4)
+}
+
 pub fn mark_color(mark: Option<Mark>) -> Color {
     tint(mark).color()
 }
@@ -772,6 +807,11 @@ impl MapView<'_> {
     /// Lieux d'eau, dessinés sous les terres (océans).
     fn water(&self) -> bool {
         self.world.info.water
+    }
+
+    /// Lieux linéaires, tracés sur les terres (fleuves).
+    fn lines(&self) -> bool {
+        self.world.info.lines
     }
 
     /// Couleur de remplissage d'une teinte, selon que les lieux sont des terres ou de l'eau.
@@ -821,7 +861,11 @@ impl MapView<'_> {
         }
     }
 
+    /// Lieu trop petit à l'écran, signalé par une pastille (jamais un fleuve : son tracé suffit).
     fn is_tiny(&self, country: usize, t: &Transform) -> bool {
+        if self.lines() {
+            return false;
+        }
         let core = self.projection.countries[country].core;
         core.width.max(core.height) * t.scale < TINY_PX
     }
@@ -842,6 +886,16 @@ impl MapView<'_> {
         }
         let p = t.to_world(screen);
         let inside = |shape: &ProjShape| shape.bbox.contains(p) && contains(&shape.hi, p);
+        // Fleuves : le plus proche du curseur, à quelques pixels près ; sinon la terre survolée.
+        if self.lines() {
+            return self.line_at(t, screen).map(Place::Country).or_else(|| {
+                self.projection
+                    .territories
+                    .iter()
+                    .position(inside)
+                    .map(Place::Territory)
+            });
+        }
         // Océans : ils passent sous les terres, qui l'emportent donc au clic.
         if self.water()
             && let Some(land) = self.projection.territories.iter().position(inside)
@@ -863,9 +917,36 @@ impl MapView<'_> {
             })
     }
 
+    /// Fleuve (index dans `countries`) le plus proche d'un point de l'écran, s'il en passe un à
+    /// moins de `LINE_HIT_PX`.
+    fn line_at(&self, t: &Transform, screen: Point) -> Option<usize> {
+        let p = t.to_world(screen);
+        let margin = LINE_HIT_PX / t.scale;
+        let mut best: Option<(usize, f32)> = None;
+        for (c, shape) in self.projection.countries.iter().enumerate() {
+            let b = shape.bbox;
+            if p.x < b.x - margin
+                || p.x > b.x + b.width + margin
+                || p.y < b.y - margin
+                || p.y > b.y + b.height + margin
+            {
+                continue;
+            }
+            for line in self.rings(c, t) {
+                for w in line.windows(2) {
+                    let d = segment_distance(screen, t.to_screen(w[0]), t.to_screen(w[1]));
+                    if d <= LINE_HIT_PX && best.is_none_or(|(_, bd)| d < bd) {
+                        best = Some((c, d));
+                    }
+                }
+            }
+        }
+        best.map(|(c, _)| c)
+    }
+
     /// Couleur d'un territoire : celle de son pays une fois celui-ci joué, un peu assombrie.
     fn territory_color(&self, territory: usize) -> Color {
-        if self.water() {
+        if self.water() || self.lines() {
             return style::LAND;
         }
         let owner = self.world.territories[territory].owner;
@@ -1009,6 +1090,70 @@ impl MapView<'_> {
         }
     }
 
+    /// Tracés ouverts (fleuves).
+    fn add_lines(builder: &mut Builder, lines: &[Vec<Point>], t: &Transform) {
+        for line in lines {
+            let mut points = line.iter().map(|&p| t.to_screen(p));
+            if let Some(first) = points.next() {
+                builder.move_to(first);
+                for p in points {
+                    builder.line_to(p);
+                }
+            }
+        }
+    }
+
+    /// Trait d'un fleuve, arrondi aux extrémités et aux coudes.
+    fn line_stroke(color: Color, width: f32) -> Stroke<'static> {
+        Stroke::default()
+            .with_color(color)
+            .with_width(width)
+            .with_line_cap(LineCap::Round)
+            .with_line_join(LineJoin::Round)
+    }
+
+    /// Grands lacs (couleur de la mer, sur les terres), puis tous les fleuves, groupés par teinte.
+    fn draw_lines(&self, frame: &mut Frame, t: &Transform, visible: &Rectangle) {
+        let detailed = t.scale >= DETAIL_SCALE;
+        let mut lakes = Builder::new();
+        for shape in &self.projection.lakes {
+            if shape.bbox.intersects(visible) {
+                Self::add_rings(&mut lakes, if detailed { &shape.hi } else { &shape.lo }, t);
+            }
+        }
+        let lakes = lakes.build();
+        frame.fill(
+            &lakes,
+            Fill {
+                style: style::OCEAN.into(),
+                rule: Rule::EvenOdd,
+            },
+        );
+        frame.stroke(
+            &lakes,
+            Stroke::default().with_color(style::COAST).with_width(0.8),
+        );
+        let mut buckets: Vec<(Tint, Builder)> =
+            Tint::ALL.iter().map(|&k| (k, Builder::new())).collect();
+        for (i, shape) in self.projection.countries.iter().enumerate() {
+            if !shape.bbox.intersects(visible) {
+                continue;
+            }
+            let k = self.tint_of(i);
+            let bucket = &mut buckets.iter_mut().find(|(b, _)| *b == k).expect("teinte").1;
+            Self::add_lines(bucket, self.rings(i, t), t);
+        }
+        let width = line_width(t);
+        for (k, builder) in buckets {
+            let w = if k == Tint::Outside {
+                width * 0.7
+            } else {
+                width
+            };
+            frame.stroke(&builder.build(), Self::line_stroke(line_color(k), w));
+        }
+    }
+
     fn add_rings(builder: &mut Builder, rings: &[Vec<Point>], t: &Transform) {
         for ring in rings {
             let mut points = ring.iter().map(|&p| t.to_screen(p));
@@ -1070,11 +1215,19 @@ impl MapView<'_> {
         if !self.water() {
             draw_land(frame, &mut coast);
         }
+        if self.lines() {
+            // Frontières d'abord : les fleuves passent par-dessus.
+            frame.stroke(
+                &std::mem::replace(&mut coast, Builder::new()).build(),
+                Stroke::default().with_color(style::COAST).with_width(0.8),
+            );
+            self.draw_lines(frame, t, &visible);
+        }
 
         let mut buckets: Vec<(Tint, Builder)> =
             Tint::ALL.iter().map(|&k| (k, Builder::new())).collect();
         for (i, shape) in self.projection.countries.iter().enumerate() {
-            if !shape.bbox.intersects(&visible) {
+            if self.lines() || !shape.bbox.intersects(&visible) {
                 continue;
             }
             let rings = self.rings(i, t);
@@ -1316,7 +1469,21 @@ impl MapView<'_> {
                 let color = style::mix(style::OCEAN, style::ACCENT, 0.35 + 0.25 * pulse);
                 self.draw_bubble(frame, target, t, color);
             }
-            if !self.water() {
+            if self.lines() {
+                // Fleuve à nommer : halo clair qui pulse sous un trait épais.
+                let mut b = Builder::new();
+                Self::add_lines(&mut b, self.rings(target, t), t);
+                let path = b.build();
+                let width = line_width(t);
+                frame.stroke(
+                    &path,
+                    Self::line_stroke(
+                        style::with_alpha(Color::WHITE, 0.25 + 0.35 * pulse),
+                        width * 2.0 + 5.0,
+                    ),
+                );
+                frame.stroke(&path, Self::line_stroke(style::ACCENT, width + 2.0));
+            } else if !self.water() {
                 let mut b = Builder::new();
                 Self::add_rings(&mut b, self.rings(target, t), t);
                 let path = b.build();
@@ -1360,8 +1527,19 @@ impl MapView<'_> {
                 );
                 self.draw_bubble(frame, flash.country, t, color);
             }
+            if self.lines() {
+                let mut b = Builder::new();
+                Self::add_lines(&mut b, self.rings(flash.country, t), t);
+                frame.stroke(
+                    &b.build(),
+                    Self::line_stroke(
+                        style::with_alpha(flash.color, flash.strength),
+                        line_width(t) + 3.0,
+                    ),
+                );
+            }
             // Océans : pas de remplissage, il passerait sur les terres ; la teinte du fond suffit.
-            if !self.water() {
+            else if !self.water() {
                 let mut b = Builder::new();
                 Self::add_rings(&mut b, self.rings(flash.country, t), t);
                 let path = b.build();
@@ -1393,6 +1571,29 @@ impl MapView<'_> {
         }
 
         if let Some(place) = self.hover {
+            if let (true, Place::Country(c)) = (self.lines(), place) {
+                // Fleuve survolé : liseré blanc sous sa couleur.
+                let mut b = Builder::new();
+                Self::add_lines(&mut b, self.rings(c, t), t);
+                let path = b.build();
+                let width = line_width(t);
+                frame.stroke(
+                    &path,
+                    Self::line_stroke(style::with_alpha(Color::WHITE, 0.85), width + 3.0),
+                );
+                frame.stroke(&path, Self::line_stroke(line_color(self.tint_of(c)), width));
+                if let (Some(cursor), Some(name)) = (cursor, self.place_name(place)) {
+                    tag(
+                        frame,
+                        &name,
+                        Point::new(cursor.x, cursor.y - 24.0),
+                        style::SURFACE_3,
+                        1.0,
+                    );
+                }
+                self.draw_globes(frame, t, cursor);
+                return;
+            }
             let mut b = Builder::new();
             Self::add_rings(&mut b, self.place_rings(place, t), t);
             let path = b.build();

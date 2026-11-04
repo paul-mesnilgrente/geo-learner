@@ -6,6 +6,7 @@ mod chart;
 mod dates;
 #[cfg(debug_assertions)]
 mod dev;
+mod flags;
 mod i18n;
 mod icons;
 mod map;
@@ -20,27 +21,36 @@ use std::sync::LazyLock;
 use geo_core::World;
 
 /// Quiz du catalogue, dans l'ordre de l'accueil : un atlas intégré à l'exécutable chacun, sauf
-/// les numéros des départements, dérivés des départements (sans carte, rien de plus à stocker).
-/// Les océans reprennent les terres de l'atlas du monde.
+/// les numéros des départements, dérivés des départements (sans carte, rien de plus à stocker),
+/// et les drapeaux, dérivés du monde (seuls les drapeaux sont stockés, dans `flags.bin`).
+/// Les océans, les mers et les fleuves reprennent les terres de l'atlas du monde.
 pub static ATLASES: LazyLock<Vec<World>> = LazyLock::new(|| {
     let load = |bytes: &[u8]| World::from_bytes(bytes).expect("atlas invalide");
     let world = load(include_bytes!("../../../assets/world.bin"));
     let oceans = load(include_bytes!("../../../assets/oceans.bin"));
     // L'Antarctique, embarqué une seule fois, avec les océans.
     let antarctica = oceans.territories.clone();
-    let oceans = water_quiz(oceans, &world, &[]);
-    let seas = water_quiz(
+    let oceans = with_land(oceans, &world, &[]);
+    let seas = with_land(
         load(include_bytes!("../../../assets/seas.bin")),
         &world,
         &antarctica,
     );
+    let rivers = with_land(
+        load(include_bytes!("../../../assets/rivers.bin")),
+        &world,
+        &[],
+    );
+    let flags = flags_quiz(&world);
     let mut departements = load(include_bytes!("../../../assets/fr-departements.bin"));
     add_number_zones(&mut departements);
     let numbers = numbers_quiz(&departements);
     vec![
         world,
+        flags,
         oceans,
         seas,
+        rivers,
         departements,
         numbers,
         load(include_bytes!("../../../assets/fr-regions.bin")),
@@ -60,9 +70,19 @@ fn numbers_quiz(departements: &World) -> World {
     world
 }
 
-/// Quiz d'eau (océans, mers) : ses lieux, sous les terres du monde (pays et territoires de
-/// l'atlas du monde, sans noms à taper), plus `extra` et les terres qu'il embarque.
-fn water_quiz(mut atlas: World, world: &World, extra: &[geo_core::Territory]) -> World {
+/// Quiz « Drapeaux du monde » : les pays du monde, mêmes zones, reconnus à leur drapeau.
+fn flags_quiz(world: &World) -> World {
+    let mut flags = world.clone();
+    flags.info.id = "drapeaux".into();
+    flags.info.title = geo_core::Text::new("Drapeaux du monde", "Flags of the world");
+    flags.info.flags = true;
+    flags
+}
+
+/// Quiz sur fond de carte du monde (océans, mers, fleuves) : ses lieux, avec les terres du monde
+/// (pays et territoires de l'atlas du monde, sans noms à taper), plus `extra` et les terres qu'il
+/// embarque.
+fn with_land(mut atlas: World, world: &World, extra: &[geo_core::Territory]) -> World {
     let land = world
         .countries
         .iter()
@@ -435,8 +455,10 @@ mod tests {
             counts,
             [
                 ("monde".to_owned(), 197),
+                ("drapeaux".to_owned(), 197),
                 ("oceans".to_owned(), 5),
                 ("mers".to_owned(), 52),
+                ("fleuves".to_owned(), 55),
                 ("fr-departements".to_owned(), 101),
                 ("fr-numeros".to_owned(), 101),
                 ("fr-regions".to_owned(), 18),

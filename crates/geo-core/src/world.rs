@@ -151,6 +151,12 @@ pub struct Info {
     /// Lieux d'eau (océans) : de grands polygones dessinés sous les terres, qui les recouvrent
     /// le long des côtes.
     pub water: bool,
+    /// Lieux linéaires (fleuves) : leurs « anneaux » sont des tracés ouverts, dessinés par-dessus
+    /// les terres.
+    pub lines: bool,
+    /// Quiz des drapeaux (dérivé de l'atlas du monde) : le drapeau d'un pays remplace son nom
+    /// dans les questions.
+    pub flags: bool,
 }
 
 /// Encart, en (lon, lat) : `[lon_min, lat_min, lon_max, lat_max]`.
@@ -191,6 +197,8 @@ pub struct World {
     /// Terres qui ne sont pas des pays du quiz (Groenland, Porto Rico, Sahara occidental…).
     pub territories: Vec<Territory>,
     pub regions: Vec<Region>,
+    /// Grands lacs, peints par-dessus les terres (atlas des fleuves).
+    pub lakes: Vec<Shape>,
 }
 
 impl World {
