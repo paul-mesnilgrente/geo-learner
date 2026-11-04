@@ -220,8 +220,16 @@ peut pas s'authentifier auprès du Store. Pour chaque version :
 
 1. Augmenter `version` dans `Cargo.toml` et mettre à jour `packaging/windows/release-notes/`.
 2. Pousser le tag `vX.Y.Z` : le workflow construit le `.msix` (artefact `geo-learner-msix`).
-3. Partner Center → *Start update* : remplacer le paquet, coller les nouveautés de chaque langue
-   dans *What's new in this version*, changer les captures si besoin, *Submit for certification*.
+3. Partner Center → *Start update*, puis :
+   - *Packages* : envoyer le nouveau `.msix`, enregistrer (l'ancien est retiré) ;
+   - textes des deux fiches par CSV : *Export listings*, modifier `ReleaseNotes` (contenu de
+     `release-notes/`), `Description`, `ShortDescription`, `Feature*` dans les colonnes `fr-fr`
+     et `en-us`, puis *Import listings* (.csv). Plus sûr que les champs du formulaire, et les
+     mots-clés sont conservés ;
+   - captures et logo 300×300 : dans chaque fiche, à la main. Chaque envoi ou suppression est
+     enregistré tout de suite ; envoyer une capture à la fois et attendre qu'elle apparaisse,
+     sinon l'ordre se mélange. Au-delà de 10 captures, le champ d'ajout disparaît ;
+   - réexporter le CSV pour vérifier, puis *Submit for certification*.
 
 ### Par la CI (prête, en veille)
 
