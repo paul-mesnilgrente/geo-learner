@@ -41,11 +41,15 @@ compilateur signale les oublis), les noms dans les données, et le modèle Vosk 
 | Canada | Provinces et territoires du Canada | 13 | Atlantique, Centre, Prairies, Côte Ouest, Nord |
 | Australie | États et territoires d'Australie | 8 | États, territoires |
 
-**Numéros des départements** se joue sans carte, dans les deux sens : « Numéro → nom » (le
-numéro s'affiche en grand, on tape ou dit le nom) et « Nom → numéro » (on tape le numéro, sans
-micro). Les noms ne valident pas « Nom → numéro » et inversement. Ce quiz est dérivé à
-l'exécution de l'atlas des départements : il n'ajoute rien à l'exécutable. En fin de partie,
-toutes les paires numéro · nom s'affichent, les ratées en rouge.
+**Numéros des départements** se joue dans les deux sens : « Numéro → nom » (le numéro s'affiche,
+on tape ou dit le nom) et « Nom → numéro » (on tape le numéro, sans micro). Les noms ne valident
+pas « Nom → numéro » et inversement. La carte de la zone sert de **repère** : elle montre les
+réponses possibles sans désigner celle qui est demandée, et ses clics ne répondent pas. Ses
+étiquettes se choisissent dans le panneau de droite (aucune, noms ou numéros) et sont retenues
+par quiz et par mode ; par défaut, les numéros pour « Numéro → nom », les noms pour « Nom →
+numéro ». Ce quiz est dérivé à l'exécution de l'atlas des départements : il n'ajoute rien à
+l'exécutable. En fin de partie, « Réponses » liste toutes les paires numéro · nom, les ratées en
+rouge.
 
 Pour apprendre les numéros par petits paquets, ce quiz a aussi une zone par dizaine
 (« Par numéro » : 01–09, 10–19, …, 90–95, 971–976). Les **Départements français** (avec carte)
@@ -59,8 +63,10 @@ la capitale australienne) ; l'île Lord Howe est rattachée à la Nouvelle-Galle
 contours du Canada sont un peu plus simplifiés que les autres (`tolerance` dans le fichier de
 l'atlas) : les îles de l'Arctique doubleraient sinon la taille du fichier.
 
-L'**accueil** présente les quiz en cartes (miniature, catégorie, dernière partie), avec les
-dernières parties à droite : un clic sur l'une d'elles rouvre son quiz, réglé sur le même mode et
+L'**accueil** range les quiz par section : le monde en tête, puis un pays par section (France,
+États-Unis, Canada, Australie), chacune avec son drapeau ; les pays qui n'ont qu'un quiz se
+partagent une rangée. Chaque quiz est une carte (miniature, nombre de lieux, dernière partie),
+avec les dernières parties à droite : un clic sur l'une d'elles rouvre son quiz, réglé sur le même mode et
 la même zone. Une carte ouvre la **page du quiz** (mode, zone, lancement, progression), d'où
 « Accueil » ramène à la liste. Les textes s'accordent au quiz (« Nommer la région »,
 « 13 régions trouvées », « Quel est cet État ? »).
@@ -95,10 +101,13 @@ coupées à l'antiméridien, y sont d'un seul tenant. En voix française, 48 mer
 reconnues (des prononciations approchées comme « mer de lap tev » pallient les noms inconnus du
 modèle) ; Tyrrhénienne, Okhotsk, Bellingshausen et Amundsen se tapent.
 
-**Drapeaux du monde** : les 197 pays, reconnus à leur drapeau, dans les mêmes zones. Deux modes :
-« Drapeau → pays » (le drapeau s'affiche en grand, sans carte ; on tape ou dit le nom du pays) et
-« Drapeau → carte » (le drapeau remplace le nom dans la question ; on clique sur le pays). En fin
-de partie sans carte, chaque drapeau s'affiche au-dessus de son pays, les ratés en rouge.
+**Drapeaux du monde** : les 197 pays, reconnus à leur drapeau, dans les mêmes zones. Trois modes :
+« Drapeau → pays » (le drapeau s'affiche ; on tape ou dit le nom du pays, la carte de la zone
+servant de repère, sans noms par défaut), « Drapeau → carte » (le drapeau remplace le nom dans la
+question ; on clique sur le pays) et « Pays → drapeau » (le pays est nommé et mis en évidence sur
+la carte, noms affichés par défaut ; on choisit son drapeau parmi six de la zone, un drapeau
+écarté montre le nom de son pays). En fin de partie, « Réponses » montre chaque drapeau au-dessus
+de son pays, les ratés en rouge.
 L'exploration des pays du monde montre aussi le drapeau du pays choisi. Ce quiz est dérivé à
 l'exécution de l'atlas du monde ; seuls les drapeaux sont stockés (`assets/flags.bin`, 276 Ko).
 Ils viennent des SVG de [hampusborgos/country-flags](https://github.com/hampusborgos/country-flags)

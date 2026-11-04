@@ -129,6 +129,7 @@ pub fn demo() -> Option<Demo> {
                     "free" => Some(Mode::Free),
                     "identify" => Some(Mode::Identify),
                     "locate" => Some(Mode::Locate),
+                    "choose" => Some(Mode::Choose),
                     _ => None,
                 }
             }

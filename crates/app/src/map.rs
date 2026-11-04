@@ -13,6 +13,7 @@ use iced::widget::text::Alignment;
 use iced::{Color, Pixels, Point, Rectangle, Renderer, Size, Theme, Vector, color};
 
 use crate::progress::Level;
+use crate::settings::MapLabels;
 use crate::style;
 
 /// En dessous de cette taille à l'écran (en pixels), un pays est signalé par une pastille.
@@ -672,6 +673,8 @@ pub struct MapView<'a> {
     /// Carte de maîtrise (aperçu, exploration) : niveau de chaque lieu (index dans
     /// `countries`), `None` s'il n'a jamais été joué.
     pub mastery: Option<&'a [Option<Level>]>,
+    /// Étiquettes écrites sur tous les lieux de la zone, joués ou non (carte de repère).
+    pub labels: MapLabels,
     pub cache: &'a Cache,
 }
 
@@ -973,19 +976,23 @@ impl MapView<'_> {
     /// Nom affiché au survol, s'il peut être révélé.
     fn place_name(&self, place: Place) -> Option<String> {
         match place {
-            Place::Country(c) => self.reveals(c).then(|| {
+            Place::Country(c) if self.reveals(c) => {
                 let country = &self.world.countries[c];
-                match self
-                    .world
-                    .info
-                    .numbers
-                    .then(|| crate::number_of(country))
-                    .flatten()
-                {
-                    Some(number) => format!("{number} · {}", country.name.get(self.lang)),
-                    None => country.name.get(self.lang).to_owned(),
-                }
-            }),
+                Some(
+                    match self
+                        .world
+                        .info
+                        .numbers
+                        .then(|| crate::number_of(country))
+                        .flatten()
+                    {
+                        Some(number) => format!("{number} · {}", country.name.get(self.lang)),
+                        None => country.name.get(self.lang).to_owned(),
+                    },
+                )
+            }
+            // Pas encore joué : seulement ce que les étiquettes montrent déjà.
+            Place::Country(c) => self.label_of(c),
             Place::Territory(i) => {
                 let territory = &self.world.territories[i];
                 Some(match territory.owner {
@@ -999,6 +1006,16 @@ impl MapView<'_> {
                     _ => territory.name.get(self.lang).to_owned(),
                 })
             }
+        }
+    }
+
+    /// Étiquette d'un lieu sur la carte de repère, selon le choix de l'utilisateur.
+    fn label_of(&self, c: usize) -> Option<String> {
+        let country = &self.world.countries[c];
+        match self.labels {
+            MapLabels::None => None,
+            MapLabels::Names => Some(country.name.get(self.lang).to_owned()),
+            MapLabels::Numbers => crate::number_of(country),
         }
     }
 
@@ -1312,17 +1329,18 @@ impl MapView<'_> {
         // Noms des pays déjà joués (tous en exploration), quand ils tiennent dans leur contour.
         // Sans carte dans le quiz, ce sont les numéros qui s'affichent.
         for &c in self.quiz.members() {
-            if !self.explore
-                && !matches!(self.quiz.mark(c), Some(Mark::Found { .. } | Mark::Missed))
-            {
-                continue;
-            }
+            let played = matches!(self.quiz.mark(c), Some(Mark::Found { .. } | Mark::Missed));
             let core = self.projection.countries[c].core;
             let country = &self.world.countries[c];
-            let name = &match self.world.info.numbers.then(|| crate::number_of(country)) {
-                Some(Some(number)) => number,
-                _ => country.name.get(self.lang).to_owned(),
+            let name = match self.label_of(c) {
+                Some(label) => label,
+                None if !self.explore && !played => continue,
+                None => match self.world.info.numbers.then(|| crate::number_of(country)) {
+                    Some(Some(number)) => number,
+                    _ => country.name.get(self.lang).to_owned(),
+                },
             };
+            let name = &name;
             let size = if t.scale > 2000.0 { 13.0 } else { 11.0 };
             let width = name.chars().count() as f32 * size * 0.56;
             if core.width * t.scale < width * 0.9 || core.height * t.scale < size + 2.0 {
@@ -1874,6 +1892,7 @@ mod tests {
             explore: false,
             emphasis: &[],
             mastery: None,
+            labels: crate::settings::MapLabels::None,
             lang: Lang::Fr,
             cache: &cache,
         };

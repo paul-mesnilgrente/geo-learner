@@ -9,6 +9,7 @@ use iced::{Center, Element, Fill};
 use super::{App, HOME_SCROLL, Message, clock, mode_title, percent, plural, score_color};
 use crate::dates::DateTime;
 use crate::i18n::{self, Lang};
+use crate::icons::{Icon, icon};
 use crate::style;
 use crate::{ATLASES, tr};
 
@@ -38,14 +39,45 @@ impl App {
         .spacing(28)
         .width(Fill);
 
-        // Une seule grille, dans l'ordre du catalogue ; la catégorie est notée sur chaque carte.
-        let cards = (0..ATLASES.len()).map(|i| self.quiz_card(i));
-        main = main.push(
-            Row::with_children(cards)
-                .spacing(14)
-                .wrap()
-                .vertical_spacing(14),
-        );
+        // Une section par catégorie (le monde, puis chaque pays), dans l'ordre du catalogue.
+        // Les pays qui n'ont qu'un quiz se partagent une rangée.
+        let mut sections: Vec<(usize, Vec<usize>)> = Vec::new();
+        for (i, atlas) in ATLASES.iter().enumerate() {
+            match sections
+                .iter_mut()
+                .find(|(first, _)| ATLASES[*first].info.category == atlas.info.category)
+            {
+                Some((_, list)) => list.push(i),
+                None => sections.push((i, vec![i])),
+            }
+        }
+        let mut singles: Vec<Element<'_, Message>> = Vec::new();
+        for (first, list) in sections {
+            let header = self.section_header(first, list.len());
+            if let [only] = list[..] {
+                singles.push(column![header, self.quiz_card(only)].spacing(12).into());
+                continue;
+            }
+            let cards = list.into_iter().map(|i| self.quiz_card(i));
+            main = main.push(
+                column![
+                    header,
+                    Row::with_children(cards)
+                        .spacing(14)
+                        .wrap()
+                        .vertical_spacing(14),
+                ]
+                .spacing(12),
+            );
+        }
+        if !singles.is_empty() {
+            main = main.push(
+                Row::with_children(singles)
+                    .spacing(14)
+                    .wrap()
+                    .vertical_spacing(24),
+            );
+        }
 
         let content = container(row![main, container(self.recent_card()).width(320)].spacing(28))
             .padding(32)
@@ -59,6 +91,32 @@ impl App {
         .width(Fill)
         .height(Fill)
         .into()
+    }
+
+    /// Titre d'une section de l'accueil : globe pour le monde, drapeau pour un pays.
+    fn section_header(&self, atlas: usize, count: usize) -> Element<'_, Message> {
+        let category = &ATLASES[atlas].info.category;
+        let badge: Element<'_, Message> =
+            match section_flag(category.get(Lang::Fr)).and_then(crate::flags::find) {
+                Some(flag) => crate::flags::view(flag, 27.0, 18.0),
+                None => icon(Icon::Globe, 20.0, style::lighten(style::ACCENT, 0.2)),
+            };
+        let mut header = row![
+            badge,
+            text(category.get(self.lang))
+                .size(19)
+                .font(style::FONT_SEMIBOLD),
+        ]
+        .spacing(10)
+        .align_y(Center);
+        if count > 1 {
+            header = header.push(
+                text(tr!(self.lang, "{} quiz", "{} quizzes", count))
+                    .size(13)
+                    .color(style::MUTED),
+            );
+        }
+        header.into()
     }
 
     /// Choix de la langue (gardé pour les lancements suivants).
@@ -114,10 +172,6 @@ impl App {
                     self.thumbnails[index].view(130.0, self.lang)
                 },
                 column![
-                    text(atlas.info.category.get(self.lang).to_uppercase())
-                        .size(11)
-                        .font(style::FONT_SEMIBOLD)
-                        .color(style::MUTED),
                     text(atlas.info.title.get(self.lang))
                         .size(16)
                         .font(style::FONT_SEMIBOLD),
@@ -223,6 +277,17 @@ impl App {
         .width(Fill)
         .style(style::card)
         .into()
+    }
+}
+
+/// Drapeau d'une catégorie de l'accueil (son nom français), s'il s'agit d'un pays.
+fn section_flag(category: &str) -> Option<&'static str> {
+    match category {
+        "France" => Some("FRA"),
+        "États-Unis" => Some("USA"),
+        "Canada" => Some("CAN"),
+        "Australie" => Some("AUS"),
+        _ => None,
     }
 }
 

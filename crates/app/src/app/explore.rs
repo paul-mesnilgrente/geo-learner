@@ -303,6 +303,7 @@ impl Explorer {
                 &[]
             },
             mastery: self.mastery.as_deref(),
+            labels: crate::settings::MapLabels::None,
             lang: self.lang,
             cache: &self.cache,
         };

@@ -18,9 +18,12 @@ pub enum Mode {
     Identify,
     /// Un nom de pays est donné : il faut cliquer dessus.
     Locate,
+    /// Un pays est donné : il faut choisir sa réponse parmi quelques propositions (son drapeau).
+    Choose,
 }
 
 impl Mode {
+    /// Modes des quiz sur carte ; `Choose` est réservé aux drapeaux.
     pub const ALL: [Mode; 3] = [Mode::Free, Mode::Identify, Mode::Locate];
 }
 
@@ -171,6 +174,11 @@ impl Quiz {
     }
 
     /// Erreurs commises sur le pays en cours.
+    /// Mauvaises réponses déjà données à la question en cours.
+    pub fn wrong_guesses(&self) -> &[usize] {
+        &self.wrong
+    }
+
     pub fn wrong_tries(&self) -> u8 {
         self.wrong_tries
     }
@@ -250,7 +258,7 @@ impl Quiz {
                 }
                 Some(_) => Outcome::AlreadyFound(country),
             },
-            Mode::Identify | Mode::Locate => {
+            Mode::Identify | Mode::Locate | Mode::Choose => {
                 let Some(target) = self.target else {
                     return Outcome::Ignored;
                 };
@@ -614,5 +622,30 @@ mod tests {
         assert!(q.is_finished());
         assert_eq!(q.missed(), 3);
         assert_eq!(q.submit(1), Outcome::Ignored);
+    }
+
+    /// Mode « Choisir » (drapeaux) : une question à la fois, comme Nommer ; les propositions
+    /// refusées sont retenues pour être écartées.
+    #[test]
+    fn choose_mode_asks_one_place_at_a_time() {
+        let mut q = Quiz::new(Mode::Choose, 4, vec![0, 1, 2], vec![2, 0, 1]);
+        assert_eq!(q.target(), Some(2));
+        assert_eq!(
+            q.submit(1),
+            Outcome::Wrong {
+                guess: 1,
+                target: 2
+            }
+        );
+        assert_eq!(q.wrong_guesses(), &[1]);
+        assert_eq!(
+            q.submit(2),
+            Outcome::Correct {
+                country: 2,
+                tries: 2
+            }
+        );
+        assert!(q.wrong_guesses().is_empty());
+        assert_eq!(q.target(), Some(0));
     }
 }

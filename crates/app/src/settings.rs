@@ -12,6 +12,16 @@ use crate::progress::data_dir;
 const MIN_DURATION: u32 = 30;
 const MAX_DURATION: u32 = 2 * 3600;
 
+/// Étiquettes de la carte quand elle ne sert que de repère (numéros des départements, drapeaux) :
+/// aucune, les noms ou les numéros des lieux.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MapLabels {
+    #[default]
+    None,
+    Names,
+    Numbers,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Settings {
     /// Langue choisie par l'utilisateur ; sans choix, celle du système.
@@ -30,6 +40,9 @@ pub struct Settings {
     /// (`"monde/Free/europe"`).
     #[serde(default)]
     durations: BTreeMap<String, u32>,
+    /// Étiquettes choisies pour la carte de repère, par atlas et mode (`"fr-numeros/Identify"`).
+    #[serde(default)]
+    labels: BTreeMap<String, MapLabels>,
     #[serde(skip)]
     path: Option<PathBuf>,
 }
@@ -46,6 +59,7 @@ impl Default for Settings {
             by_continent: false,
             second_chance: true,
             durations: BTreeMap::new(),
+            labels: BTreeMap::new(),
             path: None,
         }
     }
@@ -58,6 +72,7 @@ pub fn default_duration(mode: Mode, countries: usize) -> u32 {
         Mode::Free => 900.0 / 197.0,
         Mode::Identify => 7.0,
         Mode::Locate => 9.0,
+        Mode::Choose => 6.0,
     };
     let seconds = (countries as f32 * per_country / 30.0).ceil() as u32 * 30;
     seconds.clamp(60, MAX_DURATION)
@@ -122,6 +137,16 @@ impl Settings {
 
     pub fn set_by_continent(&mut self, by_continent: bool) {
         self.by_continent = by_continent;
+        self.save();
+    }
+
+    /// Étiquettes choisies pour la carte de repère de ce quiz et ce mode, s'il y en a.
+    pub fn labels(&self, atlas: &str, mode: Mode) -> Option<MapLabels> {
+        self.labels.get(&format!("{atlas}/{mode:?}")).copied()
+    }
+
+    pub fn set_labels(&mut self, atlas: &str, mode: Mode, labels: MapLabels) {
+        self.labels.insert(format!("{atlas}/{mode:?}"), labels);
         self.save();
     }
 
