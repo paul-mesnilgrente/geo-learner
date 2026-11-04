@@ -1,9 +1,13 @@
 name: Paquet Microsoft Store
 
 # Construit le paquet MSIX (non signé : le Store le signe) sur un tag de version ou à la demande.
-# Sur un tag, le paquet est ensuite envoyé au Store et soumis à la certification
-# (scripts/store-publish.ps1). Lancé à la main avec « check », le workflow vérifie seulement
-# l'accès au Store, sans rien soumettre.
+#
+# Publication automatique (job « store », scripts/store-publish.ps1) : en veille tant que la
+# variable de dépôt STORE_PUBLISH ne vaut pas « true ». Elle demande une application Microsoft
+# Entra avec le rôle Manager dans Partner Center, que les comptes développeur individuels ne
+# proposent pas (onglet « Microsoft Entra applications » absent, vérifié le 2026-11-04).
+# Une fois activée : sur un tag, le paquet est envoyé au Store et soumis à la certification ;
+# lancé à la main avec « check », le workflow vérifie seulement l'accès au Store.
 on:
   push:
     tags: ["v*"]
@@ -45,7 +49,7 @@ jobs:
 
   store:
     needs: msix
-    if: startsWith(github.ref, 'refs/tags/v') || inputs.store == 'check' || inputs.store == 'publish'
+    if: vars.STORE_PUBLISH == 'true' && (startsWith(github.ref, 'refs/tags/v') || inputs.store == 'check' || inputs.store == 'publish')
     runs-on: windows-latest
     # Une seule soumission à la fois : le Store n'en accepte qu'une en cours.
     concurrency: microsoft-store

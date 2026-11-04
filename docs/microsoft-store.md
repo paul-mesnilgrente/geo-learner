@@ -232,7 +232,23 @@ README), dans `docs/store/fr/` et `docs/store/en/` :
 
 ## 7. Mises à jour
 
-Publiées par la CI (`.github/workflows/msix.yml`, job `store`) :
+### À la main (situation actuelle)
+
+Le compte développeur est **individuel** : Partner Center n'y propose pas l'onglet *Microsoft
+Entra applications* (vérifié le 2026-11-04, même avec un tenant Entra associé), donc la CI ne
+peut pas s'authentifier auprès du Store. Pour chaque version :
+
+1. Augmenter `version` dans `Cargo.toml` et mettre à jour `packaging/windows/release-notes/`.
+2. Pousser le tag `vX.Y.Z` : le workflow construit le `.msix` (artefact `geo-learner-msix`).
+3. Partner Center → *Start update* : remplacer le paquet, coller les nouveautés de chaque langue
+   dans *What's new in this version*, changer les captures si besoin, *Submit for certification*.
+
+### Par la CI (prête, en veille)
+
+Si l'accès Entra devient possible (compte entreprise, ou ouverture par Microsoft), créer
+l'application et les secrets ci-dessous, puis la variable de dépôt `STORE_PUBLISH=true`
+(`gh variable set STORE_PUBLISH --body true`). Les mises à jour sont alors publiées par la CI
+(`.github/workflows/msix.yml`, job `store`) :
 
 1. Augmenter `version` dans `Cargo.toml` (le Store refuse une version égale ou inférieure ; le
    4ᵉ chiffre du paquet reste 0, il est réservé au Store).
@@ -254,7 +270,7 @@ fonctionnent.
 ### Accès de la CI au Store (une fois)
 
 - Partner Center → *Account settings → Tenants* : tenant Microsoft Entra associé (créé le
-  2026-11-04, compte administrateur `…onmicrosoft.com`, distinct du compte outlook.com).
+  2026-11-04, administrateur `paul@biglearner.onmicrosoft.com`, distinct du compte outlook.com).
 - *User management → Microsoft Entra applications* : application de la CI, rôle **Manager**,
   avec une clé (secret client, à renouveler à son expiration).
 - Secrets GitHub (`gh secret set NOM`) : `AZURE_AD_TENANT_ID`, `AZURE_AD_APPLICATION_CLIENT_ID`,
