@@ -31,6 +31,7 @@ compilateur signale les oublis), les noms dans les données, et le modèle Vosk 
 |---|---|---|---|
 | Monde | Pays du monde | 197 pays | continents, sous-régions, regroupements |
 | Monde | Océans | 5 océans | monde entier |
+| Monde | Mers du monde | 52 mers | océans (Atlantique, Pacifique, Indien, Arctique, Austral) et régions |
 | France | Départements français | 101 départements | métropole, outre-mer, régions |
 | France | Numéros des départements (sans carte) | 101 départements | métropole, outre-mer, régions |
 | France | Régions françaises | 18 régions | métropole, outre-mer |
@@ -79,6 +80,18 @@ polygone tracé à la main (`data/oceans.toml`) et dessiné **sous** les terres,
 le long des côtes : pas de contour côtier à stocker, et aucun jour entre la mer et la terre. Les
 terres sont celles de l'atlas du monde, reprises à l'exécution ; seul l'Antarctique est embarqué.
 La Caspienne, un lac, n'appartient à aucun océan.
+
+**Mers du monde** : les 53 mers de Natural Earth 1:50m, dont les deux morceaux des « mers
+intérieures de la côte occidentale de l'Écosse » réunis en une mer des Hébrides, soit 52. La mer
+de Scotia, réduite à un éclat dans Natural Earth, est tracée à la main. Elles sont dessinées sous
+les terres comme les océans ; golfes, baies, détroits et haute mer restent neutres. Les zones
+sont les océans, chaque mer dans celui qui la contient au quiz des océans (un test le vérifie),
+avec des régions pour l'Atlantique (Méditerranée et mer Noire, Europe du Nord, Atlantique Ouest
+et Sud) et le Pacifique (Asie du Nord-Est, Asie du Sud-Est, Océanie). La Caspienne n'est que
+dans « Monde entier ». Chaque zone a son méridien central : la mer de Béring et la mer de Ross,
+coupées à l'antiméridien, y sont d'un seul tenant. En voix française, 48 mers sur 52 sont
+reconnues (des prononciations approchées comme « mer de lap tev » pallient les noms inconnus du
+modèle) ; Tyrrhénienne, Okhotsk, Bellingshausen et Amundsen se tapent.
 
 ### Ajouter un quiz
 
@@ -280,7 +293,7 @@ cargo clippy --workspace --all-targets --target x86_64-pc-windows-msvc
 crates/geo-core   données, normalisation des réponses, logique de quiz, projection (sans interface)
 crates/app        application Iced : carte (canvas), écrans, saisie vocale, sauvegarde
 crates/mapgen     génération des atlas (assets/*.bin) depuis Natural Earth (admin-0 et admin-1)
-                  et des polygones des océans (data/oceans.toml, `mapgen water`)
+                  et des océans et mers (data/oceans.toml, data/seas.toml, `mapgen water`)
 data/             pays du monde et zones ; data/atlases/ : départements, régions, États
 assets/           carte générée et police Inter (sous-ensemble latin)
 ```

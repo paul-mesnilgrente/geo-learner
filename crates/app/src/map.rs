@@ -102,19 +102,32 @@ impl Projection {
 }
 
 impl ProjShape {
-    /// `fixed` : chaque point reste où il est tracé, sans être rapproché du point d'étiquette ni
-    /// replié à ±180° (les deux moitiés du Pacifique, l'Antarctique d'un bord à l'autre).
+    /// `fixed` (atlas d'eau) : chaque anneau est placé d'après sa propre longitude, pas celle du
+    /// point d'étiquette, et sans copie de l'autre côté de la carte (les deux moitiés du
+    /// Pacifique restent chacune à leur bord). Un anneau qui fait le tour du globe (Antarctique,
+    /// Arctique, Austral) n'est pas replié à ±180° : il ne s'affiche bien qu'avec une carte
+    /// centrée sur le méridien de Greenwich.
     fn new(shape: &Shape, [lon, lat]: [f32; 2], center: f32, fixed: bool) -> Self {
         let mut buf = Vec::new();
         let mut project_one = |ring: &[[f32; 2]], shift: f32| {
             if fixed {
-                let points: Vec<Point> = ring
+                let (min, max) = ring
                     .iter()
-                    .map(|&[x, y]| {
-                        let [px, py] = project_unwrapped(x, y, center);
-                        Point::new(px, py)
-                    })
-                    .collect();
+                    .fold((f32::MAX, f32::MIN), |(a, b), p| (a.min(p[0]), b.max(p[0])));
+                if max - min >= 300.0 {
+                    let points = around_pole(ring, center)
+                        .into_iter()
+                        .map(|[l, y]| {
+                            let [px, py] = project_unwrapped(l + center, y, center);
+                            Point::new(px, py)
+                        })
+                        .collect();
+                    return (points, [-180.0, 180.0]);
+                }
+                // Longitude moyenne : un point à ±180° ne dit pas de quel côté est l'anneau.
+                let anchor = ring.iter().map(|p| p[0]).sum::<f32>() / ring.len().max(1) as f32;
+                project_ring(ring, center, anchor, shift, &mut buf);
+                let points: Vec<Point> = buf.iter().map(|&[x, y]| Point::new(x, y)).collect();
                 return (points, [-180.0, 180.0]);
             }
             let range = project_ring(ring, center, lon, shift, &mut buf);
@@ -179,6 +192,45 @@ impl ProjShape {
             label,
         }
     }
+}
+
+/// Anneau qui fait le tour d'un pôle (Antarctique, océans Arctique et Austral), recoupé au bord
+/// de la carte centrée sur `center` : longitudes relatives au méridien central, ramenées dans
+/// [-180, 180], et, à chaque passage d'un bord à l'autre, un détour par le pôle le long des deux
+/// bords. Les anciens bords (désormais à l'intérieur de la carte) sont parcourus dans les deux
+/// sens et ne délimitent plus rien.
+fn around_pole(ring: &[[f32; 2]], center: f32) -> Vec<[f32; 2]> {
+    let mean = ring.iter().map(|p| p[1]).sum::<f32>() / ring.len().max(1) as f32;
+    let pole = if mean < 0.0 { -90.0 } else { 90.0 };
+    let wrap = |lon: f32| (lon - center + 180.0).rem_euclid(360.0) - 180.0;
+    let mut out: Vec<[f32; 2]> = Vec::with_capacity(ring.len() + 8);
+    for (i, &[lon, lat]) in ring.iter().enumerate() {
+        let l = wrap(lon);
+        if i > 0 {
+            let [prev_lon, prev_lat] = ring[i - 1];
+            let p = wrap(prev_lon);
+            // Bord franchi : d'un côté à l'autre, alors que le pas réel est petit.
+            if (l - p).abs() > 180.0 {
+                let (from, to) = if p > l {
+                    (180.0, -180.0)
+                } else {
+                    (-180.0, 180.0)
+                };
+                // Latitude au bord, par interpolation sur le pas réel.
+                let step = (lon - prev_lon + 540.0).rem_euclid(360.0) - 180.0;
+                let to_edge = (from - p).abs();
+                let t = if step.abs() > 0.0 {
+                    (to_edge / step.abs()).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+                let cross = prev_lat + (lat - prev_lat) * t;
+                out.extend([[from, cross], [from, pole], [to, pole], [to, cross]]);
+            }
+        }
+        out.push([l, lat]);
+    }
+    out
 }
 
 /// Bulle d'un archipel : enveloppe convexe d'un groupe d'îles, lissée et élargie d'une petite
@@ -924,6 +976,39 @@ impl MapView<'_> {
         }
     }
 
+    /// Contour d'un lieu d'eau, sans ses côtés posés sur l'antiméridien : ce n'est qu'une coupure
+    /// des données (mer de Ross, de Béring) ou le bord de la carte, pas une limite.
+    fn add_water_outline(
+        builder: &mut Builder,
+        rings: &[Vec<Point>],
+        raw: &[geo_core::world::Ring],
+        t: &Transform,
+    ) {
+        for (i, ring) in rings.iter().enumerate() {
+            let source = raw.get(i).filter(|r| r.len() == ring.len());
+            let Some(source) = source else {
+                // Anneau recoupé autour d'un pôle : tracé tel quel.
+                Self::add_rings(builder, std::slice::from_ref(ring), t);
+                continue;
+            };
+            let n = ring.len();
+            let mut open = false;
+            for k in 0..n {
+                let (a, b) = (k, (k + 1) % n);
+                let seam = source[a][0].abs() >= 179.999 && source[b][0].abs() >= 179.999;
+                if seam {
+                    open = false;
+                    continue;
+                }
+                if !open {
+                    builder.move_to(t.to_screen(ring[a]));
+                    open = true;
+                }
+                builder.line_to(t.to_screen(ring[b]));
+            }
+        }
+    }
+
     fn add_rings(builder: &mut Builder, rings: &[Vec<Point>], t: &Transform) {
         for ring in rings {
             let mut points = ring.iter().map(|&p| t.to_screen(p));
@@ -996,7 +1081,17 @@ impl MapView<'_> {
             let k = self.tint_of(i);
             let bucket = &mut buckets.iter_mut().find(|(b, _)| *b == k).expect("teinte").1;
             Self::add_rings(bucket, rings, t);
-            Self::add_rings(&mut coast, rings, t);
+            if self.water() {
+                let shape = &self.world.countries[i].shape;
+                let raw = if detailed {
+                    &shape.rings
+                } else {
+                    &shape.rings_lo
+                };
+                Self::add_water_outline(&mut coast, rings, raw, t);
+            } else {
+                Self::add_rings(&mut coast, rings, t);
+            }
         }
         for (k, builder) in buckets {
             frame.fill(
@@ -1212,32 +1307,37 @@ impl MapView<'_> {
 
     fn draw_overlay(&self, frame: &mut Frame, t: &Transform, cursor: Option<Point>) {
         self.draw_situation(frame, t);
-        // Océans : la cible est mise en évidence dans le fond de carte (sous les terres).
-        if let Some(target) = self.target.filter(|_| !self.water()) {
+        // Lieux d'eau : la cible est mise en évidence dans le fond de carte (un calque passerait
+        // sur les terres) ; seuls les cercles des petites cibles sont dessinés ici.
+        if let Some(target) = self.target {
             let pulse = 0.5 + 0.5 * (self.pulse * std::f32::consts::TAU).sin();
             let bubbled = !self.projection.bubbles[target].is_empty();
             if bubbled {
                 let color = style::mix(style::OCEAN, style::ACCENT, 0.35 + 0.25 * pulse);
                 self.draw_bubble(frame, target, t, color);
             }
-            let mut b = Builder::new();
-            Self::add_rings(&mut b, self.rings(target, t), t);
-            let path = b.build();
-            frame.fill(
-                &path,
-                Fill {
-                    style: style::with_alpha(style::ACCENT, 0.55 + 0.4 * pulse).into(),
-                    rule: Rule::EvenOdd,
-                },
-            );
-            frame.stroke(
-                &path,
-                Stroke::default()
-                    .with_color(style::lighten(style::ACCENT, 0.5))
-                    .with_width(1.5),
-            );
+            if !self.water() {
+                let mut b = Builder::new();
+                Self::add_rings(&mut b, self.rings(target, t), t);
+                let path = b.build();
+                frame.fill(
+                    &path,
+                    Fill {
+                        style: style::with_alpha(style::ACCENT, 0.55 + 0.4 * pulse).into(),
+                        rule: Rule::EvenOdd,
+                    },
+                );
+                frame.stroke(
+                    &path,
+                    Stroke::default()
+                        .with_color(style::lighten(style::ACCENT, 0.5))
+                        .with_width(1.5),
+                );
+            }
+            // Une mer, même moyenne, se perd entre les côtes : cercles jusqu'à une taille plus grande.
+            let small = if self.water() { 60.0 } else { 24.0 };
             let core = self.projection.core(target);
-            if !bubbled && core.width.max(core.height) * t.scale < 24.0 {
+            if !bubbled && core.width.max(core.height) * t.scale < small {
                 let center = t.to_screen(self.projection.label(target));
                 for (r, a) in [(10.0 + 10.0 * pulse, 1.0 - pulse), (6.0, 1.0)] {
                     frame.stroke(

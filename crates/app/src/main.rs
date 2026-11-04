@@ -25,13 +25,22 @@ use geo_core::World;
 pub static ATLASES: LazyLock<Vec<World>> = LazyLock::new(|| {
     let load = |bytes: &[u8]| World::from_bytes(bytes).expect("atlas invalide");
     let world = load(include_bytes!("../../../assets/world.bin"));
-    let oceans = oceans_quiz(load(include_bytes!("../../../assets/oceans.bin")), &world);
+    let oceans = load(include_bytes!("../../../assets/oceans.bin"));
+    // L'Antarctique, embarqué une seule fois, avec les océans.
+    let antarctica = oceans.territories.clone();
+    let oceans = water_quiz(oceans, &world, &[]);
+    let seas = water_quiz(
+        load(include_bytes!("../../../assets/seas.bin")),
+        &world,
+        &antarctica,
+    );
     let mut departements = load(include_bytes!("../../../assets/fr-departements.bin"));
     add_number_zones(&mut departements);
     let numbers = numbers_quiz(&departements);
     vec![
         world,
         oceans,
+        seas,
         departements,
         numbers,
         load(include_bytes!("../../../assets/fr-regions.bin")),
@@ -51,9 +60,9 @@ fn numbers_quiz(departements: &World) -> World {
     world
 }
 
-/// Quiz des océans : ses océans, sous les terres du monde (pays et territoires de l'atlas du
-/// monde, sans noms à taper), plus l'Antarctique qu'il embarque.
-fn oceans_quiz(mut oceans: World, world: &World) -> World {
+/// Quiz d'eau (océans, mers) : ses lieux, sous les terres du monde (pays et territoires de
+/// l'atlas du monde, sans noms à taper), plus `extra` et les terres qu'il embarque.
+fn water_quiz(mut atlas: World, world: &World, extra: &[geo_core::Territory]) -> World {
     let land = world
         .countries
         .iter()
@@ -69,11 +78,12 @@ fn oceans_quiz(mut oceans: World, world: &World) -> World {
             owner: None,
             ..t.clone()
         }));
-    oceans.territories.extend(land);
-    for t in &mut oceans.territories {
+    atlas.territories.extend(extra.iter().cloned());
+    atlas.territories.extend(land);
+    for t in &mut atlas.territories {
         t.answers.clear();
     }
-    oceans
+    atlas
 }
 
 /// Zones « Par numéro » des départements : une par dizaine (01–09, 10–19…, 971–976), pour
@@ -395,6 +405,26 @@ mod tests {
         }
     }
 
+    /// Chaque mer est dans l'océan de sa zone, tel que le dessine le quiz des océans (la
+    /// Caspienne dans aucun).
+    #[test]
+    fn seas_match_the_oceans_quiz() {
+        let oceans = ATLASES.iter().find(|a| a.info.id == "oceans").unwrap();
+        let seas = ATLASES.iter().find(|a| a.info.id == "mers").unwrap();
+        for (i, sea) in seas.countries.iter().enumerate() {
+            let zone = &seas.regions[seas.continent_of(i).unwrap()].id;
+            let expected = match zone.as_str() {
+                "atlantique" => Some("ATL"),
+                "pacifique" => Some("PAC"),
+                "indien" => Some("IND"),
+                "arctique" => Some("ARC"),
+                "austral" => Some("SOU"),
+                _ => None,
+            };
+            assert_eq!(ocean_at(oceans, sea.label), expected, "{}", sea.code);
+        }
+    }
+
     #[test]
     fn atlases_are_complete() {
         let counts: Vec<(String, usize)> = ATLASES
@@ -406,6 +436,7 @@ mod tests {
             [
                 ("monde".to_owned(), 197),
                 ("oceans".to_owned(), 5),
+                ("mers".to_owned(), 52),
                 ("fr-departements".to_owned(), 101),
                 ("fr-numeros".to_owned(), 101),
                 ("fr-regions".to_owned(), 18),

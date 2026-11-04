@@ -4,7 +4,7 @@
 //! ```sh
 //! mapgen world <admin0.geojson> <sortie>                          # pays du monde
 //! mapgen atlas <atlas.toml> <admin0.geojson> <admin1.geojson> <sortie>  # subdivisions
-//! mapgen water <atlas.toml> <admin0.geojson> <sortie>             # océans
+//! mapgen water <atlas.toml> <admin0.geojson> <marine.geojson> <sortie>  # océans, mers
 //! ```
 //! (voir `scripts/build-map.sh`).
 
@@ -68,6 +68,9 @@ struct CountryDef {
     /// Atlas d'eau : contour (lon, lat) dessiné sous les terres, en un ou plusieurs anneaux.
     #[serde(default)]
     rings: Vec<Ring>,
+    /// Atlas d'eau : entités marines de Natural Earth (par leur nom anglais) qui forment le lieu.
+    #[serde(default)]
+    marine: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -184,7 +187,7 @@ struct Source {
 fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
     let usage = "usage : mapgen world <admin0> <sortie> | mapgen atlas <toml> <admin0> <admin1> <sortie> \
-         | mapgen water <toml> <admin0> <sortie>";
+         | mapgen water <toml> <admin0> <marine> <sortie>";
     let read_json = |path: &str| -> Result<Value> {
         Ok(serde_json::from_str(&std::fs::read_to_string(path)?)?)
     };
@@ -214,7 +217,11 @@ fn main() -> Result<()> {
             let atlas: AtlasFile =
                 toml::from_str(&std::fs::read_to_string(args.get(2).ok_or(usage)?)?)?;
             let admin0 = read_json(args.get(3).ok_or(usage)?)?;
-            (build_water(&atlas, &admin0)?, args.get(4).ok_or(usage)?)
+            let marine = read_json(args.get(4).ok_or(usage)?)?;
+            (
+                build_water(&atlas, &admin0, &marine)?,
+                args.get(5).ok_or(usage)?,
+            )
         }
         _ => return Err(usage.into()),
     };
@@ -528,10 +535,11 @@ fn build_atlas(file: &AtlasFile, admin0: &Value, admin1: &Value) -> Result<World
     assemble(info, &file.items, &file.zones, source, tolerance)
 }
 
-/// Atlas d'eau (océans) : chaque lieu est un grand polygone tracé à la main dans le fichier,
-/// dont les bords ne comptent qu'en mer (le reste passe sous les terres, qui le recouvrent).
-/// Les terres du monde sont reprises à l'exécution ; seules celles de `land` sont embarquées.
-fn build_water(file: &AtlasFile, admin0: &Value) -> Result<World> {
+/// Atlas d'eau : chaque lieu est un grand polygone tracé à la main dans le fichier (océans),
+/// dont les bords ne comptent qu'en mer (le reste passe sous les terres, qui le recouvrent), ou
+/// des entités marines de Natural Earth (mers). Les terres du monde sont reprises à
+/// l'exécution ; seules celles de `land` sont embarquées.
+fn build_water(file: &AtlasFile, admin0: &Value, marine: &Value) -> Result<World> {
     let def = &file.atlas;
     let n = file.items.len();
     let mut source = Source {
@@ -540,13 +548,26 @@ fn build_water(file: &AtlasFile, admin0: &Value) -> Result<World> {
         english: vec![None; n],
         territories: Vec::new(),
     };
-    for item in &file.items {
-        if item.rings.is_empty() {
-            return Err(format!("{} : aucun contour (`rings`)", item.name).into());
+    let features = marine["features"].as_array().ok_or("GeoJSON invalide")?;
+    for (i, item) in file.items.iter().enumerate() {
+        let mut rings = item.rings.clone();
+        for name in &item.marine {
+            let feature = features
+                .iter()
+                .find(|f| f["properties"]["name"].as_str() == Some(name.as_str()))
+                .ok_or_else(|| format!("{} : entité marine « {name} » introuvable", item.name))?;
+            rings.extend(read_rings(&feature["geometry"])?);
         }
-        source
-            .rings
-            .push(item.rings.iter().map(|r| densify(r, 1.0)).collect());
+        if rings.is_empty() {
+            return Err(format!("{} : aucun contour (`rings` ou `marine`)", item.name).into());
+        }
+        // Polygones tracés à la main : densifiés (voir plus bas) ; ceux de Natural Earth sont
+        // simplifiés comme les pays.
+        if !item.rings.is_empty() {
+            rings = rings.iter().map(|r| densify(r, 1.0)).collect();
+        }
+        source.labels[i] = Some(inner_point(&rings));
+        source.rings.push(rings);
     }
     for feature in admin0["features"].as_array().ok_or("GeoJSON invalide")? {
         let props = &feature["properties"];
@@ -577,15 +598,74 @@ fn build_water(file: &AtlasFile, admin0: &Value) -> Result<World> {
         water: true,
     };
     let rings: Vec<Vec<Ring>> = source.rings.clone();
-    let mut world = assemble(info, &file.items, &file.zones, source, ATLAS_TOLERANCE)?;
-    // Contours gardés tels quels, densifiés : simplifiés, les bords suivant un méridien ou le
-    // bord de la carte redeviendraient des cordes, et laisseraient des jours le long des terres.
-    for (country, rings) in world.countries.iter_mut().zip(rings) {
+    let mut world = assemble(info, &file.items, &file.zones, source, WORLD_TOLERANCE)?;
+    // Contours tracés à la main gardés tels quels, densifiés : simplifiés, les bords suivant un
+    // méridien ou le bord de la carte redeviendraient des cordes, et laisseraient des jours le
+    // long des terres.
+    for ((country, rings), item) in world.countries.iter_mut().zip(rings).zip(&file.items) {
+        if item.rings.is_empty() {
+            continue;
+        }
         country.shape.main = vec![true; rings.len()];
         country.shape.rings_lo = rings.clone();
         country.shape.rings = rings;
     }
     Ok(world)
+}
+
+/// Point d'un lieu le plus éloigné de ses bords (approché sur une grille), pour son étiquette :
+/// le centre d'une mer en croissant (Baltique, mer Noire) peut tomber hors de l'eau.
+fn inner_point(rings: &[Ring]) -> [f32; 2] {
+    let inside = |[x, y]: [f32; 2]| {
+        let mut c = false;
+        for ring in rings {
+            for (i, &[xi, yi]) in ring.iter().enumerate() {
+                let [xj, yj] = ring[(i + ring.len() - 1) % ring.len()];
+                if (yi > y) != (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi {
+                    c = !c;
+                }
+            }
+        }
+        c
+    };
+    let edge = |p: [f32; 2]| -> f64 {
+        rings
+            .iter()
+            .flat_map(|r| (0..r.len()).map(move |i| (r[i], r[(i + 1) % r.len()])))
+            .map(|(a, b)| segment_dist2(p, a, b))
+            .fold(f64::MAX, f64::min)
+    };
+    // Grille sur l'anneau le plus étendu (une mer coupée par l'antiméridien en a deux).
+    let largest = rings
+        .iter()
+        .max_by(|a, b| area(a).total_cmp(&area(b)))
+        .expect("lieu sans contour");
+    let b = bounds_f32(largest);
+    let steps = 60;
+    let mut best = (center(largest), -1.0);
+    for i in 0..=steps {
+        for j in 0..=steps {
+            let p = [
+                b[0] + (b[2] - b[0]) * i as f32 / steps as f32,
+                b[1] + (b[3] - b[1]) * j as f32 / steps as f32,
+            ];
+            // Distance corrigée de l'écartement des méridiens.
+            if inside(p) {
+                let d = edge(p) * f64::from(p[1].to_radians().cos().max(0.2));
+                if d > best.1 {
+                    best = (p, d);
+                }
+            }
+        }
+    }
+    best.0
+}
+
+fn bounds_f32(ring: &[[f32; 2]]) -> [f32; 4] {
+    ring.iter().fold(
+        [f32::MAX, f32::MAX, f32::MIN, f32::MIN],
+        |[a, b, c, d], &[x, y]| [a.min(x), b.min(y), c.max(x), d.max(y)],
+    )
 }
 
 /// Ajoute des points le long des côtés d'un anneau (fermé implicitement), tous les `step` degrés

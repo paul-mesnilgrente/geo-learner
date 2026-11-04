@@ -1,0 +1,202 @@
+# Mers du monde (`mapgen water`) : les mers (« sea ») de Natural Earth 1:50m, dessinées sous
+# les terres comme les océans. Les deux parties des « mers intérieures de la côte occidentale de
+# l'Écosse » de Natural Earth sont réunies en une seule mer des Hébrides : 52 mers en tout.
+# Les autres eaux (golfes, baies, détroits, haute mer) restent neutres.
+#
+# Zones : l'océan dont chaque mer fait partie (comme dans le quiz des océans, où la mer de Scotia,
+# au nord de 60° S, est dans l'Atlantique), avec des sous-zones pour l'Atlantique et le
+# Pacifique. La Caspienne, un lac, n'est dans aucun océan : seulement dans « Toutes les mers ».
+# Les points d'étiquette sont calculés (le point de chaque mer le plus éloigné de ses bords).
+# `say` : prononciations faites de mots que le modèle vocal français connaît, pour les noms qu'il
+# ignore (Barents, Laptev…).
+
+items = [
+  { code = "mediterranean", name = "Mer Méditerranée", en = "Mediterranean Sea", sub = "mediterranee", marine = ["Mediterranean Sea"], aka = ["Méditerranée"] },
+  { code = "tyrrhenian", name = "Mer Tyrrhénienne", en = "Tyrrhenian Sea", sub = "mediterranee", marine = ["Tyrrhenian Sea"], aka = ["Tyrrhénienne"] },
+  { code = "adriatic", name = "Mer Adriatique", en = "Adriatic Sea", sub = "mediterranee", marine = ["Adriatic Sea"], aka = ["Adriatique"] },
+  { code = "ionian", name = "Mer Ionienne", en = "Ionian Sea", sub = "mediterranee", marine = ["Ionian Sea"], aka = ["Ionienne"] },
+  { code = "aegean", name = "Mer Égée", en = "Aegean Sea", sub = "mediterranee", marine = ["Aegean Sea"], aka = ["Égée"] },
+  { code = "balearic", name = "Mer des Baléares", en = "Balearic Sea", sub = "mediterranee", marine = ["Balearic Sea"], aka = ["mer Catalane"] },
+  { code = "black", name = "Mer Noire", en = "Black Sea", sub = "mediterranee", marine = ["Black Sea"] },
+  { code = "north", name = "Mer du Nord", en = "North Sea", sub = "europe-nord", marine = ["North Sea"] },
+  { code = "baltic", name = "Mer Baltique", en = "Baltic Sea", sub = "europe-nord", marine = ["Baltic Sea"], aka = ["Baltique"] },
+  { code = "irish", name = "Mer d'Irlande", en = "Irish Sea", sub = "europe-nord", marine = ["Irish Sea"] },
+  { code = "hebrides", name = "Mer des Hébrides", en = "Sea of the Hebrides", sub = "europe-nord", marine = ["Inner Seas", "Inner Sea"], aka = ["Hébrides", "Inner Seas"] },
+  { code = "norwegian", name = "Mer de Norvège", en = "Norwegian Sea", sub = "europe-nord", marine = ["Norwegian Sea"] },
+  { code = "caribbean", name = "Mer des Caraïbes", en = "Caribbean Sea", sub = "atlantique-ouest", marine = ["Caribbean Sea"], aka = ["Caraïbes", "mer des Antilles"] },
+  { code = "sargasso", name = "Mer des Sargasses", en = "Sargasso Sea", sub = "atlantique-ouest", marine = ["Sargasso Sea"], aka = ["Sargasses"] },
+  { code = "labrador", name = "Mer du Labrador", en = "Labrador Sea", sub = "atlantique-ouest", marine = ["Labrador Sea"] },
+  # Natural Earth n'en donne qu'un éclat près de l'île Éléphant : tracée le long de l'arc de la
+  # Scotia (Terre de Feu, Géorgie du Sud, Sandwich du Sud, Orcades du Sud, péninsule Antarctique).
+  { code = "scotia", name = "Mer de Scotia", en = "Scotia Sea", sub = "atlantique-ouest", aka = ["mer de la Scotia"], rings = [
+    [[-65.0, -55.0], [-55.0, -53.8], [-43.0, -53.3], [-36.0, -54.2], [-27.0, -56.3], [-26.0, -59.5],
+     [-45.0, -60.8], [-55.0, -61.5], [-61.0, -62.5], [-65.0, -58.0]],
+  ] },
+  { code = "beaufort", name = "Mer de Beaufort", en = "Beaufort Sea", sub = "arctique", marine = ["Beaufort Sea"] },
+  { code = "chukchi", name = "Mer des Tchouktches", en = "Chukchi Sea", sub = "arctique", marine = ["Chukchi Sea"], aka = ["mer de Tchoukotka"], say = ["mer des tchouk tchèques"] },
+  { code = "greenland", name = "Mer du Groenland", en = "Greenland Sea", sub = "arctique", marine = ["Greenland Sea"] },
+  { code = "barents", name = "Mer de Barents", en = "Barents Sea", sub = "arctique", marine = ["Barents Sea"], say = ["mer de barrent"] },
+  { code = "white", name = "Mer Blanche", en = "White Sea", sub = "arctique", marine = ["White Sea"] },
+  { code = "kara", name = "Mer de Kara", en = "Kara Sea", sub = "arctique", marine = ["Kara Sea"] },
+  { code = "laptev", name = "Mer de Laptev", en = "Laptev Sea", sub = "arctique", marine = ["Laptev Sea"], say = ["mer de lap tev"] },
+  { code = "bering", name = "Mer de Béring", en = "Bering Sea", sub = "asie-nord-est", marine = ["Bering Sea"] },
+  { code = "okhotsk", name = "Mer d'Okhotsk", en = "Sea of Okhotsk", sub = "asie-nord-est", marine = ["Sea of Okhotsk"] },
+  { code = "japan", name = "Mer du Japon", en = "Sea of Japan", sub = "asie-nord-est", marine = ["Sea of Japan"], aka = ["mer de l'Est"] },
+  { code = "yellow", name = "Mer Jaune", en = "Yellow Sea", sub = "asie-nord-est", marine = ["Yellow Sea"] },
+  { code = "bohai", name = "Mer de Bohai", en = "Bohai Sea", sub = "asie-nord-est", marine = ["Bo Hai"], aka = ["Bohai", "golfe de Bohai", "Bo Hai"] },
+  { code = "east-china", name = "Mer de Chine orientale", en = "East China Sea", sub = "asie-nord-est", marine = ["East China Sea"] },
+  { code = "south-china", name = "Mer de Chine méridionale", en = "South China Sea", sub = "asie-sud-est", marine = ["South China Sea"], aka = ["mer de Chine du Sud"] },
+  { code = "philippine", name = "Mer des Philippines", en = "Philippine Sea", sub = "asie-sud-est", marine = ["Philippine Sea"] },
+  { code = "celebes", name = "Mer de Célèbes", en = "Celebes Sea", sub = "asie-sud-est", marine = ["Celebes Sea"], aka = ["mer de Sulawesi"] },
+  { code = "sulu", name = "Mer de Sulu", en = "Sulu Sea", sub = "asie-sud-est", marine = ["Sulu Sea"], say = ["mer de sou lou"] },
+  { code = "java", name = "Mer de Java", en = "Java Sea", sub = "asie-sud-est", marine = ["Java Sea"] },
+  { code = "banda", name = "Mer de Banda", en = "Banda Sea", sub = "asie-sud-est", marine = ["Banda Sea"] },
+  { code = "molucca", name = "Mer des Moluques", en = "Molucca Sea", sub = "asie-sud-est", marine = ["Molucca Sea"], say = ["mer des molluques"] },
+  { code = "seram", name = "Mer de Seram", en = "Seram Sea", sub = "asie-sud-est", marine = ["Ceram Sea"], aka = ["mer de Céram", "Ceram Sea"], say = ["mer de cérame"] },
+  { code = "arafura", name = "Mer d'Arafura", en = "Arafura Sea", sub = "oceanie", marine = ["Arafura Sea"], say = ["mer d' ara fou ra", "mer d ara fou ra"] },
+  { code = "coral", name = "Mer de Corail", en = "Coral Sea", sub = "oceanie", marine = ["Coral Sea"] },
+  { code = "tasman", name = "Mer de Tasman", en = "Tasman Sea", sub = "oceanie", marine = ["Tasman Sea"] },
+  { code = "bismarck", name = "Mer de Bismarck", en = "Bismarck Sea", sub = "oceanie", marine = ["Bismarck Sea"] },
+  { code = "solomon", name = "Mer des Salomon", en = "Solomon Sea", sub = "oceanie", marine = ["Solomon Sea"] },
+  { code = "arabian", name = "Mer d'Arabie", en = "Arabian Sea", sub = "indien", marine = ["Arabian Sea"], aka = ["mer d'Oman"] },
+  { code = "red", name = "Mer Rouge", en = "Red Sea", sub = "indien", marine = ["Red Sea"] },
+  { code = "andaman", name = "Mer d'Andaman", en = "Andaman Sea", sub = "indien", marine = ["Andaman Sea"], say = ["mer d' an da man", "mer d an da man"] },
+  { code = "laccadive", name = "Mer des Laquedives", en = "Laccadive Sea", sub = "indien", marine = ["Laccadive Sea"], aka = ["mer des Lakshadweep"] },
+  { code = "timor", name = "Mer de Timor", en = "Timor Sea", sub = "indien", marine = ["Timor Sea"] },
+  { code = "weddell", name = "Mer de Weddell", en = "Weddell Sea", sub = "austral", marine = ["Weddell Sea"], say = ["mer de weddel"] },
+  { code = "ross", name = "Mer de Ross", en = "Ross Sea", sub = "austral", marine = ["Ross Sea"] },
+  { code = "bellingshausen", name = "Mer de Bellingshausen", en = "Bellingshausen Sea", sub = "austral", marine = ["Bellingshausen Sea"] },
+  { code = "amundsen", name = "Mer d'Amundsen", en = "Amundsen Sea", sub = "austral", marine = ["Amundsen Sea"] },
+  { code = "caspian", name = "Mer Caspienne", en = "Caspian Sea", sub = "caspienne", marine = ["Caspian Sea"], aka = ["Caspienne"] },
+]
+
+[atlas]
+id = "mers"
+title = "Mers du monde"
+category = "Monde"
+one = "mer"
+many = "mers"
+feminine = true
+levels = ["Océans", "Régions"]
+title_en = "Seas of the world"
+category_en = "World"
+one_en = "sea"
+many_en = "seas"
+levels_en = ["Oceans", "Regions"]
+# Terres reprises à l'exécution : le monde, et l'Antarctique de l'atlas des océans.
+
+[world]
+name = "Monde entier"
+en = "Whole world"
+view = [-180, -78, 180, 86]
+center = 0
+
+[[continent]]
+id = "atlantique"
+name = "Atlantique"
+en = "Atlantic"
+view = [-100, -62, 45, 78]
+center = -25
+
+[[continent]]
+id = "pacifique"
+name = "Pacifique"
+en = "Pacific"
+view = [95, -50, 205, 66]
+center = 150
+
+[[continent]]
+id = "indien"
+name = "Indien"
+en = "Indian"
+view = [30, -20, 135, 30]
+
+[[continent]]
+id = "arctique"
+name = "Arctique"
+en = "Arctic"
+view = [-35, 57, 240, 86]
+center = 102
+
+[[continent]]
+id = "austral"
+name = "Austral"
+en = "Southern"
+view = [-205, -80, -5, -57]
+center = -105
+
+# La Caspienne, hors des océans.
+[[continent]]
+id = "lacs"
+name = "Mers fermées"
+en = "Enclosed seas"
+hidden = true
+
+[[sub]]
+id = "mediterranee"
+name = "Méditerranée et mer Noire"
+en = "Mediterranean and Black Sea"
+continent = "atlantique"
+view = [-6, 29, 42, 47.5]
+
+[[sub]]
+id = "europe-nord"
+name = "Europe du Nord"
+en = "Northern Europe"
+continent = "atlantique"
+view = [-15, 49, 32, 76]
+
+[[sub]]
+id = "atlantique-ouest"
+name = "Atlantique Ouest et Sud"
+en = "Western and South Atlantic"
+continent = "atlantique"
+view = [-100, -62, -20, 66]
+
+[[sub]]
+id = "asie-nord-est"
+name = "Asie du Nord-Est"
+en = "Northeast Asia"
+continent = "pacifique"
+view = [115, 22, 205, 66]
+center = 160
+
+[[sub]]
+id = "asie-sud-est"
+name = "Asie du Sud-Est"
+en = "Southeast Asia"
+continent = "pacifique"
+
+[[sub]]
+id = "oceanie"
+name = "Océanie"
+en = "Oceania"
+continent = "pacifique"
+
+[[sub]]
+id = "indien"
+name = "Indien"
+en = "Indian"
+continent = "indien"
+hidden = true
+
+[[sub]]
+id = "arctique"
+name = "Arctique"
+en = "Arctic"
+continent = "arctique"
+hidden = true
+
+[[sub]]
+id = "austral"
+name = "Austral"
+en = "Southern"
+continent = "austral"
+hidden = true
+
+[[sub]]
+id = "caspienne"
+name = "Caspienne"
+en = "Caspian"
+continent = "lacs"
+hidden = true
