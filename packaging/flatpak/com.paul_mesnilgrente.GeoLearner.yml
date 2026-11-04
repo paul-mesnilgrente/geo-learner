@@ -1,0 +1,50 @@
+# Manifeste Flatpak de GeoLearner.
+#
+# Essai local (depuis la racine du dépôt) :
+#   flatpak run org.flatpak.Builder --user --install --force-clean --disable-rofiles-fuse --install-deps-from=flathub \
+#     target/flatpak packaging/flatpak/com.paul_mesnilgrente.GeoLearner.yml
+#   flatpak run com.paul_mesnilgrente.GeoLearner
+#
+# La copie publiée sur Flathub remplace la source « dir » par le tag Git de la version.
+id: com.paul_mesnilgrente.GeoLearner
+runtime: org.freedesktop.Platform
+runtime-version: '26.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: geo-learner
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  # Rendu de la carte par wgpu (Vulkan) ; repli logiciel tiny-skia sans GPU.
+  - --device=dri
+  # Micro pour la saisie vocale (ALSA passe par PulseAudio/PipeWire dans le runtime).
+  - --socket=pulseaudio
+  # Uniquement pour télécharger le modèle vocal Vosk, à la demande de l'utilisateur.
+  - --share=network
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  env:
+    CARGO_HOME: /run/build/geo-learner/cargo
+    CARGO_NET_OFFLINE: 'true'
+modules:
+  - name: geo-learner
+    buildsystem: simple
+    build-commands:
+      - cargo build --release --locked -p geo-learner
+      - install -Dm755 target/release/geo-learner -t /app/bin/
+      - install -Dm644 packaging/linux/${FLATPAK_ID}.desktop -t /app/share/applications/
+      - install -Dm644 packaging/linux/${FLATPAK_ID}.metainfo.xml -t /app/share/metainfo/
+      - install -Dm644 assets/icon.svg /app/share/icons/hicolor/scalable/apps/${FLATPAK_ID}.svg
+      - install -Dm644 assets/icon-512.png /app/share/icons/hicolor/512x512/apps/${FLATPAK_ID}.png
+      - install -Dm644 assets/fonts/LICENSE-Inter.txt -t /app/share/licenses/${FLATPAK_ID}/
+    sources:
+      - type: dir
+        path: ../..
+        skip:
+          - .git
+          - .cache
+          - target
+          - .flatpak-builder
+      - cargo-sources.json

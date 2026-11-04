@@ -244,6 +244,10 @@ tar -xzf geo-learner-<version>-x86_64-linux.tar.gz -C ~/.local --strip-component
 Le binaire arrive dans `~/.local/bin` (qui doit être dans le `PATH`), le lanceur et l'icône dans
 `~/.local/share`. Seule dépendance système : `libasound.so.2` (ALSA), présente partout.
 
+Le paquet Flatpak (`packaging/flatpak/`) se construit et se soumet à Flathub comme décrit dans
+[`docs/flathub.md`](docs/flathub.md). Après chaque changement de `Cargo.lock`, relancer
+`python3 scripts/flatpak-cargo-sources.py` pour régénérer les sources Cargo hors ligne.
+
 ## Intégration continue
 
 `.github/workflows/ci.yml` compile et teste l'application sous **Linux et Windows** à chaque push :
