@@ -30,6 +30,7 @@ compilateur signale les oublis), les noms dans les données, et le modèle Vosk 
 | Catégorie | Quiz | Lieux | Zones |
 |---|---|---|---|
 | Monde | Pays du monde | 197 pays | continents, sous-régions, regroupements |
+| Monde | Océans | 5 océans | monde entier |
 | France | Départements français | 101 départements | métropole, outre-mer, régions |
 | France | Numéros des départements (sans carte) | 101 départements | métropole, outre-mer, régions |
 | France | Régions françaises | 18 régions | métropole, outre-mer |
@@ -68,6 +69,16 @@ sans les nommer ; on peut ensuite la déplacer et zoomer à la molette. Les noms
 sont acceptés au clavier (« California »). Les numéros de département (« 75 », « 2A », « 971 »)
 ne le sont que dans le quiz des numéros, en « Nom → numéro » : ailleurs, taper 30, 31…
 suffirait à citer les départements de la zone 30–39.
+
+**Océans** : Pacifique, Atlantique, Indien, Arctique et Austral, avec leurs mers (la
+Méditerranée et la Baltique avec l'Atlantique, la mer Rouge avec l'océan Indien, la baie
+d'Hudson avec l'Arctique…). Les limites suivent, simplifiées, celles de l'OHI et du World
+Factbook : 60° S pour l'Austral, les méridiens du cap Horn et du cap des Aiguilles, la Tasmanie,
+l'Indonésie, le détroit de Béring, l'Islande et le détroit de Davis. Chaque océan est un grand
+polygone tracé à la main (`data/oceans.toml`) et dessiné **sous** les terres, qui le recouvrent
+le long des côtes : pas de contour côtier à stocker, et aucun jour entre la mer et la terre. Les
+terres sont celles de l'atlas du monde, reprises à l'exécution ; seul l'Antarctique est embarqué.
+La Caspienne, un lac, n'appartient à aucun océan.
 
 ### Ajouter un quiz
 
@@ -269,6 +280,7 @@ cargo clippy --workspace --all-targets --target x86_64-pc-windows-msvc
 crates/geo-core   données, normalisation des réponses, logique de quiz, projection (sans interface)
 crates/app        application Iced : carte (canvas), écrans, saisie vocale, sauvegarde
 crates/mapgen     génération des atlas (assets/*.bin) depuis Natural Earth (admin-0 et admin-1)
+                  et des polygones des océans (data/oceans.toml, `mapgen water`)
 data/             pays du monde et zones ; data/atlases/ : départements, régions, États
 assets/           carte générée et police Inter (sous-ensemble latin)
 ```

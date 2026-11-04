@@ -135,8 +135,13 @@ impl Explorer {
                 self.map_size = size;
                 self.cache.clear();
             }
-            MapEvent::Click(Some(country)) => self.selected = Some(country),
-            MapEvent::Click(None) => self.selected = None,
+            MapEvent::Click(selected) => {
+                self.selected = selected;
+                // Océans : le choix se voit dans le fond de carte, à redessiner.
+                if self.world.info.water {
+                    self.cache.clear();
+                }
+            }
             MapEvent::Globe(inset) => {
                 self.locator = match &self.locator {
                     Some(l) if l.inset == inset => None,
@@ -161,6 +166,9 @@ impl Explorer {
     /// Choix d'un nom dans la liste : la carte se déplace vers ce lieu.
     pub fn select(&mut self, country: usize) {
         self.selected = Some(country);
+        if self.world.info.water {
+            self.cache.clear();
+        }
         if self.map_size == Size::ZERO {
             return;
         }

@@ -734,8 +734,15 @@ impl MapView<'_> {
     /// Teinte d'un pays : son état dans la partie, ou sa présence dans la zone (aperçu).
     fn tint_of(&self, country: usize) -> Tint {
         match self.quiz.mark(country) {
-            // Océan à nommer : en évidence dans le fond de carte, les terres le recouvrent.
-            Some(Mark::Pending) if self.water() && self.target == Some(country) => Tint::Highlight,
+            // Océan à nommer, ou choisi pendant l'exploration (où tous sont déjà en bleu) : en
+            // évidence dans le fond de carte, puisque les terres recouvriraient un calque.
+            Some(Mark::Pending) if self.water() && self.target == Some(country) => {
+                if self.explore {
+                    Tint::Emphasis
+                } else {
+                    Tint::Highlight
+                }
+            }
             Some(Mark::Pending) if self.emphasis.contains(&country) => Tint::Emphasis,
             // Mêmes couleurs que la carte « À revoir » ; gris si jamais joué.
             Some(Mark::Pending) if let Some(levels) = self.mastery => {
