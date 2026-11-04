@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=GeoLearner
+GenericName=Geography Quiz
+GenericName[fr]=Quiz de géographie
+Comment=Learn the world map, by typing or by voice
+Comment[fr]=Apprenez la carte du monde, au clavier ou à la voix
+Exec=geo-learner
+Icon=com.paul_mesnilgrente.GeoLearner
+Terminal=false
+Categories=Education;Geography;
+Keywords=geography;quiz;map;countries;states;capitals;
+Keywords[fr]=géographie;quiz;carte;pays;départements;régions;
+StartupWMClass=com.paul_mesnilgrente.GeoLearner
+SingleMainWindow=true

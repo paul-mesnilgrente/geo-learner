@@ -225,6 +225,25 @@ Natural Earth par `scripts/make-icon.py` (Inkscape et ImageMagick).
 Sous Windows, l'exécutable intègre le runtime Visual C++ (`crt-static`, voir `.cargo/config.toml`) :
 il ne dépend pas de `VCRUNTIME140.dll`, ce que la CI vérifie.
 
+## Linux
+
+L'identifiant de l'application est `com.paul_mesnilgrente.GeoLearner` (domaine
+`paul-mesnilgrente.com` inversé). Il nomme le fichier `.desktop`, le metainfo AppStream et
+l'icône (`packaging/linux/`), et la fenêtre le déclare (`APP_ID` dans `crates/app/src/main.rs`)
+pour que le bureau lui associe son icône.
+
+Chaque tag `v*` déclenche le workflow *Archive Linux* : compilation sur Ubuntu 22.04 (le binaire
+tourne donc avec une glibc ≥ 2.35), puis `scripts/package-linux.sh`, qui joint
+`geo-learner-<version>-x86_64-linux.tar.gz` à la release GitHub. Installation dans le dossier
+utilisateur :
+
+```sh
+tar -xzf geo-learner-<version>-x86_64-linux.tar.gz -C ~/.local --strip-components=1
+```
+
+Le binaire arrive dans `~/.local/bin` (qui doit être dans le `PATH`), le lanceur et l'icône dans
+`~/.local/share`. Seule dépendance système : `libasound.so.2` (ALSA), présente partout.
+
 ## Intégration continue
 
 `.github/workflows/ci.yml` compile et teste l'application sous **Linux et Windows** à chaque push :

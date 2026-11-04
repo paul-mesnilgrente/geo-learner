@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fiche AppStream : lue par Flathub, GNOME Logiciels, KDE Discover et le Snap Store. -->
+<component type="desktop-application">
+  <id>com.paul_mesnilgrente.GeoLearner</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <name>GeoLearner</name>
+  <summary>Learn the world map</summary>
+  <summary xml:lang="fr">Apprenez la carte du monde</summary>
+
+  <developer id="com.paul_mesnilgrente">
+    <name>BigLearner</name>
+  </developer>
+  <update_contact>big.learner.app@gmail.com</update_contact>
+
+  <description>
+    <p>
+      GeoLearner helps you learn the world map and more: all 197 countries, the 50 U.S. states,
+      the provinces and territories of Canada, the states and territories of Australia, and the
+      regions and departments of France.
+    </p>
+    <p xml:lang="fr">
+      GeoLearner vous aide à retenir la carte du monde, et bien plus : les 197 pays, les
+      départements et les régions de France, les 50 États des États-Unis, les provinces et
+      territoires du Canada, les États et territoires d’Australie.
+    </p>
+    <p>Three ways to play:</p>
+    <p xml:lang="fr">Trois façons de jouer :</p>
+    <ul>
+      <li>Name them all: list every place in an area, in any order</li>
+      <li xml:lang="fr">Tout citer : nommez tous les lieux d’une zone, dans l’ordre que vous voulez</li>
+      <li>Name it: a place is highlighted, you give its name</li>
+      <li xml:lang="fr">Nommer : un lieu s’allume, à vous de trouver son nom</li>
+      <li>Find it on the map: a name is shown, you click the right place</li>
+      <li xml:lang="fr">Trouver sur la carte : un nom s’affiche, cliquez au bon endroit</li>
+    </ul>
+    <p>
+      GeoLearner keeps track of what you know: each place is learned, in progress or to review,
+      and a review game brings back the ones you miss. You can also explore the map freely,
+      without a quiz, before testing yourself.
+    </p>
+    <p xml:lang="fr">
+      GeoLearner retient ce que vous savez : chaque lieu est acquis, en cours ou à revoir, et une
+      partie de révision reprend ceux que vous ratez. Explorez aussi la carte librement, sans
+      quiz, pour faire connaissance avant de vous tester.
+    </p>
+    <p>
+      Voice input: say the names out loud and they are accepted as you speak. Speech recognition
+      runs entirely on your computer; your voice is never sent over the Internet. The voice model
+      is downloaded once, on request.
+    </p>
+    <p xml:lang="fr">
+      Saisie vocale : énumérez les noms à voix haute, ils sont validés au fil de la parole. La
+      reconnaissance se fait entièrement sur votre ordinateur, sans envoyer votre voix sur
+      Internet. Le modèle vocal se télécharge une seule fois, à la demande.
+    </p>
+    <p>English and French interface. No account, no ads.</p>
+    <p xml:lang="fr">Interface en français et en anglais. Aucun compte, aucune publicité.</p>
+  </description>
+
+  <launchable type="desktop-id">com.paul_mesnilgrente.GeoLearner.desktop</launchable>
+  <provides>
+    <binary>geo-learner</binary>
+  </provides>
+
+  <url type="homepage">https://github.com/paul-mesnilgrente/geo-learner</url>
+  <url type="bugtracker">https://github.com/paul-mesnilgrente/geo-learner/issues</url>
+  <url type="vcs-browser">https://github.com/paul-mesnilgrente/geo-learner</url>
+
+  <categories>
+    <category>Education</category>
+    <category>Geography</category>
+  </categories>
+  <keywords>
+    <keyword>geography</keyword>
+    <keyword>quiz</keyword>
+    <keyword>map</keyword>
+    <keyword>countries</keyword>
+    <keyword xml:lang="fr">géographie</keyword>
+    <keyword xml:lang="fr">carte</keyword>
+    <keyword xml:lang="fr">pays</keyword>
+    <keyword xml:lang="fr">départements</keyword>
+  </keywords>
+
+  <requires>
+    <display_length compare="ge">768</display_length>
+  </requires>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>voice</control>
+  </supports>
+
+  <content_rating type="oars-1.1"/>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#8fb5ff</color>
+    <color type="primary" scheme_preference="dark">#1f2a3b</color>
+  </branding>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>Home screen: pick a quiz</caption>
+      <caption xml:lang="fr">L’accueil : choisissez un quiz</caption>
+      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/en/1-accueil.png</image>
+      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/fr/1-accueil.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Name all the countries of the world</caption>
+      <caption xml:lang="fr">Citez tous les pays du monde</caption>
+      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/en/2-tous-les-pays.png</image>
+      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/fr/2-tous-les-pays.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Each quiz has its own page and progress</caption>
+      <caption xml:lang="fr">Chaque quiz a sa page et sa progression</caption>
+      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/en/3-page-quiz.png</image>
+      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/fr/3-page-quiz.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Mastery map: what you know and what to review</caption>
+      <caption xml:lang="fr">Carte de maîtrise : ce que vous savez et ce qu’il faut revoir</caption>
+      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/en/4-maitrise.png</image>
+      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/fr/4-maitrise.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Name the highlighted place</caption>
+      <caption xml:lang="fr">Nommez le lieu en surbrillance</caption>
+      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/en/5-nommer.png</image>
+      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/fr/5-nommer.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>The departments of France</caption>
+      <caption xml:lang="fr">Les départements français</caption>
+      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/en/6-departements.png</image>
+      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/fr/6-departements.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Learn the department numbers, both ways</caption>
+      <caption xml:lang="fr">Apprenez les numéros des départements, dans les deux sens</caption>
+      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/en/7-numeros.png</image>
+      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/fr/7-numeros.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Provinces and territories of Canada</caption>
+      <caption xml:lang="fr">Provinces et territoires du Canada</caption>
+      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/en/8-canada.png</image>
+      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/fr/8-canada.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Your score and time, game after game</caption>
+      <caption xml:lang="fr">Votre score et votre temps, partie après partie</caption>
+      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/en/9-bilan.png</image>
+      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/fr/9-bilan.png</image>
+    </screenshot>
+  </screenshots>
+
+  <releases>
+    <release version="0.2.0" date="2026-11-03">
+      <description>
+        <ul>
+          <li>English interface, following the system language; voice input in English too</li>
+          <li>New quizzes: Canada, Australia and French department numbers</li>
+          <li>Mastery of each place, mastery map and review games</li>
+          <li>Second chance: a missed place comes back a few questions later</li>
+          <li>Explore the map freely, without a quiz</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.1.0" date="2026-11-02">
+      <description>
+        <p>First release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

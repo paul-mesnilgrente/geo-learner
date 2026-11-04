@@ -132,6 +132,11 @@ pub fn number_of(country: &geo_core::Country) -> Option<String> {
         .map(|a| a.to_uppercase())
 }
 
+/// Identifiant de l'application sous Linux : nom du fichier .desktop, du metainfo et de l'icône
+/// (voir `packaging/linux/`).
+#[cfg(target_os = "linux")]
+const APP_ID: &str = "com.paul_mesnilgrente.GeoLearner";
+
 fn main() -> iced::Result {
     let size = iced::Size::new(1360.0, 860.0);
     #[cfg(debug_assertions)]
@@ -153,6 +158,12 @@ fn main() -> iced::Result {
                 64,
             )
             .ok(),
+            // Rattache la fenêtre à son fichier .desktop (icône et nom dans le dock).
+            #[cfg(target_os = "linux")]
+            platform_specific: iced::window::settings::PlatformSpecific {
+                application_id: APP_ID.to_string(),
+                ..Default::default()
+            },
             ..Default::default()
         })
         .antialiasing(true)

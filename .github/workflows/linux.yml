@@ -1,0 +1,59 @@
+name: Archive Linux
+
+# Construit l'archive Linux (.tar.gz) et la joint à la release GitHub du tag.
+# Compilé sur la plus ancienne Ubuntu disponible : le binaire exige la glibc du système de
+# compilation (2.35 ici), il tourne donc sur les distributions de 2022 et après.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag existant auquel joindre l'archive, par exemple v0.2.0 (vide : simple artefact). Le code compilé est celui de la branche choisie, pas celui du tag."
+        required: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Dépendances système
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev pkg-config desktop-file-utils appstream
+
+      - name: Validation du .desktop et du metainfo
+        run: |
+          desktop-file-validate packaging/linux/*.desktop
+          appstreamcli validate --no-net packaging/linux/*.metainfo.xml
+
+      - name: Compilation release
+        run: cargo build --release -p geo-learner
+
+      - name: Archive
+        run: ./scripts/package-linux.sh
+
+      - name: Artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: geo-learner-linux
+          path: target/linux/*.tar.gz
+          if-no-files-found: error
+
+      - name: Release GitHub
+        if: github.ref_type == 'tag' || inputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --verify-tag --title "GeoLearner ${TAG#v}" --notes ""
+          gh release upload "$TAG" target/linux/*.tar.gz --clobber

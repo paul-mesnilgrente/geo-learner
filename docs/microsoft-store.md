@@ -38,13 +38,8 @@ Le nom affiché (`displayName`) doit être le nom réservé.
 ## 4. Publier la politique de confidentialité
 
 Le Store exige une **adresse publique** (le micro et l'accès Internet sont déclarés). Le dépôt
-étant privé, au choix :
-
-- un [gist public](https://gist.github.com) contenant `PRIVACY.md` ;
-- rendre le dépôt public et pointer vers `PRIVACY.md` ;
-- tout autre hébergement de page web.
-
-Publiée dans un [gist public](https://gist.github.com/paul-mesnilgrente/5884474ce8f49255bbf82e746cb33adc)
+était privé lors de la première soumission, d'où la
+[copie dans un gist public](https://gist.github.com/paul-mesnilgrente/5884474ce8f49255bbf82e746cb33adc)
 (fichier `GeoLearner_PRIVACY.md`). Toute modification de `PRIVACY.md` doit y être reportée.
 
 Adresse de contact : big.learner.app@gmail.com.
