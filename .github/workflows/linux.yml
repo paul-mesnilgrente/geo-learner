@@ -29,12 +29,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Dépendances système
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev pkg-config desktop-file-utils appstream
-
-      - name: Validation du .desktop et du metainfo
-        run: |
-          desktop-file-validate packaging/linux/*.desktop
-          appstreamcli validate --no-net packaging/linux/*.metainfo.xml
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev pkg-config
 
       - name: Compilation release
         run: cargo build --release -p geo-learner

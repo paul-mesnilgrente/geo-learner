@@ -27,7 +27,13 @@ jobs:
 
       - name: Dépendances système (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev pkg-config
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev pkg-config desktop-file-utils appstream
+
+      - name: Validation du .desktop et du metainfo (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          desktop-file-validate packaging/linux/*.desktop
+          appstreamcli validate --no-net packaging/linux/*.metainfo.xml
 
       - name: Formatage
         run: cargo fmt --all --check
