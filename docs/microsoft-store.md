@@ -75,47 +75,22 @@ Certification Kit* (fourni avec le SDK Windows) permet aussi de lancer les tests
 Les deux fiches ont les mêmes champs. Partner Center limite la description courte à environ
 270 caractères recommandés et les mots-clés à 7.
 
-### Nouveautés de la version 0.2.0 (« What's new in this version »)
+### Nouveautés (« What's new in this version »)
 
-> Nouveautés de la version 0.2 :
-> • Interface en anglais : GeoLearner suit la langue du système, modifiable sur l'accueil. La
-> saisie vocale existe aussi en anglais.
-> • Trois nouveaux quiz : provinces et territoires du Canada, États et territoires d'Australie,
-> numéros des départements (sans carte, dans les deux sens).
-> • Zones « Par numéro » pour apprendre les départements par dizaine.
-> • Nouvel accueil en cartes ; chaque quiz a sa page, avec sa progression.
-> • Explorer la carte librement, sans quiz, avec le nom de chaque lieu.
-> • Maîtrise de chaque lieu (acquis, en cours, à revoir), carte de maîtrise et parties de
-> révision.
-> • Seconde chance en modes Nommer et Trouver : un lieu raté revient quelques questions plus
-> tard (désactivable).
-> • Carte de situation des encarts (outre-mer, Alaska, Hawaï).
-
-> What's new in version 0.2:
-> • English interface: GeoLearner follows the system language, which you can change on the home
-> screen. Voice input is available in English too.
-> • Three new quizzes: provinces and territories of Canada, states and territories of Australia,
-> and French department numbers (no map, both ways).
-> • "By number" zones to learn the French departments ten at a time.
-> • New home screen with quiz cards; each quiz has its own page with your progress.
-> • Explore the map freely, without a quiz, with every place named.
-> • Mastery of each place (learned, in progress, to review), mastery map and review games.
-> • Second chance in Name and Find modes: a missed place comes back a few questions later
-> (can be turned off).
-> • Locator map for the insets (French overseas departments, Alaska, Hawaii).
+Dans `packaging/windows/release-notes/fr-fr.txt` et `en-us.txt`, à réécrire à chaque version.
 
 ### Description courte
 
-> Apprenez les pays du monde, les départements français, les États américains, les provinces
-> canadiennes et les États australiens sur une carte interactive, au clavier ou à la voix.
+> Apprenez les pays, les océans et les mers du monde, les départements français, les États
+> américains et plus encore sur une carte interactive, au clavier ou à la voix.
 
-> Learn the countries of the world, U.S. states, Canadian provinces, Australian states and French
-> departments on an interactive map, by typing or by voice.
+> Learn the countries, oceans and seas of the world, U.S. states, Canadian provinces, French
+> departments and more on an interactive map, by typing or by voice.
 
 ### Description
 
-> GeoLearner vous aide à retenir la carte du monde, et bien plus : les 197 pays, les
-> départements et les régions de France, les 50 États des États-Unis, les provinces et
+> GeoLearner vous aide à retenir la carte du monde, et bien plus : les 197 pays, les cinq
+> océans et 52 mers, les départements et les régions de France, les 50 États des États-Unis, les provinces et
 > territoires du Canada, les États et territoires d'Australie.
 >
 > Trois façons de jouer :
@@ -143,7 +118,8 @@ Les deux fiches ont les mêmes champs. Partner Center limite la description cour
 > Interface en français et en anglais. Tout reste sur votre ordinateur. Aucun compte, aucune
 > publicité.
 
-> GeoLearner helps you learn the world map and more: all 197 countries, the 50 U.S. states, the
+> GeoLearner helps you learn the world map and more: all 197 countries, the five oceans and 52
+> seas, the 50 U.S. states, the
 > provinces and territories of Canada, the states and territories of Australia, and the regions
 > and departments of France.
 >
@@ -173,7 +149,7 @@ Les deux fiches ont les mêmes champs. Partner Center limite la description cour
 ### Fonctionnalités (liste du Store)
 
 - 197 pays : les 193 membres de l'ONU, plus le Vatican, la Palestine, le Kosovo et Taïwan
-- Départements (101) et régions (18) de France, États-Unis (50), Canada (13), Australie (8)
+- Océans (5) et mers (52), départements (101) et régions (18) de France, États-Unis (50), Canada (13), Australie (8)
 - Numéros des départements, dans les deux sens et par dizaine
 - Trois modes de jeu : tout citer, nommer, trouver sur la carte
 - Monde, continents, sous-régions et regroupements d'îles
@@ -185,7 +161,7 @@ Les deux fiches ont les mêmes champs. Partner Center limite la description cour
 - Interface en français et en anglais
 
 - 197 countries: the 193 UN members plus Vatican City, Palestine, Kosovo and Taiwan
-- U.S. states (50), Canada (13), Australia (8), French departments (101) and regions (18)
+- Oceans (5) and seas (52), U.S. states (50), Canada (13), Australia (8), French departments (101) and regions (18)
 - French department numbers, both ways and ten at a time
 - Three game modes: name them all, name it, find it on the map
 - World, continents, subregions and island groups
@@ -217,10 +193,14 @@ README), dans `docs/store/fr/` et `docs/store/en/` :
 3. Page du quiz : modes, zones, aperçu de maîtrise, progression
 4. Carte de maîtrise (exploration de l'Europe)
 5. Pays du monde, « Nommer le pays »
-6. Départements français, avec les encarts de l'outre-mer
-7. Numéros des départements, « Numéro → nom »
-8. Exploration du Canada
-9. Bilan d'une partie, avec « Réviser les erreurs »
+6. Mers du monde, « Toutes les mers » en cours
+7. Départements français, avec les encarts de l'outre-mer
+8. Numéros des départements, « Numéro → nom »
+9. Exploration du Canada
+10. Bilan d'une partie, avec « Réviser les erreurs »
+
+Vérifier la taille des captures (`magick identify`) : la fenêtre est parfois redimensionnée
+pendant la capture, il faut alors la refaire.
 
 ### Remarques pour la certification
 

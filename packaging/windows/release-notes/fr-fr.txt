@@ -1,9 +1,4 @@
-Nouveautés de la version 0.2 :
-• Interface en anglais : GeoLearner suit la langue du système, modifiable sur l'accueil. La saisie vocale existe aussi en anglais.
-• Trois nouveaux quiz : provinces et territoires du Canada, États et territoires d'Australie, numéros des départements (sans carte, dans les deux sens).
-• Zones « Par numéro » pour apprendre les départements par dizaine.
-• Nouvel accueil en cartes ; chaque quiz a sa page, avec sa progression.
-• Explorer la carte librement, sans quiz, avec le nom de chaque lieu.
-• Maîtrise de chaque lieu (acquis, en cours, à revoir), carte de maîtrise et parties de révision.
-• Seconde chance en modes Nommer et Trouver : un lieu raté revient quelques questions plus tard (désactivable).
-• Carte de situation des encarts (outre-mer, Alaska, Hawaï).
+Nouveautés de la version 0.3 :
+• Nouveau quiz : les cinq océans, avec leurs limites tracées sur la carte.
+• Nouveau quiz : 52 mers du monde, à jouer par océan ou par région (Méditerranée, Europe du Nord, Asie du Sud-Est…).
+• Nouvelle icône : un G autour du globe, sans fond, plus lisible dans la barre des tâches et le menu Démarrer.
