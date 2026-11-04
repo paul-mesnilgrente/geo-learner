@@ -1,0 +1,16 @@
+#!/bin/sh
+# Lanceur du snap : envoie le son de l'appli (ALSA, via cpal) au serveur PulseAudio/PipeWire de
+# la session. La configuration ALSA de l'hôte n'est pas utilisable dans le snap : elle désigne
+# des modules installés hors du snap.
+lib="$SNAP/usr/lib/x86_64-linux-gnu/alsa-lib"
+conf="$SNAP_USER_DATA/asound.conf"
+cat > "$conf" <<EOF
+pcm.!default { type pulse }
+ctl.!default { type pulse }
+pcm_type.pulse { lib "$lib/libasound_module_pcm_pulse.so" }
+ctl_type.pulse { lib "$lib/libasound_module_ctl_pulse.so" }
+EOF
+export ALSA_CONFIG_PATH="$conf"
+# Le XDG_RUNTIME_DIR d'un snap est un sous-dossier de celui de la session.
+export PULSE_SERVER="${PULSE_SERVER:-unix:$XDG_RUNTIME_DIR/../pulse/native}"
+exec "$@"

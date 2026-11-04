@@ -4,7 +4,8 @@ name: Paquets Linux
 # - l'archive .tar.gz, compilée sur la plus ancienne Ubuntu disponible : le binaire exige la
 #   glibc du système de compilation (2.35 ici), il tourne donc sur les distributions de 2022
 #   et après ;
-# - le paquet .flatpak (fichier unique), qui va chercher son runtime sur Flathub.
+# - le paquet .flatpak (fichier unique), qui va chercher son runtime sur Flathub ;
+# - le snap (snap/snapcraft.yaml), avant sa publication sur le Snap Store.
 on:
   push:
     tags: ["v*"]
@@ -92,3 +93,29 @@ jobs:
         run: |
           gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --verify-tag --title "GeoLearner ${TAG#v}" --notes ""
           gh release upload "$TAG" target/*.flatpak --clobber
+
+  snap:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Compilation du snap
+        id: build
+        uses: snapcore/action-build@v1
+
+      - name: Artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: geo-learner-snap
+          path: ${{ steps.build.outputs.snap }}
+          if-no-files-found: error
+
+      - name: Release GitHub
+        if: github.ref_type == 'tag' || inputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+          SNAP_FILE: ${{ steps.build.outputs.snap }}
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --verify-tag --title "GeoLearner ${TAG#v}" --notes ""
+          gh release upload "$TAG" "$SNAP_FILE" --clobber

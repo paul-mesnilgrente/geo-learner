@@ -1,0 +1,90 @@
+# Snap de GeoLearner (Snap Store, pour Ubuntu).
+#
+# Compilé par le workflow « Paquets Linux » (snapcore/action-build). Essai local du fichier
+# produit : sudo snap install --dangerous geo-learner_<version>_amd64.snap
+name: geo-learner
+base: core24
+adopt-info: geo-learner
+grade: stable
+confinement: strict
+license: MIT
+
+platforms:
+  amd64:
+    build-on: [amd64]
+    build-for: [amd64]
+
+apps:
+  geo-learner:
+    common-id: com.paul_mesnilgrente.GeoLearner
+    command-chain:
+      - bin/gpu-2404-wrapper
+      - bin/launch
+    command: bin/geo-learner
+    environment:
+      LD_LIBRARY_PATH: $SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET_BUILD_FOR/pulseaudio
+    plugs:
+      - desktop
+      - wayland
+      - x11
+      - opengl
+      # Micro pour la saisie vocale (le son passe par PulseAudio/PipeWire, voir snap/local/launch).
+      - audio-playback
+      - audio-record
+      # Uniquement pour télécharger le modèle vocal Vosk, à la demande de l'utilisateur.
+      - network
+
+plugs:
+  gpu-2404:
+    interface: content
+    target: $SNAP/gpu-2404
+    default-provider: mesa-2404
+
+layout:
+  /usr/share/libdrm:
+    bind: $SNAP/gpu-2404/libdrm
+  /usr/share/drirc.d:
+    symlink: $SNAP/gpu-2404/drirc.d
+
+parts:
+  geo-learner:
+    plugin: rust
+    source: .
+    rust-channel: stable
+    rust-path: [crates/app]
+    build-packages:
+      - libasound2-dev
+      - pkg-config
+    stage-packages:
+      - libasound2t64
+      - libasound2-plugins
+      - libxkbcommon0
+      - libwayland-client0
+      - libwayland-cursor0
+      - libx11-6
+      - libx11-xcb1
+      - libxcursor1
+      - libxi6
+      - libxrandr2
+      - libvulkan1
+      # Téléchargement du modèle vocal (l'appli appelle le curl du système).
+      - curl
+    override-pull: |
+      craftctl default
+      craftctl set version="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)"
+    override-build: |
+      craftctl default
+      ID=com.paul_mesnilgrente.GeoLearner
+      install -Dm644 packaging/linux/$ID.desktop -t $CRAFT_PART_INSTALL/usr/share/applications/
+      install -Dm644 packaging/linux/$ID.metainfo.xml -t $CRAFT_PART_INSTALL/usr/share/metainfo/
+      install -Dm644 assets/icon.svg $CRAFT_PART_INSTALL/usr/share/icons/hicolor/scalable/apps/$ID.svg
+      install -Dm755 snap/local/launch -t $CRAFT_PART_INSTALL/bin/
+    parse-info:
+      - usr/share/metainfo/com.paul_mesnilgrente.GeoLearner.metainfo.xml
+
+  gpu-2404:
+    after: [geo-learner]
+    source: https://github.com/canonical/gpu-snap.git
+    plugin: dump
+    prime:
+      - bin/gpu-2404-wrapper
