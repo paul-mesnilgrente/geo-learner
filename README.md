@@ -71,6 +71,15 @@ la même zone. Une carte ouvre la **page du quiz** (mode, zone, lancement, progr
 « Accueil » ramène à la liste. Les textes s'accordent au quiz (« Nommer la région »,
 « 13 régions trouvées », « Quel est cet État ? »).
 
+Le bouton **« ? »** de l'accueil (ou F1) ouvre le menu d'aide : *À propos* (version, licence,
+contact, politique de confidentialité, crédits des données), *Raccourcis clavier*, *Signaler un
+problème* (ticket GitHub ou e-mail, préremplis avec la version et le système) et
+**exporter / importer la progression** dans un fichier JSON, pour changer d'ordinateur. Les
+fichiers se choisissent avec la boîte de dialogue du système (`rfd`, +32 Ko : sous Linux, le
+portail XDG via `libdbus`, chargée à l'exécution, ce qui marche aussi dans Flatpak et Snap sans
+accès au dossier personnel). L'import ajoute les parties absentes, sans doublons. Les liens
+s'ouvrent avec `xdg-open` (relayé par les portails ou snapd) ou l'Explorateur sous Windows.
+
 Les départements et régions d'outre-mer, l'Alaska et Hawaï sont déplacés en **encarts** près de
 la carte principale, dans un cadre. La pastille « globe » au coin de chaque cadre ouvre une carte
 du monde qui part de la vue d'ensemble et zoome sur ces terres, dessinées à leur vraie place et
@@ -370,6 +379,8 @@ Paramètres de `GEO_DEMO`, séparés par `;` :
 - `bigflag` : avec `explore`, le drapeau du lieu choisi montré en grand ;
 - `gallery` : galerie des drapeaux ouverte, avec une recherche (`gallery=guin`) ; avec `bigflag`,
   le drapeau du premier pays de `answers` en grand ;
+- `menu` : menu d'aide ouvert sur l'accueil ; `menu=about`, `menu=shortcuts`, `menu=report` :
+  une de ses fenêtres ;
 - `lang=en` : langue imposée, sans l'enregistrer ;
 - `review=SVN,SVK` : partie de révision limitée à ces lieux ;
 - `skips=3` : questions passées après les réponses (`target=FRA;answers=DEU,DEU,DEU;skips=3`

@@ -38,9 +38,15 @@ Le nom affiché (`displayName`) doit être le nom réservé.
 ## 4. Publier la politique de confidentialité
 
 Le Store exige une **adresse publique** (le micro et l'accès Internet sont déclarés). Le dépôt
-était privé lors de la première soumission, d'où la
-[copie dans un gist public](https://gist.github.com/paul-mesnilgrente/5884474ce8f49255bbf82e746cb33adc)
-(fichier `GeoLearner_PRIVACY.md`). Toute modification de `PRIVACY.md` doit y être reportée.
+étant public depuis le 2026-11-04, c'est le fichier du dépôt lui-même :
+<https://github.com/paul-mesnilgrente/geo-learner/blob/main/PRIVACY.md> (aussi lié depuis
+« À propos » dans l'application). Il n'y a donc plus de copie à resynchroniser.
+
+Jusqu'à la 0.3.0, le dépôt étant privé, la fiche pointait vers une
+[copie dans un gist](https://gist.github.com/paul-mesnilgrente/5884474ce8f49255bbf82e746cb33adc).
+L'adresse se change dans la prochaine soumission (*Propriétés*) ; le gist ne se supprime
+qu'une fois cette soumission publiée, pour que la fiche en ligne ne pointe jamais vers une page
+disparue.
 
 Adresse de contact : big.learner.app@gmail.com.
 
@@ -66,7 +72,7 @@ Certification Kit* (fourni avec le SDK Windows) permet aussi de lancer les tests
 | Section | Contenu |
 |---|---|
 | Tarification | Gratuit (prix 0 $), tous les marchés |
-| Propriétés | Catégorie **Éducation** ; politique de confidentialité : <https://gist.github.com/paul-mesnilgrente/5884474ce8f49255bbf82e746cb33adc> |
+| Propriétés | Catégorie **Éducation** ; politique de confidentialité : <https://github.com/paul-mesnilgrente/geo-learner/blob/main/PRIVACY.md> |
 | Classification par âge | Questionnaire IARC : aucun contenu sensible → PEGI 3 attendu |
 | Paquets | Le `.msix` |
 | Fiches (français et anglais : le paquet déclare les deux langues, chacune exige sa fiche) | Textes ci-dessous, captures `docs/store/fr/` et `docs/store/en/` (dans l'ordre), logo `docs/store/logo-300.png` |

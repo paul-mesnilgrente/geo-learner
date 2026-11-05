@@ -23,6 +23,17 @@ pub enum Icon {
     Close,
     /// Chevron vers le bas : la zone s'ouvre sur des sous-zones.
     Chevron,
+    /// Point d'interrogation cerclé : le menu d'aide.
+    Help,
+    /// « i » cerclé : à propos.
+    Info,
+    Keyboard,
+    /// Bulle de dialogue : signaler un problème.
+    Message,
+    /// Flèche vers le haut, posée sur une ligne : importer.
+    Upload,
+    /// Enveloppe : écrire un e-mail.
+    Mail,
 }
 
 struct Program {
@@ -178,6 +189,63 @@ impl<Message> canvas::Program<Message> for Program {
                     start_angle: iced::Radians(0.0),
                     end_angle: iced::Radians(std::f32::consts::TAU),
                 });
+            }
+            Icon::Help => {
+                b.circle(p(12.0, 12.0), 9.0 * s);
+                b.arc(canvas::path::Arc {
+                    center: p(12.0, 9.5),
+                    radius: 2.8 * s,
+                    start_angle: iced::Radians(std::f32::consts::PI),
+                    end_angle: iced::Radians(std::f32::consts::TAU + 0.9),
+                });
+                b.line_to(p(12.0, 13.8));
+                b.move_to(p(12.0, 17.2));
+                b.line_to(p(12.0, 17.3));
+            }
+            Icon::Info => {
+                b.circle(p(12.0, 12.0), 9.0 * s);
+                b.move_to(p(12.0, 11.0));
+                b.line_to(p(12.0, 16.5));
+                b.move_to(p(12.0, 7.6));
+                b.line_to(p(12.0, 7.7));
+            }
+            Icon::Keyboard => {
+                b.rounded_rectangle(p(2.5, 6.0), Size::new(19.0 * s, 12.0 * s), (2.0 * s).into());
+                for x in [6.5, 10.0, 13.5, 17.0] {
+                    b.move_to(p(x, 10.0));
+                    b.line_to(p(x + 0.1, 10.0));
+                }
+                b.move_to(p(8.0, 14.0));
+                b.line_to(p(16.0, 14.0));
+            }
+            Icon::Message => {
+                b.move_to(p(4.0, 5.0));
+                b.line_to(p(20.0, 5.0));
+                b.line_to(p(20.0, 16.0));
+                b.line_to(p(10.0, 16.0));
+                b.line_to(p(6.0, 20.0));
+                b.line_to(p(6.0, 16.0));
+                b.line_to(p(4.0, 16.0));
+                b.close();
+                b.move_to(p(12.0, 8.0));
+                b.line_to(p(12.0, 11.0));
+                b.move_to(p(12.0, 13.4));
+                b.line_to(p(12.0, 13.5));
+            }
+            Icon::Mail => {
+                b.rounded_rectangle(p(3.0, 5.5), Size::new(18.0 * s, 13.0 * s), (2.0 * s).into());
+                b.move_to(p(3.5, 6.5));
+                b.line_to(p(12.0, 13.0));
+                b.line_to(p(20.5, 6.5));
+            }
+            Icon::Upload => {
+                b.move_to(p(12.0, 15.0));
+                b.line_to(p(12.0, 3.0));
+                b.move_to(p(7.0, 8.0));
+                b.line_to(p(12.0, 3.0));
+                b.line_to(p(17.0, 8.0));
+                b.move_to(p(4.0, 20.0));
+                b.line_to(p(20.0, 20.0));
             }
             Icon::Close => {
                 b.move_to(p(6.0, 6.0));

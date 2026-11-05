@@ -13,6 +13,13 @@ use crate::icons::{Icon, icon};
 use crate::style;
 use crate::{ATLASES, tr};
 
+/// Mise en page de l'accueil (le menu d'aide se place d'après elle) : largeur maximale, marge,
+/// colonne des dernières parties à droite et espace qui l'en sépare.
+pub(super) const HOME_WIDTH: f32 = 1280.0;
+pub(super) const HOME_PADDING: f32 = 32.0;
+pub(super) const SIDE_WIDTH: f32 = 320.0;
+pub(super) const SIDE_GAP: f32 = 28.0;
+
 /// Largeur d'une carte de quiz : trois par ligne sur une fenêtre normale.
 const CARD_WIDTH: f32 = 272.0;
 
@@ -33,7 +40,9 @@ impl App {
                 .spacing(4)
                 .width(Fill),
                 self.language_picker(),
+                self.help_button(),
             ]
+            .spacing(12)
             .align_y(Center)
         ]
         .spacing(28)
@@ -79,12 +88,16 @@ impl App {
             );
         }
 
-        let content = container(row![main, container(self.recent_card()).width(320)].spacing(28))
-            .padding(32)
-            .max_width(1280);
+        let content = container(
+            row![main, container(self.recent_card()).width(SIDE_WIDTH)].spacing(SIDE_GAP),
+        )
+        .padding(HOME_PADDING)
+        .max_width(HOME_WIDTH);
         container(
             scrollable(container(content).center_x(Fill))
                 .id(HOME_SCROLL)
+                // Le menu d'aide est placé sous son bouton : il se referme si la page défile.
+                .on_scroll(|viewport| Message::HomeScrolled(viewport.absolute_offset().y))
                 .height(Fill),
         )
         .style(style::page)

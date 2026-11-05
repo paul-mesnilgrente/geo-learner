@@ -9,6 +9,7 @@ mod dev;
 mod flags;
 mod i18n;
 mod icons;
+mod links;
 mod map;
 mod progress;
 mod settings;

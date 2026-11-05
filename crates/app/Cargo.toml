@@ -16,6 +16,7 @@ dirs = "6"
 fastrand = "2"
 zip = { version = "9.1.3", default-features = false, features = ["deflate"] }
 sha2 = "0.11.1"
+rfd = { version = "0.17.2", default-features = false, features = ["xdg-portal"] }
 
 # Heure locale des parties (déjà présentes dans l'arbre de dépendances).
 [target.'cfg(unix)'.dependencies]

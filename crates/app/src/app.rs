@@ -4,6 +4,7 @@ mod explore;
 mod gallery;
 mod home;
 mod locator;
+mod menu;
 mod progression;
 
 use std::time::{Duration, Instant};
@@ -20,6 +21,7 @@ use iced::{Center, Color, Element, Fill, Size, Subscription, Task, Theme, Vector
 use self::explore::Explorer;
 use self::gallery::Gallery;
 use self::locator::Locator;
+use self::menu::Dialog;
 use crate::ATLASES;
 use crate::i18n::Lang;
 use crate::icons::{Icon, icon};
@@ -76,6 +78,20 @@ pub enum Message {
     ExploreAnchors,
     /// Drapeau du lieu choisi montré en grand (`true`) ou refermé.
     ExploreFlag(bool),
+    /// Menu d'aide de l'accueil ouvert ou refermé.
+    Menu(bool),
+    /// Défilement de l'accueil (décalage vertical) : le menu d'aide se referme.
+    HomeScrolled(f32),
+    /// Fenêtre du menu d'aide (à propos, raccourcis…) ouverte ou refermée.
+    Dialog(Option<Dialog>),
+    /// Lien ouvert dans le navigateur ou le client mail.
+    OpenUrl(String),
+    ExportProgress,
+    /// Nom du fichier écrit (aucun si l'export est annulé), ou l'erreur.
+    ProgressExported(Result<Option<String>, String>),
+    ImportProgress,
+    /// Contenu du fichier choisi (aucun si l'import est annulé).
+    ProgressPicked(Option<Vec<u8>>),
     /// Galerie des drapeaux de la zone choisie (quiz des drapeaux).
     OpenGallery,
     CloseGallery,
@@ -171,6 +187,11 @@ pub struct App {
     /// Exploration de la carte, sans quiz.
     explorer: Option<Explorer>,
     gallery: Option<Gallery>,
+    /// Menu d'aide de l'accueil ouvert.
+    menu: bool,
+    dialog: Option<Dialog>,
+    /// Dernier décalage connu de l'accueil (la liste signale aussi son premier affichage).
+    home_offset: f32,
     /// Aperçu de la zone choisie, sur l'écran d'accueil.
     preview: Preview,
     /// Aperçu coloré par maîtrise (s'il y a déjà des parties) plutôt que la zone seule.
@@ -365,6 +386,9 @@ impl App {
             game: None,
             explorer: None,
             gallery: None,
+            menu: false,
+            dialog: None,
+            home_offset: 0.0,
             preview: Preview::new(0, 0),
             show_mastery: true,
             voice: Voice {
@@ -431,6 +455,13 @@ impl App {
         if !demo.home && (demo.atlas.is_some() || demo.region.is_some() || demo.progress.is_some())
         {
             self.screen = Screen::Quiz;
+        }
+        match demo.menu.as_deref() {
+            Some("about") => self.dialog = Some(Dialog::About),
+            Some("shortcuts") => self.dialog = Some(Dialog::Shortcuts),
+            Some("report") => self.dialog = Some(Dialog::Report),
+            Some(_) => self.menu = true,
+            None => {}
         }
         // En mémoire seulement, comme le minuteur ci-dessous.
         self.settings.by_continent = demo.by_continent;
@@ -757,6 +788,22 @@ impl App {
                     explorer.big_flag = open;
                 }
             }
+            Message::Menu(open) => self.menu = open,
+            Message::HomeScrolled(offset) => {
+                if (offset - self.home_offset).abs() > 1.0 {
+                    self.menu = false;
+                }
+                self.home_offset = offset;
+            }
+            Message::Dialog(dialog) => {
+                self.menu = false;
+                self.dialog = dialog;
+            }
+            Message::OpenUrl(url) => crate::links::open(&url),
+            Message::ExportProgress => return self.export_progress(),
+            Message::ProgressExported(result) => self.on_exported(result),
+            Message::ImportProgress => return self.import_progress(),
+            Message::ProgressPicked(bytes) => self.on_imported(bytes),
             Message::OpenGallery => {
                 self.gallery = Some(Gallery::new(self.atlas, self.region, self.lang));
             }
@@ -983,6 +1030,20 @@ impl App {
                     keyboard::Key::Character("m") if modifiers.command() => self.toggle_mic(),
                     keyboard::Key::Character("z") if modifiers.command() && self.game.is_none() => {
                         return self.update(Message::UndoDelete);
+                    }
+                    // Menu d'aide, depuis l'accueil.
+                    keyboard::Key::Named(Named::F1)
+                        if self.game.is_none()
+                            && self.explorer.is_none()
+                            && self.gallery.is_none()
+                            && self.screen == Screen::Home =>
+                    {
+                        self.dialog = None;
+                        self.menu = !self.menu;
+                    }
+                    keyboard::Key::Named(Named::Escape) if self.dialog.is_some() || self.menu => {
+                        self.dialog = None;
+                        self.menu = false;
                     }
                     keyboard::Key::Named(Named::Escape) => {
                         self.confirm_delete = None;
@@ -1470,7 +1531,10 @@ impl App {
 
     fn home_view(&self) -> Element<'_, Message> {
         match self.screen {
-            Screen::Home => self.home_page(),
+            Screen::Home => match self.menu_layer() {
+                Some(layer) => stack![self.home_page(), layer].into(),
+                None => self.home_page(),
+            },
             Screen::Quiz => self.quiz_page(),
         }
     }

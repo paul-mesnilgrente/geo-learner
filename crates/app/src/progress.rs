@@ -147,6 +147,48 @@ impl Progress {
         self.persist();
     }
 
+    /// Progression en JSON, pour l'exporter (même format que `progress.json`).
+    pub fn to_json(&self) -> Vec<u8> {
+        serde_json::to_vec(self).unwrap_or_default()
+    }
+
+    /// Lit une progression exportée.
+    pub fn from_json(bytes: &[u8]) -> Result<Self, serde_json::Error> {
+        serde_json::from_slice(bytes)
+    }
+
+    /// Ajoute les parties d'une progression importée qui manquent ici (une partie est reconnue
+    /// à sa date, son quiz, son mode, sa zone et son score), dans l'ordre chronologique.
+    /// Renvoie le nombre de parties ajoutées et celui des parties déjà présentes.
+    pub fn merge(&mut self, other: Progress) -> (usize, usize) {
+        let key = |s: &Session| {
+            (
+                s.when,
+                s.atlas.clone(),
+                s.mode,
+                s.region.clone(),
+                s.total,
+                s.found,
+                s.seconds,
+            )
+        };
+        let known: std::collections::HashSet<_> = self.sessions.iter().map(key).collect();
+        let total = other.sessions.len();
+        let mut added = 0;
+        for session in other.sessions {
+            if !known.contains(&key(&session)) {
+                self.sessions.push(session);
+                added += 1;
+            }
+        }
+        if added > 0 {
+            // Tri stable : l'ordre des parties d'une même seconde est gardé.
+            self.sessions.sort_by_key(|s| s.when);
+            self.persist();
+        }
+        (added, total - added)
+    }
+
     fn persist(&self) {
         if let Err(e) = self.save() {
             eprintln!("impossible d'enregistrer la progression : {e}");
@@ -276,6 +318,30 @@ mod tests {
             review: false,
             answers: vec![],
         }
+    }
+
+    /// Importer ajoute les parties manquantes, dans l'ordre chronologique, sans doublons ; un
+    /// export relu redonne la même progression.
+    #[test]
+    fn import_merges_missing_sessions() {
+        let at = |when: u64, region: &str| Session {
+            when,
+            ..session(Mode::Free, region, 1.0, 60)
+        };
+        let mut here = Progress {
+            sessions: vec![at(10, "europe"), at(30, "asie")],
+            path: None,
+        };
+        let other = Progress {
+            sessions: vec![at(10, "europe"), at(20, "afrique"), at(40, "oceanie")],
+            path: None,
+        };
+        let back = Progress::from_json(&other.to_json()).unwrap();
+        assert_eq!(back.sessions.len(), 3);
+        assert_eq!(here.merge(back), (2, 1));
+        let order: Vec<&str> = here.sessions.iter().map(|s| s.region.as_str()).collect();
+        assert_eq!(order, ["europe", "afrique", "asie", "oceanie"]);
+        assert!(Progress::from_json(b"{\"pas\": 1}").is_err());
     }
 
     fn attempt(code: &str, tries: Option<u8>) -> Attempt {
