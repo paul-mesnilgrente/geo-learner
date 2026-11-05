@@ -72,6 +72,8 @@ pub enum Message {
     ExploreReset,
     /// Repères des dizaines (numéros des départements) affichés ou masqués.
     ExploreAnchors,
+    /// Drapeau du lieu choisi montré en grand (`true`) ou refermé.
+    ExploreFlag(bool),
     /// Ouvre la page d'un quiz (index dans `ATLASES`).
     OpenQuiz(usize),
     /// Ouvre la page d'un quiz réglée sur un mode et une zone (dernières parties).
@@ -474,6 +476,7 @@ impl App {
             if let Some(c) = explorer.find(code) {
                 explorer.on_map(MapEvent::Click(Some(c)));
             }
+            explorer.big_flag = demo.big_flag;
             self.explorer = Some(explorer);
             return self;
         }
@@ -723,6 +726,11 @@ impl App {
                     explorer.reset();
                 }
             }
+            Message::ExploreFlag(open) => {
+                if let Some(explorer) = &mut self.explorer {
+                    explorer.big_flag = open;
+                }
+            }
             Message::GoHome => {
                 self.screen = Screen::Home;
                 self.clear_run_actions();
@@ -940,8 +948,11 @@ impl App {
                         if self.game.is_none()
                             && let Some(explorer) = &mut self.explorer
                         {
-                            // La carte de situation d'abord, puis l'exploration elle-même.
-                            if explorer.locator.take().is_none() {
+                            // Le drapeau agrandi d'abord, puis la carte de situation, puis
+                            // l'exploration elle-même.
+                            if explorer.big_flag {
+                                explorer.big_flag = false;
+                            } else if explorer.locator.take().is_none() {
                                 self.explorer = None;
                             }
                         }

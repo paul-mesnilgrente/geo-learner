@@ -8,7 +8,7 @@ use iced::alignment::{Horizontal, Vertical};
 use iced::widget::canvas::Cache;
 use iced::widget::{
     Column, Row, button, canvas, column, container, mouse_area, opaque, row, scrollable, sensor,
-    stack, text,
+    stack, text, tooltip,
 };
 use iced::{Center, Element, Fill, Point, Rectangle, Size, Theme};
 
@@ -38,6 +38,8 @@ pub struct Explorer {
     map_size: Size,
     hover: Option<Place>,
     selected: Option<usize>,
+    /// Drapeau du lieu choisi montré en grand, par-dessus l'exploration.
+    pub big_flag: bool,
     /// Partie fictive dont les lieux « à trouver » sont ceux de la zone (mis en évidence).
     quiz: Quiz,
     cache: Cache,
@@ -77,6 +79,7 @@ impl Explorer {
             map_size: Size::ZERO,
             hover: None,
             selected: None,
+            big_flag: false,
             quiz: Quiz::new(
                 Mode::Free,
                 world.countries.len(),
@@ -278,7 +281,68 @@ impl Explorer {
         )
         .padding([10, 16])
         .style(style::top_bar);
-        column![top, row![self.map(), self.panel()]].into()
+        let page = column![top, row![self.map(), self.panel()]];
+        match self.big_flag().filter(|_| self.big_flag) {
+            Some((c, flag)) => stack![page, self.flag_viewer(c, flag)].into(),
+            None => page.into(),
+        }
+    }
+
+    /// Drapeau du lieu choisi, s'il en a un (pays du monde, quiz des drapeaux).
+    fn big_flag(&self) -> Option<(usize, usize)> {
+        let c = self.selected?;
+        (self.world.info.id == "monde" || self.world.info.flags)
+            .then(|| crate::flags::find(&self.world.countries[c].code))
+            .flatten()
+            .map(|flag| (c, flag))
+    }
+
+    /// Le drapeau en grand, sur un fond assombri ; un clic n'importe où (ou Échap) le referme.
+    fn flag_viewer(&self, c: usize, flag: usize) -> Element<'_, Message> {
+        let (max_w, max_h) = if self.map_size == Size::ZERO {
+            (480.0, 320.0)
+        } else {
+            (
+                (self.map_size.width - 96.0).clamp(240.0, 720.0),
+                (self.map_size.height - 220.0).clamp(160.0, 480.0),
+            )
+        };
+        let group = &self.world.regions[self.group_of(c)];
+        let card = container(
+            column![
+                crate::flags::view(flag, max_w, max_h),
+                column![
+                    text(self.label(c)).size(24).font(style::FONT_BOLD),
+                    text(group.name.get(self.lang)).size(14).color(style::MUTED),
+                ]
+                .spacing(4)
+                .align_x(Center),
+            ]
+            .spacing(18)
+            .align_x(Center),
+        )
+        .padding(24)
+        // Fond plein : la carte ne doit pas transparaître derrière le drapeau.
+        .style(|_: &Theme| container::Style {
+            background: Some(style::SURFACE.into()),
+            border: iced::Border {
+                color: style::BORDER,
+                width: 1.0,
+                radius: 16.0.into(),
+            },
+            ..Default::default()
+        });
+        let backdrop = container(card)
+            .center(Fill)
+            .style(|_: &Theme| container::Style {
+                background: Some(style::with_alpha(iced::Color::BLACK, 0.7).into()),
+                ..Default::default()
+            });
+        opaque(
+            mouse_area(backdrop)
+                .on_press(Message::ExploreFlag(false))
+                .interaction(iced::mouse::Interaction::Pointer),
+        )
     }
 
     fn map(&self) -> Element<'_, Message> {
@@ -403,15 +467,23 @@ impl Explorer {
                 text(group.name.get(self.lang)).size(13).color(style::MUTED),
             ]
             .spacing(4);
-            // Pays du monde : son drapeau à côté de son nom.
-            let flag = (self.world.info.id == "monde" || self.world.info.flags)
-                .then(|| crate::flags::find(&self.world.countries[c].code))
-                .flatten();
-            let card: Element<'_, Message> = match flag {
-                Some(flag) => row![crate::flags::view(flag, 72.0, 48.0), names]
-                    .spacing(14)
-                    .align_y(Center)
-                    .into(),
+            // Pays du monde : son drapeau à côté de son nom ; un clic l'affiche en grand.
+            let card: Element<'_, Message> = match self.big_flag() {
+                Some((_, flag)) => {
+                    let flag = tooltip(
+                        mouse_area(crate::flags::view(flag, 72.0, 48.0))
+                            .on_press(Message::ExploreFlag(true))
+                            .interaction(iced::mouse::Interaction::Pointer),
+                        container(
+                            text(tr!(self.lang, "Agrandir le drapeau", "Enlarge the flag"))
+                                .size(12),
+                        )
+                        .padding([4, 8])
+                        .style(style::floating),
+                        tooltip::Position::Bottom,
+                    );
+                    row![flag, names].spacing(14).align_y(Center).into()
+                }
                 None => names.into(),
             };
             body = body.push(

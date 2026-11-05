@@ -108,7 +108,8 @@ question ; on clique sur le pays) et « Pays → drapeau » (le pays est nommé 
 la carte, noms affichés par défaut ; on choisit son drapeau parmi six de la zone, un drapeau
 écarté montre le nom de son pays). En fin de partie, « Réponses » montre chaque drapeau au-dessus
 de son pays, les ratés en rouge.
-L'exploration des pays du monde montre aussi le drapeau du pays choisi. Ce quiz est dérivé à
+L'exploration des pays du monde montre aussi le drapeau du pays choisi ; un clic dessus l'affiche
+en grand (Échap ou un clic le referme). Ce quiz est dérivé à
 l'exécution de l'atlas du monde ; seuls les drapeaux sont stockés (`assets/flags.bin`, 276 Ko).
 Ils viennent des SVG de [hampusborgos/country-flags](https://github.com/hampusborgos/country-flags)
 (d'après Wikimedia Commons, domaine public), aux proportions officielles (Suisse carrée,
@@ -363,6 +364,7 @@ Paramètres de `GEO_DEMO`, séparés par `;` :
 - `globe=N` : carte de situation de l'encart n° N ouverte ;
 - `explore` : exploration ouverte, avec un lieu choisi (`explore=CA-PE`) ; avec `progress`, elle
   part de l'aperçu, carte de maîtrise comprise ;
+- `bigflag` : avec `explore`, le drapeau du lieu choisi montré en grand ;
 - `lang=en` : langue imposée, sans l'enregistrer ;
 - `review=SVN,SVK` : partie de révision limitée à ces lieux ;
 - `skips=3` : questions passées après les réponses (`target=FRA;answers=DEU,DEU,DEU;skips=3`
