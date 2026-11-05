@@ -1,0 +1,115 @@
+# Cantons suisses (Natural Earth admin-1) : les 26 cantons, groupés d'après les grandes régions
+# de l'Office fédéral de la statistique (Zurich rejoint le Nord-Ouest, le Tessin la Suisse
+# centrale, pour qu'aucune zone n'ait un seul canton). Les noms allemands, italiens et anglais
+# sont aussi acceptés (Zürich, Graubünden, Ticino, Geneva).
+
+# Lieux à trouver (avant toute section : en TOML, une clé suit sinon la dernière section).
+items = [
+  { code = "CH-GE", name = "Genève", sub = "lemanique", aka = ["Genf", "Ginevra"] },
+  { code = "CH-VD", name = "Vaud", sub = "lemanique", aka = ["Waadt"] },
+  { code = "CH-VS", name = "Valais", sub = "lemanique", aka = ["Wallis", "Vallese"] },
+  { code = "CH-BE", name = "Berne", sub = "mittelland", aka = ["Bern"] },
+  { code = "CH-FR", name = "Fribourg", sub = "mittelland", aka = ["Freiburg"] },
+  { code = "CH-JU", name = "Jura", sub = "mittelland" },
+  { code = "CH-NE", name = "Neuchâtel", sub = "mittelland", aka = ["Neuenburg"] },
+  { code = "CH-SO", name = "Soleure", sub = "mittelland", aka = ["Solothurn"] },
+  { code = "CH-BS", name = "Bâle-Ville", sub = "nord-ouest", aka = ["Basel-Stadt", "Basel-City"] },
+  { code = "CH-BL", name = "Bâle-Campagne", sub = "nord-ouest", aka = ["Basel-Landschaft", "Basel-Country"] },
+  { code = "CH-AG", name = "Argovie", sub = "nord-ouest", aka = ["Aargau", "Argau"], say = ["argo vie"] },
+  { code = "CH-ZH", name = "Zurich", sub = "nord-ouest", aka = ["Zürich"] },
+  { code = "CH-GL", name = "Glaris", sub = "orientale", aka = ["Glarus"], say = ["gla ris"] },
+  { code = "CH-SH", name = "Schaffhouse", sub = "orientale", aka = ["Schaffhausen"] },
+  { code = "CH-AR", name = "Appenzell Rhodes-Extérieures", sub = "orientale", aka = ["Appenzell Ausserrhoden", "Appenzell Outer Rhodes", "Rhodes-Extérieures"] },
+  { code = "CH-AI", name = "Appenzell Rhodes-Intérieures", sub = "orientale", aka = ["Appenzell Innerrhoden", "Appenzell Inner Rhodes", "Rhodes-Intérieures"] },
+  { code = "CH-SG", name = "Saint-Gall", sub = "orientale", aka = ["Sankt Gallen", "St. Gallen"] },
+  { code = "CH-GR", name = "Grisons", sub = "orientale", aka = ["Graubünden", "Grigioni"] },
+  { code = "CH-TG", name = "Thurgovie", sub = "orientale", aka = ["Thurgau"], say = ["tour go vie"] },
+  { code = "CH-LU", name = "Lucerne", sub = "centrale", aka = ["Luzern"] },
+  { code = "CH-UR", name = "Uri", sub = "centrale" },
+  { code = "CH-SZ", name = "Schwytz", sub = "centrale", aka = ["Schwyz"], say = ["che vise"] },
+  { code = "CH-OW", name = "Obwald", sub = "centrale", aka = ["Obwalden"], say = ["ob val"] },
+  { code = "CH-NW", name = "Nidwald", sub = "centrale", aka = ["Nidwalden"], say = ["nid val"] },
+  { code = "CH-ZG", name = "Zoug", sub = "centrale", aka = ["Zug"] },
+  { code = "CH-TI", name = "Tessin", sub = "centrale", aka = ["Ticino"] },
+]
+
+[atlas]
+id = "ch-cantons"
+title = "Cantons suisses"
+category = "Suisse"
+levels = ["Régions", "Régions"]
+one = "canton"
+many = "cantons"
+title_en = "Cantons of Switzerland"
+category_en = "Switzerland"
+one_en = "canton"
+many_en = "cantons"
+levels_en = ["Regions", "Regions"]
+country = "CHE"
+context = [4.5, 44.8, 12.0, 49.0]
+
+[world]
+name = "Suisse"
+en = "Switzerland"
+view = [5.8, 45.6, 10.6, 48.0]
+center = 8
+
+[[continent]]
+id = "lemanique"
+name = "Région lémanique"
+en = "Lake Geneva region"
+
+[[continent]]
+id = "mittelland"
+name = "Espace Mittelland"
+en = "Espace Mittelland"
+
+[[continent]]
+id = "nord-ouest"
+name = "Nord-Ouest et Zurich"
+en = "Northwest and Zurich"
+
+[[continent]]
+id = "orientale"
+name = "Suisse orientale"
+en = "Eastern Switzerland"
+
+[[continent]]
+id = "centrale"
+name = "Suisse centrale et Tessin"
+en = "Central Switzerland and Ticino"
+
+[[sub]]
+id = "lemanique"
+name = "Région lémanique"
+en = "Lake Geneva region"
+continent = "lemanique"
+hidden = true
+
+[[sub]]
+id = "mittelland"
+name = "Espace Mittelland"
+en = "Espace Mittelland"
+continent = "mittelland"
+hidden = true
+
+[[sub]]
+id = "nord-ouest"
+name = "Nord-Ouest et Zurich"
+en = "Northwest and Zurich"
+continent = "nord-ouest"
+hidden = true
+
+[[sub]]
+id = "orientale"
+name = "Suisse orientale"
+en = "Eastern Switzerland"
+continent = "orientale"
+hidden = true
+
+[[sub]]
+id = "centrale"
+name = "Suisse centrale et Tessin"
+en = "Central Switzerland and Ticino"
+continent = "centrale"
+hidden = true

@@ -99,6 +99,9 @@ pub struct Territory {
     pub owner: Option<usize>,
     pub label: [f32; 2],
     pub shape: Shape,
+    /// Terre voisine, hors du pays de l'atlas (Espagne autour des départements) : plus sombre
+    /// que les terres du pays, même quand celles-ci ne sont qu'un fond de carte (préfectures).
+    pub context: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

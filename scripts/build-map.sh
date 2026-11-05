@@ -2,7 +2,8 @@
 # Régénère les atlas (assets/*.bin) à partir de Natural Earth et des fichiers de data/ :
 # pays du monde (admin-0, 1:50m), océans (data/oceans.toml), mers (data/seas.toml, polygones
 # marins 1:50m), fleuves (data/rivers.toml, tracés 1:10m et lacs 1:50m), lacs (data/lakes.toml,
-# 1:50m), capitales (data/capitals.toml, lieux habités 1:50m), drapeaux (SVG de
+# 1:50m), capitales (data/capitals.toml, lieux habités 1:50m), préfectures et capitales des
+# États (data/points/, positions Wikidata), drapeaux (SVG de
 # hampusborgos/country-flags, domaine public) et subdivisions de data/atlases/ (admin-1, 1:10m).
 set -eu
 cd "$(dirname "$0")/.."
@@ -39,3 +40,8 @@ for atlas in data/atlases/*.toml; do
     name=$(basename "$atlas" .toml)
     cargo run --release -p mapgen -- atlas "$atlas" "$ADMIN0" "$ADMIN1" "assets/$name.bin"
 done
+# Points posés sur un atlas de subdivisions (préfectures, capitales des États).
+cargo run --release -p mapgen -- points data/points/fr-prefectures.toml \
+    data/atlases/fr-departements.toml "$ADMIN0" "$ADMIN1" assets/fr-prefectures.bin
+cargo run --release -p mapgen -- points data/points/us-capitales.toml \
+    data/atlases/us-etats.toml "$ADMIN0" "$ADMIN1" assets/us-capitales.bin

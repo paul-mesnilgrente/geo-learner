@@ -1,0 +1,77 @@
+# Provinces de Belgique (Natural Earth admin-1) : les 10 provinces, plus la Région de
+# Bruxelles-Capitale, qui n'appartient à aucune. Zones : Flandre et Wallonie (Bruxelles ne se
+# joue qu'avec toute la Belgique). Les noms néerlandais et anglais sont aussi acceptés.
+
+# Lieux à trouver (avant toute section : en TOML, une clé suit sinon la dernière section).
+items = [
+  { code = "BE-VAN", name = "Anvers", sub = "flandre", en = "Antwerp", aka = ["Antwerpen"] },
+  { code = "BE-VLI", name = "Limbourg", sub = "flandre", en = "Limburg", aka = ["Limburg"] },
+  { code = "BE-VBR", name = "Brabant flamand", sub = "flandre", en = "Flemish Brabant", aka = ["Vlaams-Brabant"] },
+  { code = "BE-VOV", name = "Flandre-Orientale", sub = "flandre", en = "East Flanders", aka = ["Oost-Vlaanderen"] },
+  { code = "BE-VWV", name = "Flandre-Occidentale", sub = "flandre", en = "West Flanders", aka = ["West-Vlaanderen"] },
+  { code = "BE-WBR", name = "Brabant wallon", sub = "wallonie", en = "Walloon Brabant", aka = ["Waals-Brabant"] },
+  { code = "BE-WHT", name = "Hainaut", sub = "wallonie", aka = ["Henegouwen"] },
+  { code = "BE-WLG", name = "Liège", sub = "wallonie", aka = ["Luik", "Lüttich"] },
+  { code = "BE-WLX", name = "Luxembourg", sub = "wallonie", aka = ["Luxemburg"] },
+  { code = "BE-WNA", name = "Namur", sub = "wallonie", aka = ["Namen"] },
+  { code = "BE-BRU", name = "Bruxelles-Capitale", sub = "bruxelles", en = "Brussels-Capital", aka = ["Bruxelles", "Brussels", "Brussel"] },
+]
+
+[atlas]
+id = "be-provinces"
+title = "Provinces de Belgique"
+category = "Belgique"
+levels = ["Régions", "Régions"]
+one = "province"
+many = "provinces"
+feminine = true
+title_en = "Provinces of Belgium"
+category_en = "Belgium"
+one_en = "province"
+many_en = "provinces"
+levels_en = ["Regions", "Regions"]
+country = "BEL"
+context = [1.0, 48.5, 8.0, 53.0]
+
+[world]
+name = "Belgique"
+en = "Belgium"
+view = [2.4, 49.3, 6.5, 51.6]
+center = 4
+
+[[continent]]
+id = "flandre"
+name = "Flandre"
+en = "Flanders"
+
+[[continent]]
+id = "wallonie"
+name = "Wallonie"
+en = "Wallonia"
+
+[[continent]]
+id = "bruxelles"
+name = "Bruxelles"
+en = "Brussels"
+hidden = true
+
+[[sub]]
+id = "flandre"
+name = "Flandre"
+en = "Flanders"
+continent = "flandre"
+hidden = true
+
+[[sub]]
+id = "wallonie"
+name = "Wallonie"
+en = "Wallonia"
+continent = "wallonie"
+hidden = true
+
+[[sub]]
+id = "bruxelles"
+name = "Bruxelles"
+en = "Brussels"
+continent = "bruxelles"
+hidden = true

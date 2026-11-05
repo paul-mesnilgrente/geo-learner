@@ -231,6 +231,7 @@ fn main() -> Result<()> {
     let usage = "usage : mapgen world <admin0> <sortie> | mapgen atlas <toml> <admin0> <admin1> <sortie> \
          | mapgen water <toml> <admin0> <marine> <sortie> | mapgen rivers <toml> <rivers> <lakes> <sortie> \
          | mapgen lakes <toml> <lakes> <sortie> | mapgen capitals <toml> <places> <world.bin> <sortie> \
+         | mapgen points <points.toml> <atlas.toml> <admin0> <admin1> <sortie> \
          | mapgen flags <admin0> <svg> <world.bin> <sortie> | mapgen flag-sheet <flags.bin> <admin0> <svg> <png>";
     let read_json = |path: &str| -> Result<Value> {
         Ok(serde_json::from_str(&std::fs::read_to_string(path)?)?)
@@ -318,6 +319,18 @@ fn main() -> Result<()> {
                 toml::from_str(&std::fs::read_to_string(args.get(2).ok_or(usage)?)?)?;
             let lakes = read_json(args.get(3).ok_or(usage)?)?;
             (build_lakes(&atlas, &lakes)?, args.get(4).ok_or(usage)?)
+        }
+        Some("points") => {
+            let file: PointsFile =
+                toml::from_str(&std::fs::read_to_string(args.get(2).ok_or(usage)?)?)?;
+            let base: AtlasFile =
+                toml::from_str(&std::fs::read_to_string(args.get(3).ok_or(usage)?)?)?;
+            let admin0 = read_json(args.get(4).ok_or(usage)?)?;
+            let admin1 = read_json(args.get(5).ok_or(usage)?)?;
+            (
+                build_points(&file, &base, &admin0, &admin1)?,
+                args.get(6).ok_or(usage)?,
+            )
         }
         Some("capitals") => {
             let file: CapitalsFile =
@@ -496,6 +509,7 @@ fn territory(
             props["LABEL_Y"].as_f64().unwrap_or(0.0) as f32,
         ],
         shape: make_shape(polygons, tolerance),
+        context: false,
     }
 }
 
@@ -646,9 +660,9 @@ fn build_atlas(file: &AtlasFile, admin0: &Value, admin1: &Value) -> Result<World
             .flatten()
             .any(|&[x, y]| x >= x0 && x <= x1 && y >= y0 && y <= y1);
         if inside {
-            source
-                .territories
-                .push(territory(props, code, None, polygons, tolerance));
+            let mut land = territory(props, code, None, polygons, tolerance);
+            land.context = true;
+            source.territories.push(land);
         }
     }
 
@@ -902,6 +916,131 @@ fn build_lakes(file: &AtlasFile, lakes: &Value) -> Result<World> {
     let mut world = assemble(info, &file.items, &file.zones, source, INLAND_TOLERANCE)?;
     for country in &mut world.countries {
         country.label = inner_point(&country.shape.rings);
+    }
+    Ok(world)
+}
+
+/// Fichier de points sur un atlas de subdivisions (`data/points/*.toml`) : un lieu ponctuel
+/// (préfecture, capitale d'État) par lieu de l'atlas de base.
+#[derive(Deserialize)]
+struct PointsFile {
+    atlas: AtlasDef,
+    items: Vec<PointDef>,
+}
+
+#[derive(Deserialize)]
+struct PointDef {
+    /// Code du lieu de l'atlas de base (« FR-01 », « US-AL »).
+    code: String,
+    name: String,
+    en: Option<String>,
+    #[serde(default)]
+    aka: Vec<String>,
+    #[serde(default)]
+    say: Vec<String>,
+    #[serde(default)]
+    say_en: Vec<String>,
+    /// Position réelle [lon, lat] ; déplacée avec son lieu s'il est dans un encart.
+    label: [f32; 2],
+}
+
+/// Atlas de points (préfectures, capitales des États) : un point par lieu de l'atlas de base,
+/// dans le même ordre, les mêmes zones et les mêmes encarts. Les terres de l'atlas de base sont
+/// reprises à l'exécution.
+fn build_points(
+    file: &PointsFile,
+    base_file: &AtlasFile,
+    admin0: &Value,
+    admin1: &Value,
+) -> Result<World> {
+    let base = build_atlas(base_file, admin0, admin1)?;
+    let def = &file.atlas;
+    let mut defs = Vec::with_capacity(base_file.items.len());
+    let mut source = Source {
+        rings: Vec::new(),
+        labels: Vec::new(),
+        english: Vec::new(),
+        territories: Vec::new(),
+    };
+    for item in &base_file.items {
+        let point = file
+            .items
+            .iter()
+            .find(|p| p.code == item.code)
+            .ok_or_else(|| format!("{} : point manquant", item.name))?;
+        // Lieu d'un encart : le point suit ses terres (inverse de `Inset::real`).
+        let mut position = point.label;
+        if let Some(k) = base_file
+            .inset
+            .iter()
+            .position(|i| i.codes.contains(&item.code))
+        {
+            let inset = &base.info.insets[k];
+            position = [
+                inset.to[0] + (position[0] - inset.from[0]) / inset.factor[0],
+                inset.to[1] + (position[1] - inset.from[1]) / inset.factor[1],
+            ];
+        }
+        let [x, y] = position;
+        let d = POINT_SIZE;
+        source.rings.push(vec![vec![
+            [x - d, y - d],
+            [x + d, y - d],
+            [x + d, y + d],
+            [x - d, y + d],
+        ]]);
+        source.labels.push(Some(position));
+        source.english.push(None);
+        defs.push(CountryDef {
+            code: item.code.clone(),
+            name: point.name.clone(),
+            sub: item.sub.clone(),
+            aka: point.aka.clone(),
+            say: point.say.clone(),
+            en: point.en.clone().or_else(|| Some(point.name.clone())),
+            say_en: point.say_en.clone(),
+            label: Some(position),
+            bubble: false,
+            one_bubble: false,
+            parts: Vec::new(),
+            rings: Vec::new(),
+            marine: Vec::new(),
+            river: Vec::new(),
+            within: None,
+            lake: Vec::new(),
+        });
+    }
+    if let Some(extra) = file
+        .items
+        .iter()
+        .find(|p| !base_file.items.iter().any(|i| i.code == p.code))
+    {
+        return Err(format!("{} : lieu inconnu ({})", extra.name, extra.code).into());
+    }
+    let info = Info {
+        id: def.id.clone(),
+        title: Text::new(&def.title, &def.title_en),
+        category: Text::new(&def.category, &def.category_en),
+        one: Text::new(&def.one, &def.one_en),
+        many: Text::new(&def.many, &def.many_en),
+        feminine: def.feminine,
+        zoom_sub: base.info.zoom_sub,
+        levels: base.info.levels.clone(),
+        insets: base.info.insets.clone(),
+        numbers: false,
+        water: false,
+        lines: false,
+        flags: false,
+        points: true,
+        inland_water: false,
+    };
+    let exact = Tolerance { hi: 0.0, lo: 0.0 };
+    let mut world = assemble(info, &defs, &base_file.zones, source, exact)?;
+    for region in &mut world.regions {
+        if let Some(same) = base.regions.iter().find(|r| r.id == region.id) {
+            region.view = same.view;
+            region.center = same.center;
+        }
     }
     Ok(world)
 }

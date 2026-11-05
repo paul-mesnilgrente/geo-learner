@@ -38,10 +38,15 @@ compilateur signale les oublis), les noms dans les données, et le modèle Vosk 
 | Monde | Lacs du monde | 58 lacs | continents |
 | France | Départements français | 101 départements | métropole, outre-mer, régions |
 | France | Numéros des départements (sans carte) | 101 départements | métropole, outre-mer, régions |
+| France | Préfectures | 101 préfectures | comme les départements |
 | France | Régions françaises | 18 régions | métropole, outre-mer |
 | États-Unis | États des États-Unis | 50 États | régions et divisions du recensement |
+| États-Unis | Capitales des États-Unis | 50 capitales | comme les États |
 | Canada | Provinces et territoires du Canada | 13 | Atlantique, Centre, Prairies, Côte Ouest, Nord |
 | Australie | États et territoires d'Australie | 8 | États, territoires |
+| Suisse | Cantons suisses | 26 cantons | 5 grandes régions |
+| Belgique | Provinces de Belgique | 10 provinces et Bruxelles-Capitale | Flandre, Wallonie |
+| Nouvelle-Zélande | Régions de Nouvelle-Zélande | 16 régions | île du Nord, île du Sud |
 
 **Numéros des départements** se joue dans les deux sens : « Numéro → nom » (le numéro s'affiche,
 on tape ou dit le nom) et « Nom → numéro » (on tape le numéro, sans micro). Les noms ne valident
@@ -164,6 +169,21 @@ peints **par-dessus** les terres, en cyan tant qu'ils restent à trouver ; les p
 Léman) ont une pastille. La Caspienne est dans le quiz des mers. Pour la voix, capitales et lacs
 sont tous reconnus en français, avec des prononciations approchées (« biche cake » pour Bichkek,
 « vè nerf » pour le Vänern).
+
+**Préfectures** et **capitales des États-Unis** : des points posés sur la carte des départements
+ou des États (`data/points/`, `mapgen points`), avec les mêmes zones et les mêmes encarts : le
+point de Basse-Terre, de Juneau ou d'Honolulu suit ses terres dans l'encart. Les positions
+viennent de Wikidata, relevées une fois et gardées dans les fichiers (Natural Earth n'a pas toutes
+les préfectures). Sous les points, les départements ou les États sont en gris clair, les pays
+voisins plus sombres (`Territory::context`). Préfectures récentes : Évry-Courcouronnes (« Évry »
+accepté), Mamoudzou.
+
+**Cantons suisses** (5 zones d'après les grandes régions de l'OFS, Zurich avec le Nord-Ouest et
+le Tessin avec la Suisse centrale), **provinces de Belgique** (Flandre, Wallonie ; Bruxelles-
+Capitale avec toute la Belgique) et **régions de Nouvelle-Zélande** (par île ; îles Chatham et
+îles éloignées omises) : des atlas de subdivisions, sans code. Les noms allemands, néerlandais et
+anglais sont acceptés (Zürich, Antwerpen, Bay of Plenty). Tous ces quiz sont reconnus à la voix
+en français (« che vise » pour Schwytz, « south land », « montpellier » pour Montpelier).
 
 ### Ajouter un quiz
 
@@ -367,9 +387,11 @@ crates/app        application Iced : carte (canvas), écrans, saisie vocale, sau
 crates/mapgen     génération des atlas (assets/*.bin) depuis Natural Earth (admin-0 et admin-1),
                   des océans et mers (data/oceans.toml, data/seas.toml, `mapgen water`), des
                   fleuves (data/rivers.toml, `mapgen rivers`), des lacs (data/lakes.toml,
-                  `mapgen lakes`), des capitales (data/capitals.toml, `mapgen capitals`) et des
-                  drapeaux (`mapgen flags`)
-data/             pays du monde et zones ; data/atlases/ : départements, régions, États
+                  `mapgen lakes`), des capitales (data/capitals.toml, `mapgen capitals`), des
+                  points sur un atlas (data/points/, `mapgen points`) et des drapeaux
+                  (`mapgen flags`)
+data/             pays du monde et zones ; data/atlases/ : départements, régions, États, cantons,
+                  provinces ; data/points/ : préfectures, capitales des États
 assets/           carte générée et police Inter (sous-ensemble latin)
 ```
 

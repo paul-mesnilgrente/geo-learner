@@ -57,6 +57,17 @@ pub static ATLASES: LazyLock<Vec<World>> = LazyLock::new(|| {
     let mut departements = load(include_bytes!("../../../assets/fr-departements.bin"));
     add_number_zones(&mut departements);
     let numbers = numbers_quiz(&departements);
+    let prefectures = with_land(
+        load(include_bytes!("../../../assets/fr-prefectures.bin")),
+        &departements,
+        &[],
+    );
+    let states = load(include_bytes!("../../../assets/us-etats.bin"));
+    let state_capitals = with_land(
+        load(include_bytes!("../../../assets/us-capitales.bin")),
+        &states,
+        &[],
+    );
     vec![
         world,
         flags,
@@ -67,10 +78,15 @@ pub static ATLASES: LazyLock<Vec<World>> = LazyLock::new(|| {
         lakes,
         departements,
         numbers,
+        prefectures,
         load(include_bytes!("../../../assets/fr-regions.bin")),
-        load(include_bytes!("../../../assets/us-etats.bin")),
+        states,
+        state_capitals,
         load(include_bytes!("../../../assets/ca-provinces.bin")),
         load(include_bytes!("../../../assets/au-etats.bin")),
+        load(include_bytes!("../../../assets/ch-cantons.bin")),
+        load(include_bytes!("../../../assets/be-provinces.bin")),
+        load(include_bytes!("../../../assets/nz-regions.bin")),
     ]
 });
 
@@ -93,9 +109,9 @@ fn flags_quiz(world: &World) -> World {
     flags
 }
 
-/// Quiz sur fond de carte du monde (océans, mers, fleuves) : ses lieux, avec les terres du monde
-/// (pays et territoires de l'atlas du monde, sans noms à taper), plus `extra` et les terres qu'il
-/// embarque.
+/// Quiz sur le fond de carte d'un autre atlas (le monde pour les océans, mers, fleuves, lacs et
+/// capitales ; les départements pour les préfectures) : ses lieux, avec les lieux et les terres
+/// voisines de cet atlas (sans noms à taper), plus `extra` et les terres qu'il embarque.
 fn with_land(mut atlas: World, world: &World, extra: &[geo_core::Territory]) -> World {
     let land = world
         .countries
@@ -106,6 +122,7 @@ fn with_land(mut atlas: World, world: &World, extra: &[geo_core::Territory]) -> 
             owner: None,
             label: c.label,
             shape: c.shape.clone(),
+            context: false,
         })
         .chain(world.territories.iter().map(|t| geo_core::Territory {
             answers: Vec::new(),
@@ -484,6 +501,36 @@ mod tests {
         assert_eq!(city("ZAF").0, "Pretoria");
     }
 
+    /// Chaque préfecture, chaque capitale d'État tombe dans son département ou son État, même
+    /// dans un encart (outre-mer, Alaska, Hawaï : le point suit ses terres).
+    #[test]
+    fn points_fall_in_their_place() {
+        let atlas = |id: &str| ATLASES.iter().find(|a| a.info.id == id).unwrap();
+        for (points, base) in [
+            ("fr-prefectures", "fr-departements"),
+            ("us-capitales", "us-etats"),
+        ] {
+            let (points, base) = (atlas(points), atlas(base));
+            assert_eq!(points.countries.len(), base.countries.len());
+            for (p, place) in points.countries.iter().zip(&base.countries) {
+                assert_eq!(p.code, place.code);
+                let [lon, lat] = p.label;
+                let ring = place.shape.rings.iter().flatten();
+                let (mut x0, mut y0, mut x1, mut y1) = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);
+                for &[x, y] in ring {
+                    (x0, y0, x1, y1) = (x0.min(x), y0.min(y), x1.max(x), y1.max(y));
+                }
+                let m = 0.05;
+                assert!(
+                    (x0 - m..=x1 + m).contains(&lon) && (y0 - m..=y1 + m).contains(&lat),
+                    "{} hors de {}",
+                    p.name.get(geo_core::Lang::Fr),
+                    place.name.get(geo_core::Lang::Fr)
+                );
+            }
+        }
+    }
+
     #[test]
     fn atlases_are_complete() {
         let counts: Vec<(String, usize)> = ATLASES
@@ -502,10 +549,15 @@ mod tests {
                 ("lacs".to_owned(), 58),
                 ("fr-departements".to_owned(), 101),
                 ("fr-numeros".to_owned(), 101),
+                ("fr-prefectures".to_owned(), 101),
                 ("fr-regions".to_owned(), 18),
                 ("us-etats".to_owned(), 50),
+                ("us-capitales".to_owned(), 50),
                 ("ca-provinces".to_owned(), 13),
                 ("au-etats".to_owned(), 8),
+                ("ch-cantons".to_owned(), 26),
+                ("be-provinces".to_owned(), 11),
+                ("nz-regions".to_owned(), 16),
             ]
         );
     }

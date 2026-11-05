@@ -972,7 +972,13 @@ impl MapView<'_> {
     /// Couleur d'un territoire : celle de son pays une fois celui-ci joué, un peu assombrie.
     fn territory_color(&self, territory: usize) -> Color {
         if self.water() || self.lines() || self.points() || self.inland() {
-            return style::LAND;
+            // Fond de carte : les terres du pays (départements sous les préfectures) claires,
+            // les pays voisins plus sombres.
+            return if self.world.territories[territory].context {
+                style::TERRITORY
+            } else {
+                style::LAND
+            };
         }
         let owner = self.world.territories[territory].owner;
         match owner.and_then(|o| self.quiz.mark(o)) {

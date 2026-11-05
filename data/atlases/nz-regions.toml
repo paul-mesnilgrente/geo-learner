@@ -1,0 +1,72 @@
+# Régions de Nouvelle-Zélande (Natural Earth admin-1) : les 16 régions (11 conseils régionaux et
+# 5 autorités unitaires), par île. Les îles Chatham et les îles éloignées (Kermadec, Auckland,
+# Campbell…) ne sont pas des régions et sont omises. Noms anglais en usage en français, sauf la
+# baie de l'Abondance.
+
+# Lieux à trouver (avant toute section : en TOML, une clé suit sinon la dernière section).
+items = [
+  { code = "NZ-NTL", name = "Northland", sub = "nord", say = ["north land", "nord land"] },
+  { code = "NZ-AUK", name = "Auckland", sub = "nord" },
+  { code = "NZ-WKO", name = "Waikato", sub = "nord", say = ["wa aïe kato"] },
+  { code = "NZ-BOP", name = "Baie de l'Abondance", sub = "nord", en = "Bay of Plenty", aka = ["Bay of Plenty"] },
+  { code = "NZ-GIS", name = "Gisborne", sub = "nord", say = ["gis borne"] },
+  { code = "NZ-HKB", name = "Hawke's Bay", sub = "nord", aka = ["Baie de Hawke"], say = ["hoc bé", "hawk bay"] },
+  { code = "NZ-TKI", name = "Taranaki", sub = "nord", say = ["tara na qui"] },
+  { code = "NZ-MWT", name = "Manawatu-Whanganui", sub = "nord", en = "Manawatū-Whanganui", aka = ["Manawatu-Wanganui", "Manawatu"], say = ["mana wa tou"] },
+  { code = "NZ-WGN", name = "Wellington", sub = "nord" },
+  { code = "NZ-TAS", name = "Tasman", sub = "sud" },
+  { code = "NZ-NSN", name = "Nelson", sub = "sud" },
+  { code = "NZ-MBH", name = "Marlborough", sub = "sud" },
+  { code = "NZ-WTC", name = "West Coast", sub = "sud", aka = ["Côte Ouest"] },
+  { code = "NZ-CAN", name = "Canterbury", sub = "sud" },
+  { code = "NZ-OTA", name = "Otago", sub = "sud", say = ["o ta go"] },
+  { code = "NZ-STL", name = "Southland", sub = "sud", say = ["south land"] },
+]
+
+[atlas]
+id = "nz-regions"
+title = "Régions de Nouvelle-Zélande"
+category = "Nouvelle-Zélande"
+levels = ["Îles", "Îles"]
+one = "région"
+many = "régions"
+feminine = true
+title_en = "Regions of New Zealand"
+category_en = "New Zealand"
+one_en = "region"
+many_en = "regions"
+levels_en = ["Islands", "Islands"]
+country = "NZL"
+context = [160.0, -50.0, 180.0, -33.0]
+
+[world]
+name = "Nouvelle-Zélande"
+en = "New Zealand"
+# Marges : le Northland reste visible sous la question, le Southland au-dessus du champ de
+# réponse.
+view = [164.5, -50.5, 179.5, -32.0]
+center = 173
+
+[[continent]]
+id = "nord"
+name = "Île du Nord"
+en = "North Island"
+
+[[continent]]
+id = "sud"
+name = "Île du Sud"
+en = "South Island"
+
+[[sub]]
+id = "nord"
+name = "Île du Nord"
+en = "North Island"
+continent = "nord"
+hidden = true
+
+[[sub]]
+id = "sud"
+name = "Île du Sud"
+en = "South Island"
+continent = "sud"
+hidden = true

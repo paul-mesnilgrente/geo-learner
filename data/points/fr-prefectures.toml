@@ -1,0 +1,121 @@
+# Préfectures (`mapgen points`) : le chef-lieu de chacun des 101 départements, posé sur la carte
+# des départements (data/atlases/fr-departements.toml : mêmes zones, mêmes encarts). Positions
+# d'après Wikidata (coordonnées du chef-lieu), relevées une fois et gardées ici.
+#
+# Préfectures récentes : Évry-Courcouronnes (Essonne, « Évry » accepté), Mamoudzou (Mayotte).
+
+items = [
+  { code = "FR-01", name = "Bourg-en-Bresse", label = [5.2281, 46.2047] },  # Ain
+  { code = "FR-02", name = "Laon", label = [3.6206, 49.5644] },  # Aisne
+  { code = "FR-03", name = "Moulins", label = [3.3325, 46.5647] },  # Allier
+  { code = "FR-04", name = "Digne-les-Bains", aka = ["Digne"], label = [6.2356, 44.0925] },  # Alpes-de-Haute-Provence
+  { code = "FR-05", name = "Gap", label = [6.0778, 44.5586] },  # Hautes-Alpes
+  { code = "FR-06", name = "Nice", label = [7.2683, 43.7019] },  # Alpes-Maritimes
+  { code = "FR-07", name = "Privas", label = [4.5992, 44.735] },  # Ardèche
+  { code = "FR-08", name = "Charleville-Mézières", aka = ["Charleville"], label = [4.7194, 49.76] },  # Ardennes
+  { code = "FR-09", name = "Foix", label = [1.6069, 42.9653] },  # Ariège
+  { code = "FR-10", name = "Troyes", label = [4.0781, 48.2989] },  # Aube
+  { code = "FR-11", name = "Carcassonne", label = [2.3514, 43.2158] },  # Aude
+  { code = "FR-12", name = "Rodez", label = [2.5742, 44.35] },  # Aveyron
+  { code = "FR-13", name = "Marseille", label = [5.3764, 43.2967] },  # Bouches-du-Rhône
+  { code = "FR-14", name = "Caen", label = [-0.3636, 49.1814] },  # Calvados
+  { code = "FR-15", name = "Aurillac", label = [2.4397, 44.9253] },  # Cantal
+  { code = "FR-16", name = "Angoulême", label = [0.1594, 45.6494] },  # Charente
+  { code = "FR-17", name = "La Rochelle", label = [-1.1514, 46.1594] },  # Charente-Maritime
+  { code = "FR-18", name = "Bourges", label = [2.3958, 47.0794] },  # Cher
+  { code = "FR-19", name = "Tulle", label = [1.7706, 45.2678] },  # Corrèze
+  { code = "FR-21", name = "Dijon", label = [5.0419, 47.3231] },  # Côte-d'Or
+  { code = "FR-22", name = "Saint-Brieuc", label = [-2.7603, 48.5136] },  # Côtes-d'Armor
+  { code = "FR-23", name = "Guéret", label = [1.8683, 46.1706] },  # Creuse
+  { code = "FR-24", name = "Périgueux", label = [0.7181, 45.1842] },  # Dordogne
+  { code = "FR-25", name = "Besançon", label = [6.0214, 47.2422] },  # Doubs
+  { code = "FR-26", name = "Valence", label = [4.8908, 44.9325] },  # Drôme
+  { code = "FR-27", name = "Évreux", label = [1.1525, 49.0233] },  # Eure
+  { code = "FR-28", name = "Chartres", label = [1.4883, 48.4467] },  # Eure-et-Loir
+  { code = "FR-29", name = "Quimper", label = [-4.0978, 47.9958] },  # Finistère
+  { code = "FR-2A", name = "Ajaccio", label = [8.7364, 41.9256] },  # Corse-du-Sud
+  { code = "FR-2B", name = "Bastia", label = [9.4494, 42.7] },  # Haute-Corse
+  { code = "FR-30", name = "Nîmes", label = [4.3597, 43.8383] },  # Gard
+  { code = "FR-31", name = "Toulouse", label = [1.4433, 43.6044] },  # Haute-Garonne
+  { code = "FR-32", name = "Auch", label = [0.5886, 43.6453] },  # Gers
+  { code = "FR-33", name = "Bordeaux", label = [-0.5794, 44.8378] },  # Gironde
+  { code = "FR-34", name = "Montpellier", label = [3.8772, 43.6109] },  # Hérault
+  { code = "FR-35", name = "Rennes", label = [-1.6808, 48.1142] },  # Ille-et-Vilaine
+  { code = "FR-36", name = "Châteauroux", label = [1.6903, 46.8097] },  # Indre
+  { code = "FR-37", name = "Tours", label = [0.6883, 47.3928] },  # Indre-et-Loire
+  { code = "FR-38", name = "Grenoble", label = [5.7264, 45.1869] },  # Isère
+  { code = "FR-39", name = "Lons-le-Saunier", label = [5.5539, 46.6744] },  # Jura
+  { code = "FR-40", name = "Mont-de-Marsan", label = [-0.5006, 43.8903] },  # Landes
+  { code = "FR-41", name = "Blois", label = [1.3272, 47.5931] },  # Loir-et-Cher
+  { code = "FR-42", name = "Saint-Étienne", label = [4.3897, 45.4339] },  # Loire
+  { code = "FR-43", name = "Le Puy-en-Velay", aka = ["Le Puy"], label = [3.885, 45.0433] },  # Haute-Loire
+  { code = "FR-44", name = "Nantes", label = [-1.5539, 47.2172] },  # Loire-Atlantique
+  { code = "FR-45", name = "Orléans", label = [1.9042, 47.9022] },  # Loiret
+  { code = "FR-46", name = "Cahors", label = [1.4406, 44.4475] },  # Lot
+  { code = "FR-47", name = "Agen", label = [0.6186, 44.2031] },  # Lot-et-Garonne
+  { code = "FR-48", name = "Mende", label = [3.5006, 44.5183] },  # Lozère
+  { code = "FR-49", name = "Angers", label = [-0.5519, 47.4711] },  # Maine-et-Loire
+  { code = "FR-50", name = "Saint-Lô", label = [-1.0917, 49.1144] },  # Manche
+  { code = "FR-51", name = "Châlons-en-Champagne", aka = ["Châlons"], label = [4.3644, 48.9567] },  # Marne
+  { code = "FR-52", name = "Chaumont", label = [5.1386, 48.1108] },  # Haute-Marne
+  { code = "FR-53", name = "Laval", label = [-0.77, 48.0728] },  # Mayenne
+  { code = "FR-54", name = "Nancy", label = [6.1836, 48.6928] },  # Meurthe-et-Moselle
+  { code = "FR-55", name = "Bar-le-Duc", label = [5.1672, 48.7717] },  # Meuse
+  { code = "FR-56", name = "Vannes", label = [-2.7617, 47.655] },  # Morbihan
+  { code = "FR-57", name = "Metz", label = [6.1769, 49.1197] },  # Moselle
+  { code = "FR-58", name = "Nevers", label = [3.1567, 46.9925] },  # Nièvre
+  { code = "FR-59", name = "Lille", label = [3.0575, 50.6319] },  # Nord
+  { code = "FR-60", name = "Beauvais", label = [2.0875, 49.4342] },  # Oise
+  { code = "FR-61", name = "Alençon", label = [0.0919, 48.4297] },  # Orne
+  { code = "FR-62", name = "Arras", label = [2.78, 50.2892] },  # Pas-de-Calais
+  { code = "FR-63", name = "Clermont-Ferrand", label = [3.0869, 45.7797] },  # Puy-de-Dôme
+  { code = "FR-64", name = "Pau", label = [-0.37, 43.3008] },  # Pyrénées-Atlantiques
+  { code = "FR-65", name = "Tarbes", label = [0.0744, 43.2328] },  # Hautes-Pyrénées
+  { code = "FR-66", name = "Perpignan", label = [2.8947, 42.6975] },  # Pyrénées-Orientales
+  { code = "FR-67", name = "Strasbourg", label = [7.7522, 48.5733] },  # Bas-Rhin
+  { code = "FR-68", name = "Colmar", label = [7.355, 48.0811] },  # Haut-Rhin
+  { code = "FR-69", name = "Lyon", label = [4.835, 45.7675] },  # Rhône
+  { code = "FR-70", name = "Vesoul", label = [6.1553, 47.6222] },  # Haute-Saône
+  { code = "FR-71", name = "Mâcon", label = [4.8319, 46.3067] },  # Saône-et-Loire
+  { code = "FR-72", name = "Le Mans", label = [0.1969, 48.0042] },  # Sarthe
+  { code = "FR-73", name = "Chambéry", label = [5.9208, 45.5664] },  # Savoie
+  { code = "FR-74", name = "Annecy", label = [6.1294, 45.8992] },  # Haute-Savoie
+  { code = "FR-75", name = "Paris", label = [2.3522, 48.8567] },  # Paris
+  { code = "FR-76", name = "Rouen", label = [1.1025, 49.4431] },  # Seine-Maritime
+  { code = "FR-77", name = "Melun", label = [2.6592, 48.5397] },  # Seine-et-Marne
+  { code = "FR-78", name = "Versailles", label = [2.135, 48.805] },  # Yvelines
+  { code = "FR-79", name = "Niort", label = [-0.4622, 46.325] },  # Deux-Sèvres
+  { code = "FR-80", name = "Amiens", label = [2.2978, 49.8919] },  # Somme
+  { code = "FR-81", name = "Albi", label = [2.1458, 43.9281] },  # Tarn
+  { code = "FR-82", name = "Montauban", label = [1.355, 44.0172] },  # Tarn-et-Garonne
+  { code = "FR-83", name = "Toulon", label = [5.9306, 43.125] },  # Var
+  { code = "FR-84", name = "Avignon", label = [4.8083, 43.9486] },  # Vaucluse
+  { code = "FR-85", name = "La Roche-sur-Yon", label = [-1.4278, 46.6697] },  # Vendée
+  { code = "FR-86", name = "Poitiers", label = [0.3353, 46.5811] },  # Vienne
+  { code = "FR-87", name = "Limoges", label = [1.2617, 45.8344] },  # Haute-Vienne
+  { code = "FR-88", name = "Épinal", label = [6.4517, 48.1736] },  # Vosges
+  { code = "FR-89", name = "Auxerre", label = [3.5669, 47.7975] },  # Yonne
+  { code = "FR-90", name = "Belfort", label = [6.8628, 47.6375] },  # Territoire de Belfort
+  { code = "FR-91", name = "Évry-Courcouronnes", aka = ["Évry"], label = [2.4296, 48.6238] },  # Essonne
+  { code = "FR-92", name = "Nanterre", label = [2.2036, 48.8906] },  # Hauts-de-Seine
+  { code = "FR-93", name = "Bobigny", label = [2.4386, 48.9097] },  # Seine-Saint-Denis
+  { code = "FR-94", name = "Créteil", label = [2.4531, 48.7778] },  # Val-de-Marne
+  { code = "FR-95", name = "Cergy", label = [2.0361, 49.0522] },  # Val-d'Oise
+  { code = "FR-GF", name = "Cayenne", label = [-52.335, 4.9386] },  # Guyane
+  { code = "FR-GP", name = "Basse-Terre", label = [-61.7328, 15.9969] },  # Guadeloupe
+  { code = "FR-MQ", name = "Fort-de-France", label = [-61.0667, 14.6] },  # Martinique
+  { code = "FR-RE", name = "Saint-Denis", label = [55.4481, -20.8789] },  # La Réunion
+  { code = "FR-YT", name = "Mamoudzou", label = [45.2317, -12.7814] },  # Mayotte
+]
+
+[atlas]
+id = "fr-prefectures"
+title = "Préfectures"
+category = "France"
+one = "préfecture"
+many = "préfectures"
+feminine = true
+title_en = "French prefectures"
+category_en = "France"
+one_en = "prefecture"
+many_en = "prefectures"

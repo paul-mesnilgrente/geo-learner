@@ -300,6 +300,9 @@ fn section_flag(category: &str) -> Option<&'static str> {
         "États-Unis" => Some("USA"),
         "Canada" => Some("CAN"),
         "Australie" => Some("AUS"),
+        "Suisse" => Some("CHE"),
+        "Belgique" => Some("BEL"),
+        "Nouvelle-Zélande" => Some("NZL"),
         _ => None,
     }
 }

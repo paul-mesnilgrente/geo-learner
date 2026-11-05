@@ -1,0 +1,68 @@
+# Capitales des États américains (`mapgen points`) : la capitale de chacun des 50 États, posée
+# sur la carte des États (data/atlases/us-etats.toml : mêmes zones, Alaska et Hawaï en encarts).
+# Positions d'après Wikidata, relevées une fois et gardées ici.
+
+items = [
+  { code = "US-AL", name = "Montgomery", label = [-86.3, 32.3675] },  # Alabama
+  { code = "US-AK", name = "Juneau", label = [-134.4197, 58.3019], say = ["juno"] },  # Alaska
+  { code = "US-AZ", name = "Phoenix", label = [-112.0739, 33.4483] },  # Arizona
+  { code = "US-AR", name = "Little Rock", label = [-92.2881, 34.7444] },  # Arkansas
+  { code = "US-CA", name = "Sacramento", label = [-121.4939, 38.5811] },  # Californie
+  { code = "US-NC", name = "Raleigh", label = [-78.64, 35.78] },  # Caroline du Nord
+  { code = "US-SC", name = "Columbia", label = [-81.0442, 34.0006] },  # Caroline du Sud
+  { code = "US-CO", name = "Denver", label = [-104.9847, 39.7392] },  # Colorado
+  { code = "US-CT", name = "Hartford", label = [-72.685, 41.7633], say = ["art ford", "hart ford"] },  # Connecticut
+  { code = "US-ND", name = "Bismarck", label = [-100.7837, 46.8083] },  # Dakota du Nord
+  { code = "US-SD", name = "Pierre", label = [-100.3511, 44.3684] },  # Dakota du Sud
+  { code = "US-DE", name = "Dover", label = [-75.5257, 39.1617] },  # Delaware
+  { code = "US-FL", name = "Tallahassee", label = [-84.2806, 30.4383], say = ["tala hassi"] },  # Floride
+  { code = "US-GA", name = "Atlanta", label = [-84.3897, 33.7544] },  # Géorgie
+  { code = "US-HI", name = "Honolulu", label = [-157.8572, 21.3047] },  # Hawaï
+  { code = "US-ID", name = "Boise", label = [-116.2378, 43.6136] },  # Idaho
+  { code = "US-IL", name = "Springfield", label = [-89.645, 39.7975] },  # Illinois
+  { code = "US-IN", name = "Indianapolis", label = [-86.1581, 39.7686] },  # Indiana
+  { code = "US-IA", name = "Des Moines", label = [-93.6208, 41.5908] },  # Iowa
+  { code = "US-KS", name = "Topeka", label = [-95.678, 39.0483], say = ["to pi qua"] },  # Kansas
+  { code = "US-KY", name = "Frankfort", label = [-84.863, 38.197], say = ["franc fort"] },  # Kentucky
+  { code = "US-LA", name = "Baton Rouge", label = [-91.1786, 30.4475] },  # Louisiane
+  { code = "US-ME", name = "Augusta", label = [-69.7794, 44.3106] },  # Maine
+  { code = "US-MD", name = "Annapolis", label = [-76.4919, 38.9786], say = ["anna polis"] },  # Maryland
+  { code = "US-MA", name = "Boston", label = [-71.0578, 42.3603] },  # Massachusetts
+  { code = "US-MI", name = "Lansing", label = [-84.5467, 42.7335], say = ["lent sing"] },  # Michigan
+  { code = "US-MN", name = "Saint Paul", label = [-93.0936, 44.9442] },  # Minnesota
+  { code = "US-MS", name = "Jackson", label = [-90.1847, 32.2989] },  # Mississippi
+  { code = "US-MO", name = "Jefferson City", label = [-92.1736, 38.5767] },  # Missouri
+  { code = "US-MT", name = "Helena", label = [-112.035, 46.5928] },  # Montana
+  { code = "US-NE", name = "Lincoln", label = [-96.6781, 40.8092] },  # Nebraska
+  { code = "US-NV", name = "Carson City", label = [-119.7539, 39.1608] },  # Nevada
+  { code = "US-NH", name = "Concord", label = [-71.5381, 43.2067] },  # New Hampshire
+  { code = "US-NJ", name = "Trenton", label = [-74.7658, 40.2203], say = ["train ton", "trente ton"] },  # New Jersey
+  { code = "US-NM", name = "Santa Fe", label = [-105.9667, 35.6667] },  # Nouveau-Mexique
+  { code = "US-NY", name = "Albany", label = [-73.7667, 42.65] },  # New York
+  { code = "US-OH", name = "Columbus", label = [-83.0006, 39.9622] },  # Ohio
+  { code = "US-OK", name = "Oklahoma City", label = [-97.5353, 35.4822] },  # Oklahoma
+  { code = "US-OR", name = "Salem", label = [-123.0389, 44.94] },  # Oregon
+  { code = "US-PA", name = "Harrisburg", label = [-76.8834, 40.2646], say = ["harris bourg"] },  # Pennsylvanie
+  { code = "US-RI", name = "Providence", label = [-71.4128, 41.824] },  # Rhode Island
+  { code = "US-TN", name = "Nashville", label = [-86.7744, 36.1622] },  # Tennessee
+  { code = "US-TX", name = "Austin", label = [-97.7333, 30.3] },  # Texas
+  { code = "US-UT", name = "Salt Lake City", label = [-111.8833, 40.75] },  # Utah
+  { code = "US-VT", name = "Montpelier", label = [-72.5717, 44.2659], say = ["montpellier", "mont pelier"] },  # Vermont
+  { code = "US-VA", name = "Richmond", label = [-77.4367, 37.5408] },  # Virginie
+  { code = "US-WV", name = "Charleston", label = [-81.6333, 38.3472] },  # Virginie-Occidentale
+  { code = "US-WA", name = "Olympia", label = [-122.8931, 47.0425] },  # Washington
+  { code = "US-WI", name = "Madison", label = [-89.3842, 43.0747] },  # Wisconsin
+  { code = "US-WY", name = "Cheyenne", label = [-104.8019, 41.1456] },  # Wyoming
+]
+
+[atlas]
+id = "us-capitales"
+title = "Capitales des États-Unis"
+category = "États-Unis"
+one = "capitale"
+many = "capitales"
+feminine = true
+title_en = "U.S. state capitals"
+category_en = "United States"
+one_en = "capital"
+many_en = "capitals"
