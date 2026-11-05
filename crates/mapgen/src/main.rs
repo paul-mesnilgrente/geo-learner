@@ -84,6 +84,35 @@ struct CountryDef {
     /// Fleuves : ne garder que les tronçons compris dans ce cadre [lon_min, lat_min, lon_max,
     /// lat_max] (homonymes : Colorado des États-Unis et d'Argentine).
     within: Option<[f32; 4]>,
+    /// Lacs : entités de Natural Earth (par leur nom) qui forment le lac (mer d'Aral : Nord et
+    /// Sud).
+    #[serde(default)]
+    lake: Vec<String>,
+}
+
+/// Fichier des capitales (`data/capitals.toml`) : une par pays de `countries.toml`.
+#[derive(Deserialize)]
+struct CapitalsFile {
+    atlas: AtlasDef,
+    items: Vec<CapitalDef>,
+}
+
+#[derive(Deserialize)]
+struct CapitalDef {
+    /// Code du pays (ADM0_A3), comme dans `countries.toml`.
+    code: String,
+    name: String,
+    en: Option<String>,
+    #[serde(default)]
+    aka: Vec<String>,
+    #[serde(default)]
+    say: Vec<String>,
+    #[serde(default)]
+    say_en: Vec<String>,
+    /// Ville de Natural Earth (son nom), quand ce n'est pas l'unique « Admin-0 capital » du pays.
+    city: Option<String>,
+    /// Position [lon, lat], pour une ville absente de Natural Earth.
+    label: Option<[f32; 2]>,
 }
 
 #[derive(Deserialize)]
@@ -201,6 +230,7 @@ fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
     let usage = "usage : mapgen world <admin0> <sortie> | mapgen atlas <toml> <admin0> <admin1> <sortie> \
          | mapgen water <toml> <admin0> <marine> <sortie> | mapgen rivers <toml> <rivers> <lakes> <sortie> \
+         | mapgen lakes <toml> <lakes> <sortie> | mapgen capitals <toml> <places> <world.bin> <sortie> \
          | mapgen flags <admin0> <svg> <world.bin> <sortie> | mapgen flag-sheet <flags.bin> <admin0> <svg> <png>";
     let read_json = |path: &str| -> Result<Value> {
         Ok(serde_json::from_str(&std::fs::read_to_string(path)?)?)
@@ -280,6 +310,26 @@ fn main() -> Result<()> {
             let lakes = read_json(args.get(4).ok_or(usage)?)?;
             (
                 build_rivers(&atlas, &rivers, &lakes)?,
+                args.get(5).ok_or(usage)?,
+            )
+        }
+        Some("lakes") => {
+            let atlas: AtlasFile =
+                toml::from_str(&std::fs::read_to_string(args.get(2).ok_or(usage)?)?)?;
+            let lakes = read_json(args.get(3).ok_or(usage)?)?;
+            (build_lakes(&atlas, &lakes)?, args.get(4).ok_or(usage)?)
+        }
+        Some("capitals") => {
+            let file: CapitalsFile =
+                toml::from_str(&std::fs::read_to_string(args.get(2).ok_or(usage)?)?)?;
+            let countries: CountriesFile =
+                toml::from_str(&std::fs::read_to_string("data/countries.toml")?)?;
+            let regions: RegionsFile =
+                toml::from_str(&std::fs::read_to_string("data/regions.toml")?)?;
+            let places = read_json(args.get(3).ok_or(usage)?)?;
+            let world = World::from_bytes(&std::fs::read(args.get(4).ok_or(usage)?)?)?;
+            (
+                build_capitals(&file, &countries, &regions, &places, &world)?,
                 args.get(5).ok_or(usage)?,
             )
         }
@@ -413,6 +463,8 @@ fn build_world(defs: &CountriesFile, zones: &RegionsFile, features: &Value) -> R
         water: false,
         lines: false,
         flags: false,
+        points: false,
+        inland_water: false,
     };
     assemble(info, &defs.countries, zones, source, WORLD_TOLERANCE)
 }
@@ -614,6 +666,8 @@ fn build_atlas(file: &AtlasFile, admin0: &Value, admin1: &Value) -> Result<World
         water: false,
         lines: false,
         flags: false,
+        points: false,
+        inland_water: false,
     };
     assemble(info, &file.items, &file.zones, source, tolerance)
 }
@@ -681,6 +735,8 @@ fn build_water(file: &AtlasFile, admin0: &Value, marine: &Value) -> Result<World
         water: true,
         lines: false,
         flags: false,
+        points: false,
+        inland_water: false,
     };
     let rings: Vec<Vec<Ring>> = source.rings.clone();
     let mut world = assemble(info, &file.items, &file.zones, source, WORLD_TOLERANCE)?;
@@ -764,6 +820,8 @@ fn build_rivers(file: &AtlasFile, rivers: &Value, lakes: &Value) -> Result<World
         water: false,
         lines: true,
         flags: false,
+        points: false,
+        inland_water: false,
     };
     let mut world = assemble(info, &file.items, &file.zones, source, RIVER_TOLERANCE)?;
     for country in &mut world.countries {
@@ -781,6 +839,205 @@ fn build_rivers(file: &AtlasFile, rivers: &Value, lakes: &Value) -> Result<World
         }
     }
     Ok(world)
+}
+
+/// Lacs : les rives comptent moins que les côtes des pays, mais les petits lacs doivent garder
+/// leur forme.
+const INLAND_TOLERANCE: Tolerance = Tolerance { hi: 0.01, lo: 0.04 };
+
+/// Atlas de lacs : chaque lieu est un ou plusieurs polygones de Natural Earth, peints par-dessus
+/// les terres du monde (reprises à l'exécution).
+fn build_lakes(file: &AtlasFile, lakes: &Value) -> Result<World> {
+    let def = &file.atlas;
+    let n = file.items.len();
+    let mut source = Source {
+        rings: Vec::with_capacity(n),
+        labels: vec![None; n],
+        english: vec![None; n],
+        territories: Vec::new(),
+    };
+    let features = lakes["features"].as_array().ok_or("GeoJSON invalide")?;
+    for item in &file.items {
+        let mut rings: Vec<Ring> = Vec::new();
+        for name in &item.lake {
+            let before = rings.len();
+            for feature in features
+                .iter()
+                .filter(|f| f["properties"]["name"].as_str() == Some(name.as_str()))
+            {
+                // Natural Earth répète certains lacs (Volta, mer Morte) : un anneau en double
+                // s'annulerait au remplissage pair-impair.
+                for ring in read_rings(&feature["geometry"])? {
+                    if !rings.contains(&ring) {
+                        rings.push(ring);
+                    }
+                }
+            }
+            if rings.len() == before {
+                return Err(format!("{} : lac « {name} » introuvable", item.name).into());
+            }
+        }
+        if rings.is_empty() {
+            return Err(format!("{} : aucun lac (`lake`)", item.name).into());
+        }
+        source.rings.push(rings);
+    }
+    let info = Info {
+        id: def.id.clone(),
+        title: Text::new(&def.title, &def.title_en),
+        category: Text::new(&def.category, &def.category_en),
+        one: Text::new(&def.one, &def.one_en),
+        many: Text::new(&def.many, &def.many_en),
+        feminine: def.feminine,
+        zoom_sub: false,
+        levels: levels(&def.levels, &def.levels_en),
+        insets: Vec::new(),
+        numbers: false,
+        water: false,
+        lines: false,
+        flags: false,
+        points: false,
+        inland_water: true,
+    };
+    let mut world = assemble(info, &file.items, &file.zones, source, INLAND_TOLERANCE)?;
+    for country in &mut world.countries {
+        country.label = inner_point(&country.shape.rings);
+    }
+    Ok(world)
+}
+
+/// Demi-côté (en degrés) du carré qui tient lieu de contour à une capitale.
+const POINT_SIZE: f32 = 0.005;
+
+/// Atlas des capitales : un point par pays de l'atlas du monde, dans le même ordre et les mêmes
+/// zones (cadrages repris de `world.bin`). Les terres du monde sont reprises à l'exécution.
+fn build_capitals(
+    file: &CapitalsFile,
+    countries: &CountriesFile,
+    zones: &RegionsFile,
+    places: &Value,
+    world: &World,
+) -> Result<World> {
+    let def = &file.atlas;
+    let places = places["features"].as_array().ok_or("GeoJSON invalide")?;
+    let mut defs = Vec::with_capacity(countries.countries.len());
+    let mut source = Source {
+        rings: Vec::new(),
+        labels: Vec::new(),
+        english: Vec::new(),
+        territories: Vec::new(),
+    };
+    for country in &countries.countries {
+        let capital = file
+            .items
+            .iter()
+            .find(|c| c.code == country.code)
+            .ok_or_else(|| format!("{} : capitale manquante", country.name))?;
+        let place = match &capital.city {
+            Some(city) => places
+                .iter()
+                .find(|f| f["properties"]["NAME"].as_str() == Some(city.as_str())),
+            None => {
+                let found: Vec<&Value> = places
+                    .iter()
+                    .filter(|f| {
+                        let p = &f["properties"];
+                        p["ADM0_A3"].as_str() == Some(country.code.as_str())
+                            && p["FEATURECLA"].as_str() == Some("Admin-0 capital")
+                    })
+                    .collect();
+                match found[..] {
+                    [one] => Some(one),
+                    [] => None,
+                    _ => {
+                        return Err(format!(
+                            "{} : plusieurs capitales dans Natural Earth, préciser `city`",
+                            capital.name
+                        )
+                        .into());
+                    }
+                }
+            }
+        };
+        let position = match (capital.label, place) {
+            (Some(label), _) => label,
+            (None, Some(f)) => {
+                let p = &f["properties"];
+                let coord = |key: &str| p[key].as_f64().map(|v| v as f32);
+                [
+                    coord("LONGITUDE").ok_or("longitude manquante")?,
+                    coord("LATITUDE").ok_or("latitude manquante")?,
+                ]
+            }
+            (None, None) => {
+                return Err(
+                    format!("{} : introuvable, préciser `city` ou `label`", capital.name).into(),
+                );
+            }
+        };
+        let [x, y] = position;
+        let d = POINT_SIZE;
+        source.rings.push(vec![vec![
+            [x - d, y - d],
+            [x + d, y - d],
+            [x + d, y + d],
+            [x - d, y + d],
+        ]]);
+        source.labels.push(Some(position));
+        source.english.push(None);
+        defs.push(CountryDef {
+            code: country.code.clone(),
+            name: capital.name.clone(),
+            sub: country.sub.clone(),
+            aka: capital.aka.clone(),
+            say: capital.say.clone(),
+            en: capital.en.clone().or_else(|| Some(capital.name.clone())),
+            say_en: capital.say_en.clone(),
+            label: Some(position),
+            bubble: false,
+            one_bubble: false,
+            parts: Vec::new(),
+            rings: Vec::new(),
+            marine: Vec::new(),
+            river: Vec::new(),
+            within: None,
+            lake: Vec::new(),
+        });
+    }
+    if let Some(extra) = file
+        .items
+        .iter()
+        .find(|c| !countries.countries.iter().any(|d| d.code == c.code))
+    {
+        return Err(format!("{} : pays inconnu ({})", extra.name, extra.code).into());
+    }
+    let info = Info {
+        id: def.id.clone(),
+        title: Text::new(&def.title, &def.title_en),
+        category: Text::new(&def.category, &def.category_en),
+        one: Text::new(&def.one, &def.one_en),
+        many: Text::new(&def.many, &def.many_en),
+        feminine: def.feminine,
+        zoom_sub: false,
+        levels: world.info.levels.clone(),
+        insets: Vec::new(),
+        numbers: false,
+        water: false,
+        lines: false,
+        flags: false,
+        points: true,
+        inland_water: false,
+    };
+    let exact = Tolerance { hi: 0.0, lo: 0.0 };
+    let mut capitals = assemble(info, &defs, zones, source, exact)?;
+    // Mêmes cadrages que le quiz des pays : une zone se voit en entier, pas seulement ses villes.
+    for region in &mut capitals.regions {
+        if let Some(same) = world.regions.iter().find(|r| r.id == region.id) {
+            region.view = same.view;
+            region.center = same.center;
+        }
+    }
+    Ok(capitals)
 }
 
 /// Tracés d'une géométrie GeoJSON linéaire.

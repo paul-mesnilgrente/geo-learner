@@ -157,6 +157,11 @@ pub struct Info {
     /// Quiz des drapeaux (dérivé de l'atlas du monde) : le drapeau d'un pays remplace son nom
     /// dans les questions.
     pub flags: bool,
+    /// Lieux ponctuels (capitales) : une pastille à leur point d'étiquette, quel que soit le
+    /// zoom ; leur contour n'est qu'un minuscule carré.
+    pub points: bool,
+    /// Eaux intérieures (lacs) : des polygones peints par-dessus les terres, en couleur d'eau.
+    pub inland_water: bool,
 }
 
 /// Encart, en (lon, lat) : `[lon_min, lat_min, lon_max, lat_max]`.

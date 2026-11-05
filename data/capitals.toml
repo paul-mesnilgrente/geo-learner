@@ -1,0 +1,225 @@
+# Capitales du monde (`mapgen capitals`) : la capitale de chacun des 197 pays de
+# `countries.toml`, dans le même ordre et les mêmes zones (`regions.toml`). Chaque capitale est
+# un point, placé d'après Natural Earth 1:50m (`ne_50m_populated_places`) : la ville marquée
+# « Admin-0 capital » du pays, ou `city` (nom Natural Earth) quand il y en a plusieurs ou
+# qu'elle est rangée ailleurs, ou `label` [lon, lat] quand elle manque.
+#
+# Pays à plusieurs capitales : la capitale officielle est le point et le nom ; les autres sont
+# acceptées en réponse si elles partagent le titre (Afrique du Sud : Pretoria, Le Cap,
+# Bloemfontein ; Bolivie : Sucre, La Paz ; Sri Lanka : Kotte, Colombo). Une simple capitale
+# économique ne l'est pas (Abidjan, Cotonou, Dar es Salam, Lagos).
+#
+# name : nom français affiché ; en : nom anglais, s'il diffère ; aka : autres noms acceptés ;
+# say / say_en : formes orales pour la reconnaissance vocale.
+
+items = [
+  { code = "AFG", name = "Kaboul", en = "Kabul" },  # Afghanistan
+  { code = "ZAF", name = "Pretoria", aka = ["Tshwane", "Le Cap", "Cape Town", "Bloemfontein"], city = "Pretoria" },  # Afrique du Sud
+  { code = "ALB", name = "Tirana" },  # Albanie
+  { code = "DZA", name = "Alger", en = "Algiers" },  # Algérie
+  { code = "DEU", name = "Berlin" },  # Allemagne
+  { code = "AND", name = "Andorre-la-Vieille", en = "Andorra la Vella" },  # Andorre
+  { code = "AGO", name = "Luanda" },  # Angola
+  { code = "ATG", name = "Saint John's" },  # Antigua-et-Barbuda
+  { code = "SAU", name = "Riyad", en = "Riyadh", aka = ["Riyadh"] },  # Arabie saoudite
+  { code = "ARG", name = "Buenos Aires" },  # Argentine
+  { code = "ARM", name = "Erevan", en = "Yerevan" },  # Arménie
+  { code = "AUS", name = "Canberra" },  # Australie
+  { code = "AUT", name = "Vienne", en = "Vienna", aka = ["Wien"] },  # Autriche
+  { code = "AZE", name = "Bakou", en = "Baku" },  # Azerbaïdjan
+  { code = "BHS", name = "Nassau" },  # Bahamas
+  { code = "BHR", name = "Manama", say = ["mana ma"] },  # Bahreïn
+  { code = "BGD", name = "Dacca", en = "Dhaka", aka = ["Dhaka"], say = ["da qua"] },  # Bangladesh
+  { code = "BRB", name = "Bridgetown", say = ["bridge town"] },  # Barbade
+  { code = "BEL", name = "Bruxelles", en = "Brussels" },  # Belgique
+  { code = "BLZ", name = "Belmopan", say = ["bel mo pan"] },  # Belize
+  { code = "BEN", name = "Porto-Novo", city = "Porto-Novo" },  # Bénin
+  { code = "BTN", name = "Thimphou", en = "Thimphu", aka = ["Thimphu"], say = ["tim fou"] },  # Bhoutan
+  { code = "BLR", name = "Minsk" },  # Biélorussie
+  { code = "MMR", name = "Naypyidaw", aka = ["Nay Pyi Taw", "Naypyitaw", "Naypyitaw"], city = "Naypyidaw", say = ["nè pi do"] },  # Birmanie
+  { code = "BOL", name = "Sucre", aka = ["La Paz"], city = "Sucre" },  # Bolivie
+  { code = "BIH", name = "Sarajevo" },  # Bosnie-Herzégovine
+  { code = "BWA", name = "Gaborone", say = ["gab oh rone", "ga bo rone"] },  # Botswana
+  { code = "BRA", name = "Brasilia", en = "Brasília" },  # Brésil
+  { code = "BRN", name = "Bandar Seri Begawan", say = ["bande art série bé ga wan"] },  # Brunei
+  { code = "BGR", name = "Sofia" },  # Bulgarie
+  { code = "BFA", name = "Ouagadougou" },  # Burkina Faso
+  { code = "BDI", name = "Bujumbura" },  # Burundi
+  { code = "KHM", name = "Phnom Penh" },  # Cambodge
+  { code = "CMR", name = "Yaoundé" },  # Cameroun
+  { code = "CAN", name = "Ottawa" },  # Canada
+  { code = "CPV", name = "Praia" },  # Cap-Vert
+  { code = "CHL", name = "Santiago" },  # Chili
+  { code = "CHN", name = "Pékin", en = "Beijing", aka = ["Peking", "Beijing"] },  # Chine
+  { code = "CYP", name = "Nicosie", en = "Nicosia" },  # Chypre
+  { code = "COL", name = "Bogota", en = "Bogotá" },  # Colombie
+  { code = "COM", name = "Moroni" },  # Comores
+  { code = "COG", name = "Brazzaville" },  # Congo
+  { code = "COD", name = "Kinshasa" },  # République démocratique du Congo
+  { code = "KOR", name = "Séoul", en = "Seoul" },  # Corée du Sud
+  { code = "PRK", name = "Pyongyang" },  # Corée du Nord
+  { code = "CRI", name = "San José" },  # Costa Rica
+  { code = "CIV", name = "Yamoussoukro", city = "Yamoussoukro" },  # Côte d'Ivoire
+  { code = "HRV", name = "Zagreb" },  # Croatie
+  { code = "CUB", name = "La Havane", en = "Havana" },  # Cuba
+  { code = "DNK", name = "Copenhague", en = "Copenhagen", aka = ["København"] },  # Danemark
+  { code = "DJI", name = "Djibouti" },  # Djibouti
+  { code = "DMA", name = "Roseau" },  # Dominique
+  { code = "EGY", name = "Le Caire", en = "Cairo" },  # Égypte
+  { code = "ARE", name = "Abou Dabi", en = "Abu Dhabi", aka = ["Abu Dhabi", "Abou Dhabi"] },  # Émirats arabes unis
+  { code = "ECU", name = "Quito" },  # Équateur
+  { code = "ERI", name = "Asmara", say = ["as mara"] },  # Érythrée
+  { code = "ESP", name = "Madrid" },  # Espagne
+  { code = "EST", name = "Tallinn" },  # Estonie
+  { code = "SWZ", name = "Mbabane", say = ["em baba né"] },  # Eswatini
+  { code = "USA", name = "Washington", en = "Washington, D.C.", aka = ["Washington DC", "Washington D.C."] },  # États-Unis
+  { code = "ETH", name = "Addis-Abeba", en = "Addis Ababa" },  # Éthiopie
+  { code = "FJI", name = "Suva" },  # Fidji
+  { code = "FIN", name = "Helsinki" },  # Finlande
+  { code = "FRA", name = "Paris" },  # France
+  { code = "GAB", name = "Libreville" },  # Gabon
+  { code = "GMB", name = "Banjul" },  # Gambie
+  { code = "GEO", name = "Tbilissi", en = "Tbilisi" },  # Géorgie
+  { code = "GHA", name = "Accra" },  # Ghana
+  { code = "GRC", name = "Athènes", en = "Athens" },  # Grèce
+  { code = "GRD", name = "Saint-Georges", en = "St. George's", aka = ["Saint George's"] },  # Grenade
+  { code = "GTM", name = "Guatemala", en = "Guatemala City", aka = ["Guatemala-Ville", "Ciudad de Guatemala"] },  # Guatemala
+  { code = "GIN", name = "Conakry" },  # Guinée
+  { code = "GNB", name = "Bissau" },  # Guinée-Bissau
+  { code = "GNQ", name = "Malabo" },  # Guinée équatoriale
+  { code = "GUY", name = "Georgetown" },  # Guyana
+  { code = "HTI", name = "Port-au-Prince" },  # Haïti
+  { code = "HND", name = "Tegucigalpa", say = ["té goût si gale pa"] },  # Honduras
+  { code = "HUN", name = "Budapest" },  # Hongrie
+  { code = "IND", name = "New Delhi", aka = ["Nouvelle-Delhi"] },  # Inde
+  { code = "IDN", name = "Jakarta" },  # Indonésie
+  { code = "IRQ", name = "Bagdad", en = "Baghdad" },  # Irak
+  { code = "IRN", name = "Téhéran", en = "Tehran" },  # Iran
+  { code = "IRL", name = "Dublin" },  # Irlande
+  { code = "ISL", name = "Reykjavik", en = "Reykjavík" },  # Islande
+  { code = "ISR", name = "Jérusalem", en = "Jerusalem" },  # Israël
+  { code = "ITA", name = "Rome" },  # Italie
+  { code = "JAM", name = "Kingston" },  # Jamaïque
+  { code = "JPN", name = "Tokyo" },  # Japon
+  { code = "JOR", name = "Amman" },  # Jordanie
+  { code = "KAZ", name = "Astana", aka = ["Nur-Sultan", "Noursoultan"] },  # Kazakhstan
+  { code = "KEN", name = "Nairobi" },  # Kenya
+  { code = "KGZ", name = "Bichkek", en = "Bishkek", say = ["biche cake"] },  # Kirghizistan
+  { code = "KIR", name = "Tarawa-Sud", en = "South Tarawa", aka = ["Tarawa"], say = ["tara wa sud", "tara wa"] },  # Kiribati
+  { code = "KOS", name = "Pristina", aka = ["Prishtina", "Priština"] },  # Kosovo
+  { code = "KWT", name = "Koweït", en = "Kuwait City", aka = ["Koweït City", "Ville de Koweït"] },  # Koweït
+  { code = "LAO", name = "Vientiane" },  # Laos
+  { code = "LSO", name = "Maseru", say = ["masse rou"] },  # Lesotho
+  { code = "LVA", name = "Riga" },  # Lettonie
+  { code = "LBN", name = "Beyrouth", en = "Beirut" },  # Liban
+  { code = "LBR", name = "Monrovia" },  # Liberia
+  { code = "LBY", name = "Tripoli" },  # Libye
+  { code = "LIE", name = "Vaduz", say = ["va douze"] },  # Liechtenstein
+  { code = "LTU", name = "Vilnius" },  # Lituanie
+  { code = "LUX", name = "Luxembourg" },  # Luxembourg
+  { code = "MKD", name = "Skopje" },  # Macédoine du Nord
+  { code = "MDG", name = "Antananarivo" },  # Madagascar
+  { code = "MYS", name = "Kuala Lumpur" },  # Malaisie
+  { code = "MWI", name = "Lilongwe", say = ["li longue oué"] },  # Malawi
+  { code = "MDV", name = "Malé", say = ["ma lé"] },  # Maldives
+  { code = "MLI", name = "Bamako" },  # Mali
+  { code = "MLT", name = "La Valette", en = "Valletta" },  # Malte
+  { code = "MAR", name = "Rabat" },  # Maroc
+  { code = "MHL", name = "Majuro", say = ["ma jus ro"] },  # Îles Marshall
+  { code = "MUS", name = "Port-Louis", en = "Port Louis" },  # Maurice
+  { code = "MRT", name = "Nouakchott" },  # Mauritanie
+  { code = "MEX", name = "Mexico", en = "Mexico City", aka = ["Ciudad de México"] },  # Mexique
+  { code = "FSM", name = "Palikir", say = ["palis kir"] },  # Micronésie
+  { code = "MDA", name = "Chisinau", en = "Chișinău", aka = ["Chișinău", "Kichinev", "Kishinev"] },  # Moldavie
+  { code = "MCO", name = "Monaco" },  # Monaco
+  { code = "MNG", name = "Oulan-Bator", en = "Ulaanbaatar", aka = ["Oulan Bator", "Ulan Bator", "Oulaanbaatar"], say = ["ou lan bateau", "ou l'an bateau"] },  # Mongolie
+  { code = "MNE", name = "Podgorica", say = ["pod go ri tsa"] },  # Monténégro
+  { code = "MOZ", name = "Maputo" },  # Mozambique
+  { code = "NAM", name = "Windhoek", say = ["vint hook", "vine houx"] },  # Namibie
+  { code = "NRU", name = "Yaren", label = [166.9209, -0.5477], say = ["ya renne"] },  # Nauru
+  { code = "NPL", name = "Katmandou", en = "Kathmandu" },  # Népal
+  { code = "NIC", name = "Managua" },  # Nicaragua
+  { code = "NER", name = "Niamey" },  # Niger
+  { code = "NGA", name = "Abuja" },  # Nigeria
+  { code = "NOR", name = "Oslo" },  # Norvège
+  { code = "NZL", name = "Wellington" },  # Nouvelle-Zélande
+  { code = "OMN", name = "Mascate", en = "Muscat" },  # Oman
+  { code = "UGA", name = "Kampala" },  # Ouganda
+  { code = "UZB", name = "Tachkent", en = "Tashkent" },  # Ouzbékistan
+  { code = "PAK", name = "Islamabad" },  # Pakistan
+  { code = "PLW", name = "Ngerulmud", aka = ["Melekeok"], label = [134.6244, 7.5006], say = ["nez roule moud"] },  # Palaos
+  { code = "PSX", name = "Ramallah", aka = ["Jérusalem-Est", "East Jerusalem"], city = "Ramallah" },  # Palestine
+  { code = "PAN", name = "Panama", en = "Panama City", aka = ["Ciudad de Panamá"] },  # Panama
+  { code = "PNG", name = "Port Moresby", say = ["port morse bi"] },  # Papouasie-Nouvelle-Guinée
+  { code = "PRY", name = "Asuncion", en = "Asunción", aka = ["Assomption"], say = ["à sun sion"] },  # Paraguay
+  { code = "NLD", name = "Amsterdam" },  # Pays-Bas
+  { code = "PER", name = "Lima" },  # Pérou
+  { code = "PHL", name = "Manille", en = "Manila" },  # Philippines
+  { code = "POL", name = "Varsovie", en = "Warsaw" },  # Pologne
+  { code = "PRT", name = "Lisbonne", en = "Lisbon" },  # Portugal
+  { code = "QAT", name = "Doha" },  # Qatar
+  { code = "CAF", name = "Bangui" },  # République centrafricaine
+  { code = "DOM", name = "Saint-Domingue", en = "Santo Domingo" },  # République dominicaine
+  { code = "CZE", name = "Prague" },  # Tchéquie
+  { code = "ROU", name = "Bucarest", en = "Bucharest" },  # Roumanie
+  { code = "GBR", name = "Londres", en = "London" },  # Royaume-Uni
+  { code = "RUS", name = "Moscou", en = "Moscow" },  # Russie
+  { code = "RWA", name = "Kigali" },  # Rwanda
+  { code = "KNA", name = "Basseterre", say = ["basse terre"] },  # Saint-Christophe-et-Niévès
+  { code = "SMR", name = "Saint-Marin", en = "San Marino" },  # Saint-Marin
+  { code = "VCT", name = "Kingstown", say = ["kings town"] },  # Saint-Vincent-et-les-Grenadines
+  { code = "LCA", name = "Castries" },  # Sainte-Lucie
+  { code = "SLB", name = "Honiara", say = ["oh nia ra"] },  # Îles Salomon
+  { code = "SLV", name = "San Salvador" },  # Salvador
+  { code = "WSM", name = "Apia", say = ["à pia"] },  # Samoa
+  { code = "STP", name = "São Tomé" },  # Sao Tomé-et-Principe
+  { code = "SEN", name = "Dakar" },  # Sénégal
+  { code = "SRB", name = "Belgrade" },  # Serbie
+  { code = "SYC", name = "Victoria" },  # Seychelles
+  { code = "SLE", name = "Freetown", say = ["free town"] },  # Sierra Leone
+  { code = "SGP", name = "Singapour", en = "Singapore" },  # Singapour
+  { code = "SVK", name = "Bratislava" },  # Slovaquie
+  { code = "SVN", name = "Ljubljana" },  # Slovénie
+  { code = "SOM", name = "Mogadiscio", en = "Mogadishu" },  # Somalie
+  { code = "SDN", name = "Khartoum" },  # Soudan
+  { code = "SDS", name = "Djouba", en = "Juba", aka = ["Juba"], city = "Juba" },  # Soudan du Sud
+  { code = "LKA", name = "Sri Jayawardenepura Kotte", aka = ["Kotte", "Sri Jayawardenepura", "Colombo"], city = "Sri Jayawardenepura Kotte" },  # Sri Lanka
+  { code = "SWE", name = "Stockholm" },  # Suède
+  { code = "CHE", name = "Berne", en = "Bern" },  # Suisse
+  { code = "SUR", name = "Paramaribo", say = ["para mari bo"] },  # Suriname
+  { code = "SYR", name = "Damas", en = "Damascus" },  # Syrie
+  { code = "TJK", name = "Douchanbé", en = "Dushanbe", say = ["douche en bé"] },  # Tadjikistan
+  { code = "TWN", name = "Taipei", aka = ["Taïpei"] },  # Taïwan
+  { code = "TZA", name = "Dodoma", city = "Dodoma", say = ["dodo ma"] },  # Tanzanie
+  { code = "TCD", name = "N'Djaména", en = "N'Djamena" },  # Tchad
+  { code = "THA", name = "Bangkok" },  # Thaïlande
+  { code = "TLS", name = "Dili", say = ["di li"] },  # Timor oriental
+  { code = "TGO", name = "Lomé" },  # Togo
+  { code = "TON", name = "Nuku'alofa", say = ["nou cou à lo fa"] },  # Tonga
+  { code = "TTO", name = "Port-d'Espagne", en = "Port of Spain" },  # Trinité-et-Tobago
+  { code = "TUN", name = "Tunis" },  # Tunisie
+  { code = "TKM", name = "Achgabat", en = "Ashgabat", aka = ["Achkhabad"], say = ["hache ga batte"] },  # Turkménistan
+  { code = "TUR", name = "Ankara" },  # Turquie
+  { code = "TUV", name = "Funafuti", say = ["fou na fou ti"] },  # Tuvalu
+  { code = "UKR", name = "Kiev", en = "Kyiv", aka = ["Kyiv", "Kiyv"] },  # Ukraine
+  { code = "URY", name = "Montevideo" },  # Uruguay
+  { code = "VUT", name = "Port-Vila", en = "Port Vila" },  # Vanuatu
+  { code = "VAT", name = "Cité du Vatican", en = "Vatican City", aka = ["Vatican"] },  # Vatican
+  { code = "VEN", name = "Caracas" },  # Venezuela
+  { code = "VNM", name = "Hanoï", en = "Hanoi" },  # Viêt Nam
+  { code = "YEM", name = "Sanaa" },  # Yémen
+  { code = "ZMB", name = "Lusaka" },  # Zambie
+  { code = "ZWE", name = "Harare" },  # Zimbabwe
+]
+
+[atlas]
+id = "capitales"
+title = "Capitales du monde"
+category = "Monde"
+one = "capitale"
+many = "capitales"
+feminine = true
+title_en = "World capitals"
+category_en = "World"
+one_en = "capital"
+many_en = "capitals"

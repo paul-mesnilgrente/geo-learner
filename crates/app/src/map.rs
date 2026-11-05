@@ -817,9 +817,24 @@ impl MapView<'_> {
         self.world.info.lines
     }
 
+    /// Lieux ponctuels (capitales) : des pastilles, à toutes les échelles.
+    fn points(&self) -> bool {
+        self.world.info.points
+    }
+
+    /// Eaux intérieures (lacs), peintes par-dessus les terres.
+    fn inland(&self) -> bool {
+        self.world.info.inland_water
+    }
+
     /// Couleur de remplissage d'une teinte, selon que les lieux sont des terres ou de l'eau.
     fn fill_color(&self, k: Tint) -> Color {
-        if self.water() {
+        // Lac à trouver : cyan, comme les fleuves, qui se détache des terres, de l'océan et du
+        // bleu de la cible.
+        if self.inland() && k == Tint::Pending {
+            return style::mix(style::OCEAN, color!(0x5cc8e8), 0.55);
+        }
+        if self.water() || self.inland() {
             water_color(k)
         } else {
             k.color()
@@ -869,6 +884,9 @@ impl MapView<'_> {
         if self.lines() {
             return false;
         }
+        if self.points() {
+            return true;
+        }
         let core = self.projection.countries[country].core;
         core.width.max(core.height) * t.scale < TINY_PX
     }
@@ -879,13 +897,17 @@ impl MapView<'_> {
     }
 
     fn hit(&self, t: &Transform, screen: Point) -> Option<Place> {
-        for &c in self.quiz.members() {
-            if self.projection.bubbles[c].is_empty()
-                && self.is_tiny(c, t)
-                && t.to_screen(self.projection.label(c)).distance(screen) <= MARKER_RADIUS + 5.0
-            {
-                return Some(Place::Country(c));
-            }
+        // Pastille la plus proche (les capitales d'Europe ou des Antilles sont serrées).
+        let marker = self
+            .quiz
+            .members()
+            .iter()
+            .filter(|&&c| self.projection.bubbles[c].is_empty() && self.is_tiny(c, t))
+            .map(|&c| (c, t.to_screen(self.projection.label(c)).distance(screen)))
+            .filter(|&(_, d)| d <= MARKER_RADIUS + 5.0)
+            .min_by(|a, b| a.1.total_cmp(&b.1));
+        if let Some((c, _)) = marker {
+            return Some(Place::Country(c));
         }
         let p = t.to_world(screen);
         let inside = |shape: &ProjShape| shape.bbox.contains(p) && contains(&shape.hi, p);
@@ -949,7 +971,7 @@ impl MapView<'_> {
 
     /// Couleur d'un territoire : celle de son pays une fois celui-ci joué, un peu assombrie.
     fn territory_color(&self, territory: usize) -> Color {
-        if self.water() || self.lines() {
+        if self.water() || self.lines() || self.points() || self.inland() {
             return style::LAND;
         }
         let owner = self.world.territories[territory].owner;
@@ -1248,7 +1270,8 @@ impl MapView<'_> {
         let mut buckets: Vec<(Tint, Builder)> =
             Tint::ALL.iter().map(|&k| (k, Builder::new())).collect();
         for (i, shape) in self.projection.countries.iter().enumerate() {
-            if self.lines() || !shape.bbox.intersects(&visible) {
+            // Fleuves tracés à part ; capitales : seulement leur pastille.
+            if self.lines() || self.points() || !shape.bbox.intersects(&visible) {
                 continue;
             }
             let rings = self.rings(i, t);
@@ -1315,7 +1338,7 @@ impl MapView<'_> {
                 continue;
             }
             let center = t.to_screen(self.projection.label(c));
-            let color = self.tint_of(c).color();
+            let color = self.fill_color(self.tint_of(c));
             // Plus discrètes sur la petite carte d'aperçu.
             let radius = if self.preview {
                 MARKER_RADIUS * 0.6
@@ -1323,7 +1346,13 @@ impl MapView<'_> {
                 MARKER_RADIUS
             };
             let dot = Path::circle(center, radius);
-            frame.fill(&dot, style::lighten(color, 0.15));
+            // Capitale à trouver : plus claire que les terres, sur lesquelles elle est posée.
+            let fill = if self.points() && self.tint_of(c) == Tint::Pending {
+                style::lighten(style::LAND, 0.45)
+            } else {
+                style::lighten(color, 0.15)
+            };
+            frame.fill(&dot, fill);
             frame.stroke(
                 &dot,
                 Stroke::default().with_color(style::COAST).with_width(1.2),
@@ -1331,7 +1360,9 @@ impl MapView<'_> {
         }
 
         // Noms des pays déjà joués (tous en exploration), quand ils tiennent dans leur contour.
-        // Sans carte dans le quiz, ce sont les numéros qui s'affichent.
+        // Sans carte dans le quiz, ce sont les numéros qui s'affichent. Les capitales ont leur
+        // nom à droite de leur pastille, s'il ne chevauche pas un nom déjà posé.
+        let mut placed: Vec<Rectangle> = Vec::new();
         for &c in self.quiz.members() {
             let played = matches!(self.quiz.mark(c), Some(Mark::Found { .. } | Mark::Missed));
             let core = self.projection.countries[c].core;
@@ -1347,21 +1378,35 @@ impl MapView<'_> {
             let name = &name;
             let size = if t.scale > 2000.0 { 13.0 } else { 11.0 };
             let width = name.chars().count() as f32 * size * 0.56;
-            if core.width * t.scale < width * 0.9 || core.height * t.scale < size + 2.0 {
-                continue;
-            }
             let at = self.projection.label(c);
             if !visible.contains(at) {
                 continue;
             }
-            let position = t.to_screen(at);
+            let mut position = t.to_screen(at);
+            let align_x = if self.points() {
+                position.x += MARKER_RADIUS + 4.0;
+                let room = Rectangle::new(
+                    Point::new(position.x - 2.0, position.y - size * 0.7),
+                    Size::new(width + 4.0, size * 1.4),
+                );
+                if placed.iter().any(|r| r.intersects(&room)) {
+                    continue;
+                }
+                placed.push(room);
+                Alignment::Left
+            } else {
+                if core.width * t.scale < width * 0.9 || core.height * t.scale < size + 2.0 {
+                    continue;
+                }
+                Alignment::Center
+            };
             let text = |color: Color, offset: Vector| Text {
                 content: name.clone(),
                 position: position + offset,
                 color,
                 size: Pixels(size),
                 font: style::FONT_SEMIBOLD,
-                align_x: Alignment::Center,
+                align_x,
                 align_y: Vertical::Center,
                 ..Text::default()
             };

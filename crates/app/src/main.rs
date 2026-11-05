@@ -24,7 +24,8 @@ use geo_core::World;
 /// Quiz du catalogue, dans l'ordre de l'accueil : un atlas intégré à l'exécutable chacun, sauf
 /// les numéros des départements, dérivés des départements (sans carte, rien de plus à stocker),
 /// et les drapeaux, dérivés du monde (seuls les drapeaux sont stockés, dans `flags.bin`).
-/// Les océans, les mers et les fleuves reprennent les terres de l'atlas du monde.
+/// Les océans, les mers, les fleuves, les lacs et les capitales reprennent les terres de l'atlas
+/// du monde.
 pub static ATLASES: LazyLock<Vec<World>> = LazyLock::new(|| {
     let load = |bytes: &[u8]| World::from_bytes(bytes).expect("atlas invalide");
     let world = load(include_bytes!("../../../assets/world.bin"));
@@ -42,6 +43,16 @@ pub static ATLASES: LazyLock<Vec<World>> = LazyLock::new(|| {
         &world,
         &[],
     );
+    let lakes = with_land(
+        load(include_bytes!("../../../assets/lakes.bin")),
+        &world,
+        &[],
+    );
+    let capitals = with_land(
+        load(include_bytes!("../../../assets/capitals.bin")),
+        &world,
+        &[],
+    );
     let flags = flags_quiz(&world);
     let mut departements = load(include_bytes!("../../../assets/fr-departements.bin"));
     add_number_zones(&mut departements);
@@ -49,9 +60,11 @@ pub static ATLASES: LazyLock<Vec<World>> = LazyLock::new(|| {
     vec![
         world,
         flags,
+        capitals,
         oceans,
         seas,
         rivers,
+        lakes,
         departements,
         numbers,
         load(include_bytes!("../../../assets/fr-regions.bin")),
@@ -446,6 +459,31 @@ mod tests {
         }
     }
 
+    /// Une capitale par pays du monde, dans le même ordre et les mêmes zones.
+    #[test]
+    fn capitals_follow_the_world() {
+        let world = &ATLASES[0];
+        let capitals = ATLASES.iter().find(|a| a.info.id == "capitales").unwrap();
+        let codes = |w: &geo_core::World| {
+            w.countries
+                .iter()
+                .map(|c| c.code.clone())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(codes(capitals), codes(world));
+        for (a, b) in capitals.regions.iter().zip(&world.regions) {
+            assert_eq!((&a.id, &a.members), (&b.id, &b.members));
+        }
+        let city = |code: &str| {
+            let c = capitals.countries.iter().find(|c| c.code == code).unwrap();
+            (c.name.get(geo_core::Lang::Fr).to_owned(), c.label)
+        };
+        let (paris, [lon, lat]) = city("FRA");
+        assert_eq!(paris, "Paris");
+        assert!((lon - 2.35).abs() < 0.2 && (lat - 48.86).abs() < 0.2);
+        assert_eq!(city("ZAF").0, "Pretoria");
+    }
+
     #[test]
     fn atlases_are_complete() {
         let counts: Vec<(String, usize)> = ATLASES
@@ -457,9 +495,11 @@ mod tests {
             [
                 ("monde".to_owned(), 197),
                 ("drapeaux".to_owned(), 197),
+                ("capitales".to_owned(), 197),
                 ("oceans".to_owned(), 5),
                 ("mers".to_owned(), 52),
                 ("fleuves".to_owned(), 55),
+                ("lacs".to_owned(), 58),
                 ("fr-departements".to_owned(), 101),
                 ("fr-numeros".to_owned(), 101),
                 ("fr-regions".to_owned(), 18),

@@ -1,0 +1,168 @@
+# Lacs du monde (`mapgen lakes`) : 58 grands lacs naturels et réservoirs, d'après Natural Earth
+# 1:50m (`ne_50m_lakes`). `lake` donne les entités Natural Earth (par leur nom) qui forment le
+# lac : la mer d'Aral en a deux (Grande et Petite), le lac Eyre aussi (Nord et Sud).
+#
+# Les lacs sont peints par-dessus les terres, en couleur d'eau. La Caspienne, la plus grande
+# étendue d'eau fermée, est déjà dans le quiz des mers ; les lacs absents du 1:50m (Garde,
+# Majeur, Ohrid, Neuchâtel) n'y figurent pas.
+#
+# `aka` accepte le nom sans « lac » (« Victoria », « Baïkal ») ; `say` : formes orales pour les
+# noms absents du vocabulaire du modèle vocal.
+
+items = [
+  # Europe
+  { code = "ladoga", name = "Lac Ladoga", en = "Lake Ladoga", sub = "europe", aka = ["Ladoga"], lake = ["Lake Ladoga"], say = ["la do ga", "lac la do ga"] },
+  { code = "onega", name = "Lac Onega", en = "Lake Onega", sub = "europe", aka = ["Onega", "Onéga", "Lac Onéga"], lake = ["Lake Onega"], say = ["o né ga", "lac o né ga"] },
+  { code = "vanern", name = "Lac Vänern", en = "Lake Vänern", sub = "europe", aka = ["Vänern", "Vaner"], lake = ["Vänern"], say = ["vè nerf", "lac vè nerf"] },
+  { code = "vattern", name = "Lac Vättern", en = "Lake Vättern", sub = "europe", aka = ["Vättern"], lake = ["Vättern"], say = ["vè terne", "lac vè terne"] },
+  { code = "malar", name = "Lac Mälar", en = "Lake Mälaren", sub = "europe", aka = ["Mälar", "Mälaren", "Lac Mälaren"], lake = ["Mälaren"], say = ["mè lard", "lac mè lard"] },
+  { code = "saimaa", name = "Lac Saimaa", en = "Lake Saimaa", sub = "europe", aka = ["Saimaa"], lake = ["Lake Saimaa"], say = ["say ma", "lac say ma"] },
+  { code = "peipous", name = "Lac Peïpous", en = "Lake Peipus", sub = "europe", aka = ["Peïpous", "Peipus", "Lac Peipsi", "Peipsi"], lake = ["Lake Peipus"], say = ["pei pous", "lac pei pous"] },
+  { code = "leman", name = "Lac Léman", en = "Lake Geneva", sub = "europe", aka = ["Léman", "Lac de Genève"], lake = ["Lake Geneva"] },
+  { code = "constance", name = "Lac de Constance", en = "Lake Constance", sub = "europe", aka = ["Constance", "Bodensee"], lake = ["Bodensee"] },
+  { code = "balaton", name = "Lac Balaton", en = "Lake Balaton", sub = "europe", aka = ["Balaton"], lake = ["Lake Balaton"], say = ["bala ton", "lac bala ton"] },
+  { code = "neagh", name = "Lough Neagh", en = "Lough Neagh", sub = "europe", aka = ["Neagh", "Lac Neagh"], lake = ["Lough Neagh"], say = ["lock nez"] },
+  { code = "skadar", name = "Lac de Scutari", en = "Lake Skadar", sub = "europe", aka = ["Scutari", "Skadar", "Lac Skadar", "Lake Scutari"], lake = ["Lake Skadar"] },
+  # Asie
+  { code = "baikal", name = "Lac Baïkal", en = "Lake Baikal", sub = "asie", aka = ["Baïkal"], lake = ["Lake Baikal"] },
+  { code = "balkhach", name = "Lac Balkhach", en = "Lake Balkhash", sub = "asie", aka = ["Balkhach", "Balkhash"], lake = ["Lake Balkhash"], say = ["bal cache", "lac bal cache"] },
+  { code = "aral", name = "Mer d'Aral", en = "Aral Sea", sub = "asie", aka = ["Aral"], lake = ["North Aral Sea", "South Aral Sea"] },
+  { code = "issyk-koul", name = "Lac Issyk-Koul", en = "Lake Issyk-Kul", sub = "asie", aka = ["Issyk-Koul", "Issyk-Kul", "Yssyk-Koul", "Ysyk-Köl"], lake = ["Issyk-Kul"], say = ["is sic coule", "lac is sic coule"] },
+  { code = "ourmia", name = "Lac d'Ourmia", en = "Lake Urmia", sub = "asie", aka = ["Ourmia", "Urmia", "Lac Ourmia"], lake = ["Lake Urmia"], say = ["our mia", "lac our mia"] },
+  { code = "van", name = "Lac de Van", en = "Lake Van", sub = "asie", aka = ["Van", "Lac Van"], lake = ["Lake Van"] },
+  { code = "sevan", name = "Lac Sevan", en = "Lake Sevan", sub = "asie", aka = ["Sevan"], lake = ["Lake Sevan"], say = ["sé vanne", "lac sé vanne"] },
+  { code = "mer-morte", name = "Mer Morte", en = "Dead Sea", sub = "asie", lake = ["Dead Sea"] },
+  { code = "tiberiade", name = "Lac de Tibériade", en = "Sea of Galilee", sub = "asie", aka = ["Tibériade", "Mer de Galilée", "Lac de Galilée", "Lake Tiberias", "Kinneret"], lake = ["Sea of Galilee"] },
+  { code = "qinghai", name = "Lac Qinghai", en = "Qinghai Lake", sub = "asie", aka = ["Qinghai", "Koukou Nor", "Kokonor"], lake = ["Qinghai Hu"], say = ["chine aïe", "lac chine aïe"] },
+  { code = "khovsgol", name = "Lac Khövsgöl", en = "Lake Khövsgöl", sub = "asie", aka = ["Khövsgöl", "Hovsgol"], lake = ["Khövsgöl Nuur"], say = ["queue sève gueule", "lac queue sève gueule"] },
+  { code = "tonle-sap", name = "Tonlé Sap", en = "Tonlé Sap", sub = "asie", aka = ["Lac Tonlé Sap"], lake = ["Tonlé Sap"], say = ["tonne lé sape", "lac tonne lé sape"] },
+  { code = "poyang", name = "Lac Poyang", en = "Poyang Lake", sub = "asie", aka = ["Poyang"], lake = ["Poyang Hu"], say = ["po yang", "lac po yang"] },
+  { code = "biwa", name = "Lac Biwa", en = "Lake Biwa", sub = "asie", aka = ["Biwa"], lake = ["Biwa Ko"], say = ["bi wa", "lac bi wa"] },
+  { code = "toba", name = "Lac Toba", en = "Lake Toba", sub = "asie", aka = ["Toba"], lake = ["Danau Toba"], say = ["to ba", "lac to ba"] },
+  # Afrique
+  { code = "victoria", name = "Lac Victoria", en = "Lake Victoria", sub = "afrique", aka = ["Victoria", "Nyanza"], lake = ["Lake Victoria"] },
+  { code = "tanganyika", name = "Lac Tanganyika", en = "Lake Tanganyika", sub = "afrique", aka = ["Tanganyika"], lake = ["Lake Tanganyika"] },
+  { code = "malawi", name = "Lac Malawi", en = "Lake Malawi", sub = "afrique", aka = ["Malawi", "Lac Nyassa", "Nyassa", "Lake Nyasa"], lake = ["Lake Malawi"] },
+  { code = "tchad", name = "Lac Tchad", en = "Lake Chad", sub = "afrique", aka = ["Tchad"], lake = ["Lake Chad"] },
+  { code = "turkana", name = "Lac Turkana", en = "Lake Turkana", sub = "afrique", aka = ["Turkana", "Lac Rodolphe"], lake = ["Lake Turkana"] },
+  { code = "albert", name = "Lac Albert", en = "Lake Albert", sub = "afrique", aka = ["Albert"], lake = ["Lake Albert"] },
+  { code = "edouard", name = "Lac Édouard", en = "Lake Edward", sub = "afrique", aka = ["Édouard"], lake = ["Lake Edward"] },
+  { code = "kivu", name = "Lac Kivu", en = "Lake Kivu", sub = "afrique", aka = ["Kivu"], lake = ["Lake Kivu"] },
+  { code = "tana", name = "Lac Tana", en = "Lake Tana", sub = "afrique", aka = ["Tana"], lake = ["Lake Tana"] },
+  { code = "volta", name = "Lac Volta", en = "Lake Volta", sub = "afrique", aka = ["Volta"], lake = ["Lake Volta"] },
+  { code = "nasser", name = "Lac Nasser", en = "Lake Nasser", sub = "afrique", aka = ["Nasser"], lake = ["Lake Nasser"] },
+  { code = "kariba", name = "Lac Kariba", en = "Lake Kariba", sub = "afrique", aka = ["Kariba"], lake = ["Lake Kariba"], say = ["kari ba", "lac kari ba"] },
+  # Amérique du Nord
+  { code = "superieur", name = "Lac Supérieur", en = "Lake Superior", sub = "amerique-nord", aka = ["Supérieur"], lake = ["Lake Superior"] },
+  { code = "michigan", name = "Lac Michigan", en = "Lake Michigan", sub = "amerique-nord", aka = ["Michigan"], lake = ["Lake Michigan"] },
+  { code = "huron", name = "Lac Huron", en = "Lake Huron", sub = "amerique-nord", aka = ["Huron"], lake = ["Lake Huron"] },
+  { code = "erie", name = "Lac Érié", en = "Lake Erie", sub = "amerique-nord", aka = ["Érié"], lake = ["Lake Erie"], say = ["é ri é", "lac é ri é"] },
+  { code = "ontario", name = "Lac Ontario", en = "Lake Ontario", sub = "amerique-nord", aka = ["Ontario"], lake = ["Lake Ontario"] },
+  { code = "ours", name = "Grand lac de l'Ours", en = "Great Bear Lake", sub = "amerique-nord", aka = ["Lac de l'Ours", "Grand lac de l'ours"], lake = ["Great Bear Lake"] },
+  { code = "esclaves", name = "Grand lac des Esclaves", en = "Great Slave Lake", sub = "amerique-nord", aka = ["Lac des Esclaves"], lake = ["Great Slave Lake"] },
+  { code = "winnipeg", name = "Lac Winnipeg", en = "Lake Winnipeg", sub = "amerique-nord", aka = ["Winnipeg"], lake = ["Lake Winnipeg"] },
+  { code = "athabasca", name = "Lac Athabasca", en = "Lake Athabasca", sub = "amerique-nord", aka = ["Athabasca"], lake = ["Lake Athabasca"], say = ["atta basse ca", "lac atta basse ca"] },
+  { code = "grand-lac-sale", name = "Grand Lac Salé", en = "Great Salt Lake", sub = "amerique-nord", aka = ["Lac Salé"], lake = ["Great Salt Lake"] },
+  { code = "champlain", name = "Lac Champlain", en = "Lake Champlain", sub = "amerique-nord", aka = ["Champlain"], lake = ["Lake Champlain"] },
+  { code = "nicaragua", name = "Lac Nicaragua", en = "Lake Nicaragua", sub = "amerique-nord", aka = ["Nicaragua", "Cocibolca"], lake = ["Lago de Nicaragua"] },
+  # Amérique du Sud
+  { code = "titicaca", name = "Lac Titicaca", en = "Lake Titicaca", sub = "amerique-sud", aka = ["Titicaca"], lake = ["Lago Titicaca"] },
+  { code = "general-carrera", name = "Lac Général-Carrera", en = "General Carrera Lake", sub = "amerique-sud", aka = ["Général-Carrera", "Lac Buenos Aires", "Lago Buenos Aires", "General Carrera"], lake = ["Lago Buenos Aires"] },
+  { code = "argentino", name = "Lac Argentino", en = "Lake Argentino", sub = "amerique-sud", aka = ["Argentino", "Lago Argentino"], lake = ["Lago Argentino"], say = ["argentine o", "lac argentine o"] },
+  { code = "mar-chiquita", name = "Mar Chiquita", en = "Mar Chiquita", sub = "amerique-sud", aka = ["Lagune Mar Chiquita", "Laguna Mar Chiquita"], lake = ["Laguna Mar Chiquita"] },
+  # Océanie
+  { code = "eyre", name = "Lac Eyre", en = "Lake Eyre", sub = "oceanie", aka = ["Eyre", "Kati Thanda"], lake = ["Lake Eyre North", "Lake Eyre South"] },
+  { code = "torrens", name = "Lac Torrens", en = "Lake Torrens", sub = "oceanie", aka = ["Torrens"], lake = ["Lake Torrens"], say = ["torrent", "lac torrent"] },
+  { code = "taupo", name = "Lac Taupo", en = "Lake Taupo", sub = "oceanie", aka = ["Taupo"], lake = ["Lake Taupo"], say = ["tau po", "lac tau po"] },
+]
+
+[atlas]
+id = "lacs"
+title = "Lacs du monde"
+category = "Monde"
+one = "lac"
+many = "lacs"
+title_en = "Lakes of the world"
+category_en = "World"
+one_en = "lake"
+many_en = "lakes"
+# Terres reprises de l'atlas du monde à l'exécution.
+
+[world]
+name = "Monde entier"
+en = "Whole world"
+view = [-169, -50, 191, 76]
+center = 11
+
+[[continent]]
+id = "europe"
+name = "Europe"
+en = "Europe"
+
+[[continent]]
+id = "asie"
+name = "Asie"
+en = "Asia"
+
+[[continent]]
+id = "afrique"
+name = "Afrique"
+en = "Africa"
+
+[[continent]]
+id = "amerique-nord"
+name = "Amérique du Nord"
+en = "North America"
+
+[[continent]]
+id = "amerique-sud"
+name = "Amérique du Sud"
+en = "South America"
+
+[[continent]]
+id = "oceanie"
+name = "Océanie"
+en = "Oceania"
+
+# Un seul niveau de zones : une sous-région technique par continent, masquée.
+[[sub]]
+id = "europe"
+name = "Europe"
+en = "Europe"
+continent = "europe"
+hidden = true
+
+[[sub]]
+id = "asie"
+name = "Asie"
+en = "Asia"
+continent = "asie"
+hidden = true
+
+[[sub]]
+id = "afrique"
+name = "Afrique"
+en = "Africa"
+continent = "afrique"
+hidden = true
+
+[[sub]]
+id = "amerique-nord"
+name = "Amérique du Nord"
+en = "North America"
+continent = "amerique-nord"
+hidden = true
+
+[[sub]]
+id = "amerique-sud"
+name = "Amérique du Sud"
+en = "South America"
+continent = "amerique-sud"
+hidden = true
+
+[[sub]]
+id = "oceanie"
+name = "Océanie"
+en = "Oceania"
+continent = "oceanie"
+hidden = true

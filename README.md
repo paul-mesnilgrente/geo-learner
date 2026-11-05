@@ -31,9 +31,11 @@ compilateur signale les oublis), les noms dans les données, et le modèle Vosk 
 |---|---|---|---|
 | Monde | Pays du monde | 197 pays | continents, sous-régions, regroupements |
 | Monde | Drapeaux du monde | 197 drapeaux | comme les pays du monde |
+| Monde | Capitales du monde | 197 capitales | comme les pays du monde |
 | Monde | Océans | 5 océans | monde entier |
 | Monde | Mers du monde | 52 mers | océans (Atlantique, Pacifique, Indien, Arctique, Austral) et régions |
 | Monde | Fleuves du monde | 55 fleuves | continents |
+| Monde | Lacs du monde | 58 lacs | continents |
 | France | Départements français | 101 départements | métropole, outre-mer, régions |
 | France | Numéros des départements (sans carte) | 101 départements | métropole, outre-mer, régions |
 | France | Régions françaises | 18 régions | métropole, outre-mer |
@@ -143,6 +145,25 @@ cyan, avec les 50 plus grands lacs (Natural Earth 1:50m : Grands Lacs, Victoria,
 clic ou le survol désigne le fleuve le plus proche, à 8 pixels près. Le fleuve à nommer est
 épaissi, avec un halo. Toutes les formes orales sont reconnues en français, dont des
 prononciations approchées pour les noms inconnus du modèle (« brahma poutre », « tôt cantine »).
+
+**Capitales du monde** : la capitale de chacun des 197 pays, dans les mêmes zones, avec les trois
+modes : « Toutes les capitales », « Nommer la capitale » (une pastille clignote sur la carte, on
+tape ou dit le nom de la ville) et « Trouver sur la carte » (on clique sur la bonne pastille). Les
+capitales sont des **points** : une pastille à toutes les échelles, la plus proche du clic
+l'emporte, et leur nom s'écrit à droite quand il ne chevauche pas un autre. Les positions
+viennent de Natural Earth 1:50m (lieux habités, `data/capitals.toml`), les terres de l'atlas du
+monde à l'exécution (31 Ko en tout). Pays à plusieurs capitales : la capitale officielle est le
+point et le nom, les autres capitales sont acceptées (Afrique du Sud : Pretoria, Le Cap,
+Bloemfontein ; Bolivie : Sucre, La Paz ; Sri Lanka : Kotte, Colombo), pas une capitale
+économique (Abidjan, Cotonou, Dar es Salam). Nauru (Yaren) n'a pas de capitale officielle ; la
+Palestine a Ramallah (Jérusalem-Est acceptée).
+
+**Lacs du monde** : 58 grands lacs et réservoirs par continent, d'après Natural Earth 1:50m
+(`data/lakes.toml`, 56 Ko) : Grands Lacs, lacs de la Rift Valley, Baïkal, Léman, Titicaca… Ils sont
+peints **par-dessus** les terres, en cyan tant qu'ils restent à trouver ; les petits (Tibériade,
+Léman) ont une pastille. La Caspienne est dans le quiz des mers. Pour la voix, capitales et lacs
+sont tous reconnus en français, avec des prononciations approchées (« biche cake » pour Bichkek,
+« vè nerf » pour le Vänern).
 
 ### Ajouter un quiz
 
@@ -345,7 +366,9 @@ crates/geo-core   données, normalisation des réponses, logique de quiz, projec
 crates/app        application Iced : carte (canvas), écrans, saisie vocale, sauvegarde
 crates/mapgen     génération des atlas (assets/*.bin) depuis Natural Earth (admin-0 et admin-1),
                   des océans et mers (data/oceans.toml, data/seas.toml, `mapgen water`), des
-                  fleuves (data/rivers.toml, `mapgen rivers`) et des drapeaux (`mapgen flags`)
+                  fleuves (data/rivers.toml, `mapgen rivers`), des lacs (data/lakes.toml,
+                  `mapgen lakes`), des capitales (data/capitals.toml, `mapgen capitals`) et des
+                  drapeaux (`mapgen flags`)
 data/             pays du monde et zones ; data/atlases/ : départements, régions, États
 assets/           carte générée et police Inter (sous-ensemble latin)
 ```
