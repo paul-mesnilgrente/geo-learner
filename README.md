@@ -71,8 +71,9 @@ la même zone. Une carte ouvre la **page du quiz** (mode, zone, lancement, progr
 « Accueil » ramène à la liste. Les textes s'accordent au quiz (« Nommer la région »,
 « 13 régions trouvées », « Quel est cet État ? »).
 
-Le bouton **« ? »** de l'accueil (ou F1) ouvre le menu d'aide : *À propos* (version, licence,
-contact, politique de confidentialité, crédits des données), *Raccourcis clavier*, *Signaler un
+Le bouton **« ? »** de l'accueil (ou F1) ouvre le menu d'aide : *À propos* (logo, version,
+licence, contact, politique de confidentialité, crédits des données), *Nouveautés* (page des
+releases GitHub, dont les notes viennent de `docs/releases/`), *Raccourcis clavier*, *Signaler un
 problème* (ticket GitHub ou e-mail, préremplis avec la version et le système) et
 **exporter / importer la progression** dans un fichier JSON, pour changer d'ordinateur. Les
 fichiers se choisissent avec la boîte de dialogue du système (`rfd`, +32 Ko : sous Linux, le

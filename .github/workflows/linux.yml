@@ -1,6 +1,7 @@
 name: Paquets Linux
 
-# Construit les paquets Linux et les joint à la release GitHub du tag :
+# Construit les paquets Linux et les joint à la release GitHub du tag (créée avec les notes de
+# docs/releases/<tag>.md si le fichier existe) :
 # - l'archive .tar.gz, compilée sur la plus ancienne Ubuntu disponible : le binaire exige la
 #   glibc du système de compilation (2.35 ici), il tourne donc sur les distributions de 2022
 #   et après ;
@@ -54,7 +55,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --verify-tag --title "GeoLearner ${TAG#v}" --notes ""
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --verify-tag --title "GeoLearner ${TAG#v}" --notes-file "$(f="docs/releases/$TAG.md"; [ -f "$f" ] && echo "$f" || echo /dev/null)"
           gh release upload "$TAG" target/linux/*.tar.gz --clobber
 
   flatpak:
@@ -92,7 +93,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --verify-tag --title "GeoLearner ${TAG#v}" --notes ""
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --verify-tag --title "GeoLearner ${TAG#v}" --notes-file "$(f="docs/releases/$TAG.md"; [ -f "$f" ] && echo "$f" || echo /dev/null)"
           gh release upload "$TAG" target/*.flatpak --clobber
 
   snap:
@@ -121,7 +122,7 @@ jobs:
           TAG: ${{ inputs.tag || github.ref_name }}
           SNAP_FILE: ${{ steps.build.outputs.snap }}
         run: |
-          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --verify-tag --title "GeoLearner ${TAG#v}" --notes ""
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --verify-tag --title "GeoLearner ${TAG#v}" --notes-file "$(f="docs/releases/$TAG.md"; [ -f "$f" ] && echo "$f" || echo /dev/null)"
           gh release upload "$TAG" "$SNAP_FILE" --clobber
 
       - name: Publication sur le Snap Store (canal stable)

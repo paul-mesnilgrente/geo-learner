@@ -53,6 +53,13 @@ pub fn theme() -> Theme {
     )
 }
 
+/// Marge à mettre sous un petit texte posé à côté d'un grand (rangée alignée en bas) pour que
+/// leurs lignes de base coïncident. Avec Inter (jambage 0,242 em, hauteur 1,211 em) et la hauteur
+/// de ligne d'iced (1,3), la ligne de base est à 0,2865 × la taille au-dessus du bas de la ligne.
+pub fn baseline_gap(big: f32, small: f32) -> f32 {
+    (big - small) * 0.2865
+}
+
 pub fn with_alpha(c: Color, a: f32) -> Color {
     Color { a, ..c }
 }

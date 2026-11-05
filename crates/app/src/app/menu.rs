@@ -1,10 +1,12 @@
 //! Menu d'aide de l'accueil (bouton « ? » ou F1) : à propos, raccourcis clavier, signaler un
 //! problème, exporter et importer la progression. Les fenêtres s'ouvrent par-dessus la page.
 
+use std::sync::LazyLock;
+
 use iced::alignment::{Horizontal, Vertical};
 use iced::widget::{
-    Column, button, column, container, mouse_area, opaque, responsive, row, rule, space, stack,
-    text,
+    Column, button, column, container, image, mouse_area, opaque, responsive, row, rule, space,
+    stack, text,
 };
 use iced::{Center, Color, Element, Fill, Padding, Task, Theme};
 
@@ -29,6 +31,16 @@ pub enum Dialog {
         body: String,
     },
 }
+
+/// Logo de l'application (128 px, RGBA brut : pas de décodeur PNG embarqué), affiché à 64 px
+/// pour rester net sur un écran HiDPI. Une seule poignée : l'image n'est envoyée qu'une fois.
+static LOGO: LazyLock<image::Handle> = LazyLock::new(|| {
+    image::Handle::from_rgba(
+        128,
+        128,
+        include_bytes!("../../../../assets/icon-128.rgba").as_slice(),
+    )
+});
 
 /// Haut du menu déroulant, sous le bouton « ? » de l'en-tête de l'accueil.
 const MENU_TOP: f32 = 104.0;
@@ -271,6 +283,11 @@ fn menu_card<'a>(lang: Lang) -> Element<'a, Message> {
                 Message::Dialog(Some(Dialog::About)),
             ),
             item(
+                Icon::Sparkle,
+                tr!(lang, "Nouveautés", "What's new"),
+                Message::OpenUrl(links::RELEASES.into()),
+            ),
+            item(
                 Icon::Keyboard,
                 tr!(lang, "Raccourcis clavier", "Keyboard shortcuts"),
                 Message::Dialog(Some(Dialog::Shortcuts)),
@@ -321,7 +338,7 @@ fn about<'a>(lang: Lang) -> Element<'a, Message> {
     let muted = |s: String| text(s).size(13).color(style::MUTED);
     column![
         row![
-            icon(Icon::Globe, 40.0, style::lighten(style::ACCENT, 0.2)),
+            image(LOGO.clone()).width(64).height(64),
             column![
                 text("GeoLearner").size(24).font(style::FONT_BOLD),
                 muted(tr!(lang, "Version {}", "Version {}", links::VERSION)),

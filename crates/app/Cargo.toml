@@ -9,7 +9,7 @@ geo-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 postcard.workspace = true
-iced = { version = "0.14", default-features = false, features = ["wgpu", "tiny-skia", "canvas", "tokio", "crisp", "x11", "wayland", "linux-theme-detection"] }
+iced = { version = "0.14", default-features = false, features = ["wgpu", "tiny-skia", "canvas", "tokio", "crisp", "x11", "wayland", "linux-theme-detection", "image-without-codecs"] }
 cpal = "0.18"
 utter = "0.0.7"
 dirs = "6"

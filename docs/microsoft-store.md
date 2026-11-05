@@ -224,7 +224,9 @@ Le compte développeur est **individuel** : Partner Center n'y propose pas l'ong
 Entra applications* (vérifié le 2026-11-04, même avec un tenant Entra associé), donc la CI ne
 peut pas s'authentifier auprès du Store. Pour chaque version :
 
-1. Augmenter `version` dans `Cargo.toml` et mettre à jour `packaging/windows/release-notes/`.
+1. Augmenter `version` dans `Cargo.toml`, mettre à jour `packaging/windows/release-notes/` et
+   écrire `docs/releases/vX.Y.Z.md` (notes de la release GitHub, en français puis en anglais :
+   « Nouveautés » dans l'application y mène).
 2. Pousser le tag `vX.Y.Z` : le workflow construit le `.msix` (artefact `geo-learner-msix`).
 3. Partner Center → *Start update*, puis :
    - *Packages* : envoyer le nouveau `.msix`, enregistrer (l'ancien est retiré) ;

@@ -1590,13 +1590,16 @@ impl App {
                 text(info.title.get(self.lang))
                     .size(28)
                     .font(style::FONT_BOLD),
-                text(format!(
-                    "{} {}",
-                    self.world().countries.len(),
-                    info.many.get(self.lang)
-                ))
-                .size(14)
-                .color(style::MUTED),
+                container(
+                    text(format!(
+                        "{} {}",
+                        self.world().countries.len(),
+                        info.many.get(self.lang)
+                    ))
+                    .size(14)
+                    .color(style::MUTED)
+                )
+                .padding(iced::Padding::ZERO.bottom(style::baseline_gap(28.0, 14.0))),
             ]
             .spacing(12)
             .align_y(iced::Alignment::End),

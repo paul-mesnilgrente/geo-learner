@@ -4,6 +4,8 @@
 
 pub const REPOSITORY: &str = "https://github.com/paul-mesnilgrente/geo-learner";
 pub const PRIVACY: &str = "https://github.com/paul-mesnilgrente/geo-learner/blob/main/PRIVACY.md";
+/// Notes de chaque version, sur GitHub.
+pub const RELEASES: &str = "https://github.com/paul-mesnilgrente/geo-learner/releases";
 pub const CONTACT: &str = "big.learner.app@gmail.com";
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

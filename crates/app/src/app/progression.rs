@@ -587,7 +587,8 @@ fn chart_card<'a>(
         column![
             row![
                 text(title.into()).size(16).font(style::FONT_SEMIBOLD),
-                text(subtitle).size(12).color(style::MUTED),
+                container(text(subtitle).size(12).color(style::MUTED))
+                    .padding(iced::Padding::ZERO.bottom(style::baseline_gap(16.0, 12.0))),
             ]
             .spacing(10)
             .align_y(iced::Alignment::End),

@@ -149,11 +149,14 @@ def main():
     png(master, 512, ROOT / "assets" / "icon-512.png")
     # Logo de la fiche du Store (Partner Center), à renvoyer à la main après un changement.
     png(master, 300, ROOT / "docs" / "store" / "logo-300.png")
-    # Icône de la fenêtre : RGBA brut 64×64, chargé tel quel par l'application.
-    subprocess.run(
-        ["magick", str(master), "-resize", "64x64", "-depth", "8", f"rgba:{ROOT / 'assets' / 'icon-64.rgba'}"],
-        check=True,
-    )
+    # Icône de la fenêtre (64) et logo de « À propos » (128) : RGBA brut, chargé tel quel par
+    # l'application (pas de décodeur PNG embarqué).
+    for size in (64, 128):
+        subprocess.run(
+            ["magick", str(master), "-resize", f"{size}x{size}", "-depth", "8",
+             f"rgba:{ROOT / 'assets' / f'icon-{size}.rgba'}"],
+            check=True,
+        )
     print("icônes générées")
 
 

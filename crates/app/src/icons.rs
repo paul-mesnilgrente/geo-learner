@@ -34,6 +34,8 @@ pub enum Icon {
     Upload,
     /// Enveloppe : écrire un e-mail.
     Mail,
+    /// Étincelle à quatre branches : les nouveautés.
+    Sparkle,
 }
 
 struct Program {
@@ -231,6 +233,19 @@ impl<Message> canvas::Program<Message> for Program {
                 b.line_to(p(12.0, 11.0));
                 b.move_to(p(12.0, 13.4));
                 b.line_to(p(12.0, 13.5));
+            }
+            Icon::Sparkle => {
+                // Grande étincelle (branches incurvées vers le centre) et une petite.
+                b.move_to(p(10.0, 3.0));
+                b.quadratic_curve_to(p(11.0, 9.0), p(17.0, 10.0));
+                b.quadratic_curve_to(p(11.0, 11.0), p(10.0, 17.0));
+                b.quadratic_curve_to(p(9.0, 11.0), p(3.0, 10.0));
+                b.quadratic_curve_to(p(9.0, 9.0), p(10.0, 3.0));
+                b.close();
+                b.move_to(p(18.0, 15.0));
+                b.line_to(p(18.0, 21.0));
+                b.move_to(p(15.0, 18.0));
+                b.line_to(p(21.0, 18.0));
             }
             Icon::Mail => {
                 b.rounded_rectangle(p(3.0, 5.5), Size::new(18.0 * s, 13.0 * s), (2.0 * s).into());
