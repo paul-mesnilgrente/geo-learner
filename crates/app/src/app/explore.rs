@@ -297,51 +297,14 @@ impl Explorer {
             .map(|flag| (c, flag))
     }
 
-    /// Le drapeau en grand, sur un fond assombri ; un clic n'importe où (ou Échap) le referme.
+    /// Le drapeau en grand ; un clic n'importe où (ou Échap) le referme.
     fn flag_viewer(&self, c: usize, flag: usize) -> Element<'_, Message> {
-        let (max_w, max_h) = if self.map_size == Size::ZERO {
-            (480.0, 320.0)
-        } else {
-            (
-                (self.map_size.width - 96.0).clamp(240.0, 720.0),
-                (self.map_size.height - 220.0).clamp(160.0, 480.0),
-            )
-        };
         let group = &self.world.regions[self.group_of(c)];
-        let card = container(
-            column![
-                crate::flags::view(flag, max_w, max_h),
-                column![
-                    text(self.label(c)).size(24).font(style::FONT_BOLD),
-                    text(group.name.get(self.lang)).size(14).color(style::MUTED),
-                ]
-                .spacing(4)
-                .align_x(Center),
-            ]
-            .spacing(18)
-            .align_x(Center),
-        )
-        .padding(24)
-        // Fond plein : la carte ne doit pas transparaître derrière le drapeau.
-        .style(|_: &Theme| container::Style {
-            background: Some(style::SURFACE.into()),
-            border: iced::Border {
-                color: style::BORDER,
-                width: 1.0,
-                radius: 16.0.into(),
-            },
-            ..Default::default()
-        });
-        let backdrop = container(card)
-            .center(Fill)
-            .style(|_: &Theme| container::Style {
-                background: Some(style::with_alpha(iced::Color::BLACK, 0.7).into()),
-                ..Default::default()
-            });
-        opaque(
-            mouse_area(backdrop)
-                .on_press(Message::ExploreFlag(false))
-                .interaction(iced::mouse::Interaction::Pointer),
+        crate::flags::viewer(
+            flag,
+            self.label(c),
+            group.name.get(self.lang).to_owned(),
+            Message::ExploreFlag(false),
         )
     }
 

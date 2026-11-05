@@ -1,6 +1,7 @@
 //! Application : écran d'accueil (choix du mode et de la zone, progression) et écran de jeu.
 
 mod explore;
+mod gallery;
 mod home;
 mod locator;
 mod progression;
@@ -17,6 +18,7 @@ use iced::widget::{
 use iced::{Center, Color, Element, Fill, Size, Subscription, Task, Theme, Vector, keyboard, time};
 
 use self::explore::Explorer;
+use self::gallery::Gallery;
 use self::locator::Locator;
 use crate::ATLASES;
 use crate::i18n::Lang;
@@ -74,6 +76,12 @@ pub enum Message {
     ExploreAnchors,
     /// Drapeau du lieu choisi montré en grand (`true`) ou refermé.
     ExploreFlag(bool),
+    /// Galerie des drapeaux de la zone choisie (quiz des drapeaux).
+    OpenGallery,
+    CloseGallery,
+    GalleryQuery(String),
+    /// Drapeau d'un pays de la galerie montré en grand, ou refermé.
+    GalleryFlag(Option<usize>),
     /// Ouvre la page d'un quiz (index dans `ATLASES`).
     OpenQuiz(usize),
     /// Ouvre la page d'un quiz réglée sur un mode et une zone (dernières parties).
@@ -162,6 +170,7 @@ pub struct App {
     game: Option<Game>,
     /// Exploration de la carte, sans quiz.
     explorer: Option<Explorer>,
+    gallery: Option<Gallery>,
     /// Aperçu de la zone choisie, sur l'écran d'accueil.
     preview: Preview,
     /// Aperçu coloré par maîtrise (s'il y a déjà des parties) plutôt que la zone seule.
@@ -355,6 +364,7 @@ impl App {
             confirm_delete: None,
             game: None,
             explorer: None,
+            gallery: None,
             preview: Preview::new(0, 0),
             show_mastery: true,
             voice: Voice {
@@ -469,6 +479,16 @@ impl App {
                     explorer.on_map(MapEvent::Click(Some(c)));
                 }
             }
+            return self;
+        }
+        if let Some(query) = &demo.gallery {
+            let mut gallery = Gallery::new(self.atlas, self.region, self.lang);
+            gallery.search(query.clone());
+            // Avec `bigflag`, le drapeau du premier pays de `answers` est montré en grand.
+            if demo.big_flag {
+                gallery.big = demo.answers.first().and_then(|code| gallery.find(code));
+            }
+            self.gallery = Some(gallery);
             return self;
         }
         if let Some(code) = &demo.explore {
@@ -613,6 +633,12 @@ impl App {
                 game.world.regions[game.region].name.get(self.lang),
                 mode_title(game.quiz.mode(), &game.world.info, self.lang)
             ),
+            None if self.gallery.is_some() => tr!(
+                self.lang,
+                "Drapeaux · {} — GeoLearner",
+                "Flags · {} — GeoLearner",
+                self.world().regions[self.region].name.get(self.lang)
+            ),
             None if self.explorer.is_some() => tr!(
                 self.lang,
                 "Explorer · {} — GeoLearner",
@@ -731,6 +757,20 @@ impl App {
                     explorer.big_flag = open;
                 }
             }
+            Message::OpenGallery => {
+                self.gallery = Some(Gallery::new(self.atlas, self.region, self.lang));
+            }
+            Message::CloseGallery => self.gallery = None,
+            Message::GalleryQuery(query) => {
+                if let Some(gallery) = &mut self.gallery {
+                    gallery.search(query);
+                }
+            }
+            Message::GalleryFlag(country) => {
+                if let Some(gallery) = &mut self.gallery {
+                    gallery.big = country;
+                }
+            }
             Message::GoHome => {
                 self.screen = Screen::Home;
                 self.clear_run_actions();
@@ -813,6 +853,7 @@ impl App {
             }
             Message::Start | Message::Restart | Message::Review(_) => {
                 self.explorer = None;
+                self.gallery = None;
                 let mut review = None;
                 if let Some(game) = &self.game {
                     self.atlas = game.atlas;
@@ -945,6 +986,13 @@ impl App {
                     }
                     keyboard::Key::Named(Named::Escape) => {
                         self.confirm_delete = None;
+                        // Galerie : le drapeau agrandi d'abord, puis la galerie elle-même.
+                        if self.game.is_none()
+                            && let Some(gallery) = &mut self.gallery
+                            && gallery.big.take().is_none()
+                        {
+                            self.gallery = None;
+                        }
                         if self.game.is_none()
                             && let Some(explorer) = &mut self.explorer
                         {
@@ -1412,10 +1460,11 @@ impl App {
     // --- Vues ---
 
     pub fn view(&self) -> Element<'_, Message> {
-        match (&self.game, &self.explorer) {
-            (Some(game), _) => self.game_view(game),
-            (None, Some(explorer)) => explorer.view(),
-            (None, None) => self.home_view(),
+        match (&self.game, &self.explorer, &self.gallery) {
+            (Some(game), _, _) => self.game_view(game),
+            (None, _, Some(gallery)) => gallery.view(),
+            (None, Some(explorer), None) => explorer.view(),
+            (None, None, None) => self.home_view(),
         }
     }
 
@@ -1812,6 +1861,21 @@ impl App {
                 .style(style::secondary)
                 .on_press(Message::OpenExplore),
             ]
+            .push(self.world().info.flags.then(|| {
+                // Quiz des drapeaux : tous ceux de la zone, avec leur nom, pour les apprendre.
+                button(
+                    row![
+                        icon(Icon::Flag, 14.0, style::TEXT),
+                        text(tr!(self.lang, "Voir les drapeaux", "See the flags")).size(13)
+                    ]
+                    .spacing(8)
+                    .align_y(Center),
+                )
+                .padding([8, 12])
+                .width(Fill)
+                .style(style::secondary)
+                .on_press(Message::OpenGallery)
+            }))
             .spacing(12),
         )
         .padding(18)

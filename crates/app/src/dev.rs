@@ -52,6 +52,8 @@ pub struct Demo {
     pub explore: Option<String>,
     /// Exploration : le drapeau du lieu choisi montré en grand.
     pub big_flag: bool,
+    /// Galerie des drapeaux ouverte, recherche éventuelle (`gallery=fr`).
+    pub gallery: Option<String>,
     /// Langue imposée, en mémoire seulement (`lang=en`).
     pub lang: Option<geo_core::Lang>,
     /// Partie de révision limitée à ces lieux (`review=FRA,DEU`).
@@ -161,6 +163,7 @@ pub fn demo() -> Option<Demo> {
             "flight" => demo.flight = value.parse().ok(),
             "explore" => demo.explore = Some(value.to_owned()),
             "bigflag" => demo.big_flag = true,
+            "gallery" => demo.gallery = Some(value.to_owned()),
             "lang" => demo.lang = geo_core::Lang::from_locale(value),
             "review" => demo.review = value.split(',').map(str::to_owned).collect(),
             "skips" => demo.skips = value.parse().unwrap_or(0),

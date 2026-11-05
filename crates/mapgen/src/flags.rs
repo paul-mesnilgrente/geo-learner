@@ -20,15 +20,17 @@ use serde_json::Value;
 
 use crate::Result;
 
-/// Hauteur d'un drapeau dans l'unité des coordonnées (la largeur suit ses proportions).
-pub const HEIGHT: f64 = 512.0;
-/// Écart maximal toléré en simplifiant un contour, en unités (≈ 0,7 px pour un drapeau de 240 px
-/// de haut) : invisible, même sur les armoiries.
-const TOLERANCE: f64 = 1.5;
+/// Hauteur d'un drapeau dans l'unité des coordonnées (la largeur suit ses proportions). Assez
+/// fine pour les traits les plus minces des armoiries (contours du soleil argentin) : sur une
+/// grille de 512, l'arrondi les épaississait ou les effaçait par endroits.
+pub const HEIGHT: f64 = 2048.0;
+/// Écart maximal toléré en simplifiant un contour, en unités (≈ 0,2 px pour un drapeau de 240 px
+/// de haut, 0,5 px agrandi à 480 px) : les rayons ondulés restent ondulés.
+const TOLERANCE: f64 = 2.0;
 /// Longueur maximale d'un segment de courbe aplatie, en unités.
-const CURVE_STEP: f64 = 3.0;
+const CURVE_STEP: f64 = 4.0;
 /// Les contours plus petits (en unités²) disparaissent.
-const MIN_AREA: f64 = 0.6;
+const MIN_AREA: f64 = 9.6;
 
 type Contours = Vec<Vec<[f64; 2]>>;
 /// Calque d'une couleur, en coordonnées entières.
@@ -535,8 +537,10 @@ mod tests {
         let flag = convert("BFA", svg).unwrap();
         let star = flag.layers.last().unwrap();
         assert_eq!(star.color, [0xfc, 0xd1, 0x16, 255]);
-        assert!(inside(star, [384.0, 256.0]), "centre de l'étoile vide");
-        assert!(inside(star, [384.0, 256.0 - 70.0]), "branche du haut vide");
+        // Coordonnées du SVG (900 × 600) ramenées à la grille.
+        let u = (HEIGHT / 600.0) as f32;
+        assert!(inside(star, [450.0 * u, 300.0 * u]), "centre de l'étoile vide");
+        assert!(inside(star, [450.0 * u, 218.0 * u]), "branche du haut vide");
     }
 
     /// Union Jack : les diagonales rouges sont découpées par un `clipPath`.
@@ -544,14 +548,14 @@ mod tests {
     fn clip_paths_cut_shapes() {
         let svg = br##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30"><clipPath id="a"><path d="M0 0v30h60V0z"/></clipPath><clipPath id="b"><path d="M30 15h30v15zv15H0zH0V0zV0h30z"/></clipPath><g clip-path="url(#a)"><path d="M0 0v30h60V0z" fill="#012169"/><path d="M0 0l60 30m0-30L0 30" stroke="#fff" stroke-width="6"/><path d="M0 0l60 30m0-30L0 30" clip-path="url(#b)" stroke="#C8102E" stroke-width="4"/><path d="M30 0v30M0 15h60" stroke="#fff" stroke-width="10"/><path d="M30 0v30M0 15h60" stroke="#C8102E" stroke-width="6"/></g></svg>"##;
         let flag = convert("GBR", svg).unwrap();
-        assert_eq!(flag.width, 1024);
+        assert_eq!(f64::from(flag.width), 2.0 * HEIGHT);
         let red = flag
             .layers
             .iter()
             .find(|l| l.color == [0xc8, 0x10, 0x2e, 255]);
         let red = red.unwrap();
         // Diagonale rouge du quart supérieur gauche : sous la diagonale blanche (côté bas)…
-        let u = 1024.0 / 60.0;
+        let u = f32::from(flag.width) / 60.0;
         assert!(inside(red, [10.0 * u, 5.8 * u]));
         // … mais pas au-dessus (le contre-changement de la croix de Saint-Patrick).
         assert!(!inside(red, [10.0 * u, 4.2 * u]));

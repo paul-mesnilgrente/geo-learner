@@ -7,8 +7,9 @@ use std::rc::Rc;
 use std::sync::LazyLock;
 
 use geo_core::Flag;
-use iced::widget::canvas::{self, Cache, Fill, Geometry, Path, Stroke, fill::Rule};
-use iced::{Color, Element, Point, Rectangle, Renderer, Size, Theme, mouse};
+use iced::widget::canvas::{self, Cache, Geometry, Path, Stroke, fill::Rule};
+use iced::widget::{column, container, mouse_area, opaque, responsive, text};
+use iced::{Center, Color, Element, Fill, Point, Rectangle, Renderer, Size, Theme, mouse};
 
 use crate::style;
 
@@ -83,6 +84,57 @@ pub fn view<'a, M: 'a>(index: usize, max_width: f32, max_height: f32) -> Element
     .into()
 }
 
+/// Le drapeau `index` en grand, avec son nom, sur un fond assombri qui couvre la page : un clic
+/// n'importe où envoie `on_close` (Échap aussi, géré par l'application).
+pub fn viewer<'a, M: Clone + 'a>(
+    index: usize,
+    title: String,
+    subtitle: String,
+    on_close: M,
+) -> Element<'a, M> {
+    let content = responsive(move |space| {
+        // Place laissée autour pour le cadre et le nom.
+        let max_w = (space.width - 96.0).clamp(160.0, 720.0);
+        let max_h = (space.height - 200.0).clamp(100.0, 480.0);
+        let card = container(
+            column![
+                view(index, max_w, max_h),
+                column![
+                    text(title.clone()).size(24).font(style::FONT_BOLD),
+                    text(subtitle.clone()).size(14).color(style::MUTED),
+                ]
+                .spacing(4)
+                .align_x(Center),
+            ]
+            .spacing(18)
+            .align_x(Center),
+        )
+        .padding(24)
+        // Fond plein : rien ne doit transparaître derrière le drapeau.
+        .style(|_: &Theme| container::Style {
+            background: Some(style::SURFACE.into()),
+            border: iced::Border {
+                color: style::BORDER,
+                width: 1.0,
+                radius: 16.0.into(),
+            },
+            ..Default::default()
+        });
+        container(card)
+            .center(Fill)
+            .style(|_: &Theme| container::Style {
+                background: Some(style::with_alpha(Color::BLACK, 0.7).into()),
+                ..Default::default()
+            })
+            .into()
+    });
+    opaque(
+        mouse_area(content)
+            .on_press(on_close)
+            .interaction(mouse::Interaction::Pointer),
+    )
+}
+
 struct FlagView {
     flag: &'static Painted,
     cache: Rc<Cache>,
@@ -117,7 +169,7 @@ impl<M> canvas::Program<M> for FlagView {
                 });
                 frame.fill(
                     &path,
-                    Fill {
+                    canvas::Fill {
                         style: (*color).into(),
                         rule: Rule::EvenOdd,
                     },

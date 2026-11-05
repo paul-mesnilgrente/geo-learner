@@ -108,15 +108,18 @@ question ; on clique sur le pays) et « Pays → drapeau » (le pays est nommé 
 la carte, noms affichés par défaut ; on choisit son drapeau parmi six de la zone, un drapeau
 écarté montre le nom de son pays). En fin de partie, « Réponses » montre chaque drapeau au-dessus
 de son pays, les ratés en rouge.
-L'exploration des pays du monde montre aussi le drapeau du pays choisi ; un clic dessus l'affiche
-en grand (Échap ou un clic le referme). Ce quiz est dérivé à
-l'exécution de l'atlas du monde ; seuls les drapeaux sont stockés (`assets/flags.bin`, 276 Ko).
+Pour les apprendre, « Voir les drapeaux » (sous l'aperçu, page du quiz) ouvre la **galerie** de la
+zone choisie : chaque drapeau avec le nom de son pays, par sous-région, avec une recherche (nom
+français ou anglais). L'exploration des pays du monde montre aussi le drapeau du pays choisi. Dans
+les deux, un clic sur un drapeau l'affiche en grand (Échap ou un clic le referme). Ce quiz est
+dérivé à l'exécution de l'atlas du monde ; seuls les drapeaux sont stockés (`assets/flags.bin`,
+453 Ko).
 Ils viennent des SVG de [hampusborgos/country-flags](https://github.com/hampusborgos/country-flags)
 (d'après Wikimedia Commons, domaine public), aux proportions officielles (Suisse carrée,
 Qatar 28:11, Népal), et sont convertis par `mapgen flags` en **calques de polygones** : courbes
 aplaties, traits changés en surfaces, `clipPath` appliqués (croix de Saint-Patrick de l'Union
-Jack), dégradés remplacés par leur couleur moyenne, puis coordonnées entières codées par
-différences. L'application les peint sur un canvas, nets à toute taille, sans moteur SVG.
+Jack), dégradés remplacés par leur couleur moyenne, puis coordonnées entières (2048 unités de
+haut, assez fin pour les traits du soleil argentin) codées par différences. L'application les peint sur un canvas, nets à toute taille, sans moteur SVG.
 `mapgen flag-sheet` produit une planche de contrôle (original rendu par resvg à côté de chaque
 drapeau converti).
 
@@ -365,6 +368,8 @@ Paramètres de `GEO_DEMO`, séparés par `;` :
 - `explore` : exploration ouverte, avec un lieu choisi (`explore=CA-PE`) ; avec `progress`, elle
   part de l'aperçu, carte de maîtrise comprise ;
 - `bigflag` : avec `explore`, le drapeau du lieu choisi montré en grand ;
+- `gallery` : galerie des drapeaux ouverte, avec une recherche (`gallery=guin`) ; avec `bigflag`,
+  le drapeau du premier pays de `answers` en grand ;
 - `lang=en` : langue imposée, sans l'enregistrer ;
 - `review=SVN,SVK` : partie de révision limitée à ces lieux ;
 - `skips=3` : questions passées après les réponses (`target=FRA;answers=DEU,DEU,DEU;skips=3`

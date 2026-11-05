@@ -1,6 +1,6 @@
 //! Drapeaux vectoriels (générés par `mapgen flags` à partir de SVG) : des calques de polygones
 //! colorés, peints dans l'ordre. Les coordonnées, entières, sont stockées par différences d'un
-//! point au suivant : la plupart tiennent sur un octet.
+//! point au suivant : petites, elles tiennent sur un ou deux octets.
 
 use serde::{Deserialize, Serialize};
 
