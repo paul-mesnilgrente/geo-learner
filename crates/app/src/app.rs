@@ -508,6 +508,15 @@ impl App {
         game.refresh_choices();
         for code in &demo.answers {
             if let Some(c) = self.world().countries.iter().position(|c| &c.code == code) {
+                // « Pays → drapeau » : le drapeau refusé doit faire partie des choix affichés.
+                if !game.choices.contains(&c)
+                    && let Some(slot) = game
+                        .choices
+                        .iter()
+                        .position(|&o| Some(o) != game.choices_for)
+                {
+                    game.choices[slot] = c;
+                }
                 let outcome = game.quiz.submit(c);
                 game.apply(outcome);
             }
@@ -1054,13 +1063,19 @@ impl App {
                     game.apply(outcome);
                 }
             }
-            // Sans carte, « Nom → numéro » se joue aussi au clavier.
+            // Une question à la fois (« Nom → numéro » aussi se tape) : tout nom reconnu est
+            // validé, juste ou faux. Ne valider que les bonnes réponses trahirait les mauvaises.
+            // Seul le texte tapé compte, jamais la cible : un nom qui peut encore s'allonger
+            // (« Niger » → « Nigeria », « 1 » → « 13 ») attend une pause, qu'il soit juste ou non.
             Mode::Identify | Mode::Locate
-                if game.quiz.target() == Some(country)
-                    && (game.quiz.mode() == Mode::Identify || game.world.info.numbers) =>
+                if game.quiz.mode() == Mode::Identify || game.world.info.numbers =>
             {
-                let outcome = game.quiz.submit(country);
-                game.apply(outcome);
+                if matcher.can_extend(country) {
+                    game.pending = Some((country, game.now));
+                } else {
+                    let outcome = game.quiz.submit(country);
+                    game.apply(outcome);
+                }
             }
             _ => {}
         }
@@ -1194,7 +1209,12 @@ impl App {
             && now - at > AMBIGUOUS_DELAY
         {
             game.pending = None;
-            if game.quiz.mark(country) == Some(Mark::Pending) {
+            let submit = match game.quiz.mode() {
+                Mode::Free => game.quiz.mark(country) == Some(Mark::Pending),
+                // Le champ n'a pas changé entre-temps (une réponse dictée l'aurait vidé).
+                _ => !game.input.is_empty(),
+            };
+            if submit {
                 let outcome = game.quiz.submit(country);
                 game.apply(outcome);
                 self.check_finished();
@@ -2296,45 +2316,61 @@ impl App {
         )
     }
 
-    /// Mode « Pays → drapeau » : les drapeaux proposés ; ceux déjà refusés sont barrés.
+    /// Mode « Pays → drapeau » : les drapeaux proposés ; ceux déjà refusés sont voilés.
     fn choices_bar<'a>(&'a self, game: &'a Game) -> Element<'a, Message> {
+        const W: f32 = 116.0;
+        const H: f32 = 72.0;
         let wrong = game.quiz.wrong_guesses();
         let flags = game.choices.iter().filter_map(|&c| {
             let flag = crate::flags::find(&game.world.countries[c].code)?;
             let refused = wrong.contains(&c);
-            let tile = container(crate::flags::view(flag, 116.0, 72.0))
-                .center_x(116)
-                .center_y(72);
-            let tile: Element<'a, Message> = if refused {
-                // Drapeau écarté : estompé, avec le nom de son pays (on apprend en se trompant).
-                column![
-                    container(tile).style(|_: &iced::Theme| container::Style {
-                        background: Some(style::with_alpha(style::SURFACE, 0.0).into()),
+            let mut tile = stack![
+                container(crate::flags::view(flag, W, H))
+                    .center_x(W)
+                    .center_y(H)
+            ];
+            if refused {
+                // Drapeau écarté : voilé, avec le nom de son pays par-dessus (on apprend en se
+                // trompant). Le voile garde la taille de la tuile : rien ne bouge.
+                tile = tile.push(
+                    container(
+                        text(game.world.countries[c].name.get(self.lang))
+                            .size(12)
+                            .font(style::FONT_SEMIBOLD)
+                            .color(style::DANGER)
+                            .center(),
+                    )
+                    .center_x(W)
+                    .center_y(H)
+                    .padding(4)
+                    .style(|_: &iced::Theme| container::Style {
+                        background: Some(style::with_alpha(style::SURFACE, 0.92).into()),
                         ..Default::default()
                     }),
-                    text(game.world.countries[c].name.get(self.lang))
-                        .size(11)
-                        .color(style::DANGER),
-                ]
-                .spacing(4)
-                .align_x(Center)
-                .into()
-            } else {
-                tile.into()
-            };
+                );
+            }
             let mut b = button(tile).padding(8).style(style::option_card(false));
             if !refused {
                 b = b.on_press(Message::ChooseFlag(c));
             }
             Some(b.into())
         });
-        let mut body = column![Row::with_children(flags).spacing(10).align_y(Center)]
-            .spacing(10)
-            .align_x(Center);
-        if let Some(feedback) = &game.feedback {
-            body = body.push(feedback_chip(feedback));
-        }
-        container(body).padding(14).style(style::floating).into()
+        let card = container(Row::with_children(flags).spacing(10).align_y(Center))
+            .padding(14)
+            .style(style::floating);
+        // Le message s'affiche au-dessus, dans une place réservée : les drapeaux ne bougent pas
+        // quand il apparaît ou disparaît (comme pour le champ de réponse).
+        let feedback: Element<'a, Message> = match &game.feedback {
+            Some(feedback) => feedback_chip(feedback),
+            None => space().into(),
+        };
+        column![
+            container(feedback).height(34).align_y(Vertical::Bottom),
+            card
+        ]
+        .spacing(8)
+        .align_x(Center)
+        .into()
     }
 
     fn answer_bar<'a>(&'a self, game: &'a Game) -> Element<'a, Message> {
@@ -3384,6 +3420,48 @@ mod tests {
         assert!(matcher.lookup("971").is_none());
         let gard = matcher.lookup("Gard").unwrap();
         assert_eq!(ATLASES[departements].countries[gard].code, "FR-30");
+    }
+
+    /// Au clavier, une mauvaise réponse est validée d'elle-même, comme une bonne : attendre
+    /// Entrée la trahirait. Un nom qui peut s'allonger (« Niger ») attend une pause.
+    #[test]
+    fn typed_wrong_answers_are_submitted_too() {
+        let (mut app, _) = App::new();
+        let game = Game::new(0, 0, Mode::Identify, None, Lang::Fr, None);
+        let target = game.quiz.target().unwrap();
+        let matcher = &app.matchers[0];
+        let pick = |extendable: bool| {
+            *game
+                .quiz
+                .members()
+                .iter()
+                .find(|&&c| {
+                    let name = game.world.countries[c].name.get(Lang::Fr);
+                    c != target
+                        && matcher.lookup(name) == Some(c)
+                        && matcher.can_extend(c) == extendable
+                })
+                .unwrap()
+        };
+        let (plain, extendable) = (pick(false), pick(true));
+        let name = |c: usize| game.world.countries[c].name.get(Lang::Fr).to_owned();
+        let (plain, extendable) = (name(plain), name(extendable));
+        app.game = Some(game);
+
+        app.on_input(plain);
+        let game = app.game.as_ref().unwrap();
+        assert_eq!(game.quiz.wrong_tries(), 1);
+        assert!(game.input.is_empty());
+
+        app.on_input(extendable);
+        let game = app.game.as_ref().unwrap();
+        assert_eq!(game.quiz.wrong_tries(), 1);
+        assert!(game.pending.is_some());
+        let later = game.now + AMBIGUOUS_DELAY + Duration::from_millis(50);
+        app.on_tick(later);
+        let game = app.game.as_ref().unwrap();
+        assert_eq!(game.quiz.wrong_tries(), 2);
+        assert!(game.input.is_empty());
     }
 
     /// Durée de construction de l'aperçu (refait à chaque changement de zone).
