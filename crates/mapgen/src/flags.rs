@@ -539,7 +539,10 @@ mod tests {
         assert_eq!(star.color, [0xfc, 0xd1, 0x16, 255]);
         // Coordonnées du SVG (900 × 600) ramenées à la grille.
         let u = (HEIGHT / 600.0) as f32;
-        assert!(inside(star, [450.0 * u, 300.0 * u]), "centre de l'étoile vide");
+        assert!(
+            inside(star, [450.0 * u, 300.0 * u]),
+            "centre de l'étoile vide"
+        );
         assert!(inside(star, [450.0 * u, 218.0 * u]), "branche du haut vide");
     }
 
