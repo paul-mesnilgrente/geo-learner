@@ -1066,6 +1066,10 @@ impl MapView<'_> {
         let water = color!(0x8fbfff);
         match self.quiz.mark(country) {
             None => style::mix(style::OCEAN, water, 0.10),
+            // Carte de maîtrise : la couleur du niveau, comme les terres et les pastilles.
+            Some(Mark::Pending) if self.mastery.is_some() => {
+                style::mix(style::OCEAN, self.tint_of(country).color(), 0.45)
+            }
             Some(Mark::Pending) if self.preview || self.explore => {
                 style::mix(style::OCEAN, style::ACCENT, 0.5)
             }
