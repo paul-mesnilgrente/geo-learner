@@ -87,23 +87,28 @@ Dans `packaging/windows/release-notes/fr-fr.txt` et `en-us.txt`, à réécrire �
 
 ### Description courte
 
-> Apprenez les pays, les océans et les mers du monde, les départements français, les États
-> américains et plus encore sur une carte interactive, au clavier ou à la voix.
+> Apprenez les pays, drapeaux et capitales du monde, les océans, les fleuves, les départements
+> français, les États américains et plus encore sur une carte interactive, au clavier ou à la
+> voix.
 
-> Learn the countries, oceans and seas of the world, U.S. states, Canadian provinces, French
+> Learn the countries, flags and capitals of the world, oceans, rivers, U.S. states, French
 > departments and more on an interactive map, by typing or by voice.
 
 ### Description
 
-> GeoLearner vous aide à retenir la carte du monde, et bien plus : les 197 pays, les cinq
-> océans et 52 mers, les départements et les régions de France, les 50 États des États-Unis, les provinces et
-> territoires du Canada, les États et territoires d'Australie.
+> GeoLearner vous aide à retenir la carte du monde, et bien plus : les 197 pays, leurs drapeaux
+> et leurs capitales, les cinq océans et 52 mers, 55 grands fleuves et 58 lacs, les départements
+> et les régions de France, les 50 États des États-Unis, les provinces et territoires du Canada,
+> les États et territoires d'Australie.
 >
 > Trois façons de jouer :
 > • Tout citer : nommez tous les lieux d'une zone, dans l'ordre que vous voulez. Chaque réponse
 > juste se colore sur la carte.
 > • Nommer : un lieu s'allume, à vous de trouver son nom.
 > • Trouver sur la carte : un nom s'affiche, cliquez au bon endroit.
+>
+> Drapeaux : reconnaissez le pays d'un drapeau, situez-le sur la carte, ou choisissez le drapeau
+> d'un pays parmi six. Une galerie montre tous les drapeaux d'une zone avec leur nom.
 >
 > Jouez sur le monde entier, un continent, une région (Balkans, Caraïbes, Asie centrale,
 > Polynésie…) ou un regroupement comme les Petites Antilles ou l'Union européenne. Côté France,
@@ -124,16 +129,19 @@ Dans `packaging/windows/release-notes/fr-fr.txt` et `en-us.txt`, à réécrire �
 > Interface en français et en anglais. Tout reste sur votre ordinateur. Aucun compte, aucune
 > publicité.
 
-> GeoLearner helps you learn the world map and more: all 197 countries, the five oceans and 52
-> seas, the 50 U.S. states, the
-> provinces and territories of Canada, the states and territories of Australia, and the regions
-> and departments of France.
+> GeoLearner helps you learn the world map and more: all 197 countries, their flags and capitals,
+> the five oceans and 52 seas, 55 great rivers and 58 lakes, the 50 U.S. states, the provinces
+> and territories of Canada, the states and territories of Australia, and the regions and
+> departments of France.
 >
 > Three ways to play:
 > • Name them all: list every place in an area, in any order. Each correct answer lights up on
 > the map.
 > • Name it: a place is highlighted, you give its name.
 > • Find it on the map: a name is shown, you click the right place.
+>
+> Flags: recognize a flag's country, find it on the map, or pick a country's flag among six. A
+> gallery shows all the flags of an area with their names.
 >
 > Play the whole world, a continent, a subregion (Balkans, Caribbean, Central Asia,
 > Polynesia…) or a group such as the Lesser Antilles or the European Union. For the U.S., play
@@ -155,7 +163,9 @@ Dans `packaging/windows/release-notes/fr-fr.txt` et `en-us.txt`, à réécrire �
 ### Fonctionnalités (liste du Store)
 
 - 197 pays : les 193 membres de l'ONU, plus le Vatican, la Palestine, le Kosovo et Taïwan
-- Océans (5) et mers (52), départements (101) et régions (18) de France, États-Unis (50), Canada (13), Australie (8)
+- Drapeaux (197), dans trois sens, et leur galerie ; capitales du monde (197)
+- Océans (5), mers (52), grands fleuves (55) et lacs (58)
+- Départements (101) et régions (18) de France, États-Unis (50), Canada (13), Australie (8)
 - Numéros des départements, dans les deux sens et par dizaine
 - Trois modes de jeu : tout citer, nommer, trouver sur la carte
 - Monde, continents, sous-régions et regroupements d'îles
@@ -167,7 +177,9 @@ Dans `packaging/windows/release-notes/fr-fr.txt` et `en-us.txt`, à réécrire �
 - Interface en français et en anglais
 
 - 197 countries: the 193 UN members plus Vatican City, Palestine, Kosovo and Taiwan
-- Oceans (5) and seas (52), U.S. states (50), Canada (13), Australia (8), French departments (101) and regions (18)
+- Flags (197), three ways to play, and their gallery; world capitals (197)
+- Oceans (5), seas (52), great rivers (55) and lakes (58)
+- U.S. states (50), Canada (13), Australia (8), French departments (101) and regions (18)
 - French department numbers, both ways and ten at a time
 - Three game modes: name them all, name it, find it on the map
 - World, continents, subregions and island groups
@@ -186,24 +198,26 @@ Le Store en accepte 7 au plus.
 enregistre pas. Passer par *Export listings*, remplir les lignes `SearchTerm1` à `SearchTerm7`
 (une colonne par langue), puis *Import listings* (.csv) ; vérifier avec un nouvel export.
 
-- Français : géographie, pays, carte du monde, quiz, départements, États-Unis, éducation.
-- Anglais : geography, countries, world map, quiz, US states, Canada provinces, education.
+- Français : géographie, pays, carte du monde, quiz, drapeaux, capitales, départements.
+- Anglais : geography, countries, world map, quiz, flags, capitals, US states.
 
 ### Captures
 
 Dans l'ordre (1600×900, générées par le mode démo avec `lang=fr` ou `lang=en`, voir le
 README), dans `docs/store/fr/` et `docs/store/en/` :
 
-1. Accueil : les quiz en cartes et les dernières parties
+1. Accueil : les quiz par sections et les dernières parties (`home;progress=12`)
 2. Pays du monde, « Tous les pays » en cours
-3. Page du quiz : modes, zones, aperçu de maîtrise, progression
-4. Carte de maîtrise (exploration de l'Europe)
-5. Pays du monde, « Nommer le pays »
-6. Mers du monde, « Toutes les mers » en cours
-7. Départements français, avec les encarts de l'outre-mer
-8. Numéros des départements, « Numéro → nom »
-9. Exploration du Canada
-10. Bilan d'une partie, avec « Réviser les erreurs »
+3. Drapeaux, « Pays → drapeau », un drapeau écarté (`atlas=drapeaux;region=europe;mode=choose;target=ITA;answers=IRL`)
+4. Capitales d'Europe, « Toutes les capitales » en cours
+5. Fleuves du monde, « Tous les fleuves » en cours
+6. Lacs d'Afrique, « Nommer le lac » (`atlas=lacs;region=afrique;mode=identify;target=tanganyika`)
+7. Carte de maîtrise (exploration de l'Europe, `progress=12;explore=FRA`)
+8. Galerie des drapeaux d'Europe (`atlas=drapeaux;region=europe;gallery`)
+9. Départements français, avec les encarts de l'outre-mer
+10. Bilan d'une partie, avec « Réviser les erreurs » (`giveup;summary`)
+
+Fenêtre de 1600×900 : `GEO_WINDOW=1600x900`.
 
 Vérifier la taille des captures (`magick identify`) : la fenêtre est parfois redimensionnée
 pendant la capture, il faut alors la refaire.
@@ -238,6 +252,9 @@ peut pas s'authentifier auprès du Store. Pour chaque version :
      enregistré tout de suite ; envoyer une capture à la fois et attendre qu'elle apparaisse,
      sinon l'ordre se mélange. Au-delà de 10 captures, le champ d'ajout disparaît ;
    - réexporter le CSV pour vérifier, puis *Submit for certification*.
+   - 0.4.0 : dans *Propriétés*, remplacer l'adresse de la politique de confidentialité (gist) par
+     <https://github.com/paul-mesnilgrente/geo-learner/blob/main/PRIVACY.md>, puis supprimer le
+     gist une fois la version publiée.
 
 ### Par la CI (prête, en veille)
 

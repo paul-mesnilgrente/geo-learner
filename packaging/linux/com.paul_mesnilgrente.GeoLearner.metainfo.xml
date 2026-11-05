@@ -16,14 +16,16 @@
 
   <description>
     <p>
-      GeoLearner helps you learn the world map and more: all 197 countries, the five oceans and
-      52 seas, the 50 U.S. states, the provinces and territories of Canada, the states and
-      territories of Australia, and the regions and departments of France.
+      GeoLearner helps you learn the world map and more: all 197 countries, their flags and
+      capitals, the five oceans and 52 seas, 55 great rivers and 58 lakes, the 50 U.S. states,
+      the provinces and territories of Canada, the states and territories of Australia, and the
+      regions and departments of France.
     </p>
     <p xml:lang="fr">
-      GeoLearner vous aide à retenir la carte du monde, et bien plus : les 197 pays, les cinq
-      océans et 52 mers, les départements et les régions de France, les 50 États des États-Unis,
-      les provinces et territoires du Canada, les États et territoires d’Australie.
+      GeoLearner vous aide à retenir la carte du monde, et bien plus : les 197 pays, leurs
+      drapeaux et leurs capitales, les cinq océans et 52 mers, 55 grands fleuves et 58 lacs, les
+      départements et les régions de France, les 50 États des États-Unis, les provinces et
+      territoires du Canada, les États et territoires d’Australie.
     </p>
     <p>Three ways to play:</p>
     <p xml:lang="fr">Trois façons de jouer :</p>
@@ -77,9 +79,13 @@
     <keyword>quiz</keyword>
     <keyword>map</keyword>
     <keyword>countries</keyword>
+    <keyword>flags</keyword>
+    <keyword>capitals</keyword>
     <keyword xml:lang="fr">géographie</keyword>
     <keyword xml:lang="fr">carte</keyword>
     <keyword xml:lang="fr">pays</keyword>
+    <keyword xml:lang="fr">drapeaux</keyword>
+    <keyword xml:lang="fr">capitales</keyword>
     <keyword xml:lang="fr">départements</keyword>
   </keywords>
 
@@ -103,60 +109,77 @@
     <screenshot type="default">
       <caption>Home screen: pick a quiz</caption>
       <caption xml:lang="fr">L’accueil : choisissez un quiz</caption>
-      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/en/1-accueil.png</image>
-      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/fr/1-accueil.png</image>
+      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.4.0/docs/store/en/01-accueil.png</image>
+      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.4.0/docs/store/fr/01-accueil.png</image>
     </screenshot>
     <screenshot>
       <caption>Name all the countries of the world</caption>
       <caption xml:lang="fr">Citez tous les pays du monde</caption>
-      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/en/2-tous-les-pays.png</image>
-      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/fr/2-tous-les-pays.png</image>
+      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.4.0/docs/store/en/02-tous-les-pays.png</image>
+      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.4.0/docs/store/fr/02-tous-les-pays.png</image>
     </screenshot>
     <screenshot>
-      <caption>Each quiz has its own page and progress</caption>
-      <caption xml:lang="fr">Chaque quiz a sa page et sa progression</caption>
-      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/en/3-page-quiz.png</image>
-      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/fr/3-page-quiz.png</image>
+      <caption>Country → flag: pick the right flag</caption>
+      <caption xml:lang="fr">Pays → drapeau : choisissez le bon drapeau</caption>
+      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.4.0/docs/store/en/03-drapeaux.png</image>
+      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.4.0/docs/store/fr/03-drapeaux.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>The capitals of Europe</caption>
+      <caption xml:lang="fr">Les capitales d’Europe</caption>
+      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.4.0/docs/store/en/04-capitales.png</image>
+      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.4.0/docs/store/fr/04-capitales.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>The great rivers of the world</caption>
+      <caption xml:lang="fr">Les grands fleuves du monde</caption>
+      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.4.0/docs/store/en/05-fleuves.png</image>
+      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.4.0/docs/store/fr/05-fleuves.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Name the highlighted lake</caption>
+      <caption xml:lang="fr">Nommez le lac en surbrillance</caption>
+      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.4.0/docs/store/en/06-lacs.png</image>
+      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.4.0/docs/store/fr/06-lacs.png</image>
     </screenshot>
     <screenshot>
       <caption>Mastery map: what you know and what to review</caption>
       <caption xml:lang="fr">Carte de maîtrise : ce que vous savez et ce qu’il faut revoir</caption>
-      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/en/4-maitrise.png</image>
-      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/fr/4-maitrise.png</image>
+      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.4.0/docs/store/en/07-maitrise.png</image>
+      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.4.0/docs/store/fr/07-maitrise.png</image>
     </screenshot>
     <screenshot>
-      <caption>Name the highlighted place</caption>
-      <caption xml:lang="fr">Nommez le lieu en surbrillance</caption>
-      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/en/5-nommer.png</image>
-      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/fr/5-nommer.png</image>
+      <caption>The flags gallery, to learn them</caption>
+      <caption xml:lang="fr">La galerie des drapeaux, pour les apprendre</caption>
+      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.4.0/docs/store/en/08-galerie.png</image>
+      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.4.0/docs/store/fr/08-galerie.png</image>
     </screenshot>
     <screenshot>
       <caption>The departments of France</caption>
       <caption xml:lang="fr">Les départements français</caption>
-      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/en/6-departements.png</image>
-      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/fr/6-departements.png</image>
-    </screenshot>
-    <screenshot>
-      <caption>Learn the department numbers, both ways</caption>
-      <caption xml:lang="fr">Apprenez les numéros des départements, dans les deux sens</caption>
-      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/en/7-numeros.png</image>
-      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/fr/7-numeros.png</image>
-    </screenshot>
-    <screenshot>
-      <caption>Provinces and territories of Canada</caption>
-      <caption xml:lang="fr">Provinces et territoires du Canada</caption>
-      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/en/8-canada.png</image>
-      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/fr/8-canada.png</image>
+      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.4.0/docs/store/en/09-departements.png</image>
+      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.4.0/docs/store/fr/09-departements.png</image>
     </screenshot>
     <screenshot>
       <caption>Your score and time, game after game</caption>
       <caption xml:lang="fr">Votre score et votre temps, partie après partie</caption>
-      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/en/9-bilan.png</image>
-      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.2.0/docs/store/fr/9-bilan.png</image>
+      <image>https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.4.0/docs/store/en/10-bilan.png</image>
+      <image xml:lang="fr">https://raw.githubusercontent.com/paul-mesnilgrente/geo-learner/v0.4.0/docs/store/fr/10-bilan.png</image>
     </screenshot>
   </screenshots>
 
   <releases>
+    <release version="0.4.0" date="2026-11-05">
+      <description>
+        <ul>
+          <li>New quizzes: flags of the world (three ways to play, plus a gallery), world capitals, 55 rivers and 58 lakes</li>
+          <li>Home screen in sections: the world, then each country</li>
+          <li>Reference map, with or without names, for the department numbers and the flags</li>
+          <li>Help menu: about, what's new, keyboard shortcuts, report a problem, export and import your progress</li>
+          <li>When typing, a recognized answer is submitted right away, right or wrong</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.3.0" date="2026-11-04">
       <description>
         <ul>

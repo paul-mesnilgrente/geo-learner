@@ -1,4 +1,6 @@
-What's new in version 0.3:
-• New quiz: the five oceans, with their limits drawn on the map.
-• New quiz: 52 seas of the world, by ocean or by region (Mediterranean, Northern Europe, Southeast Asia…).
-• New icon: a G around the globe, with no background, easier to spot in the taskbar and Start menu.
+What's new in version 0.4:
+• Four new quizzes: flags of the world (three ways to play, plus a gallery to learn them), world capitals, 55 great rivers and 58 lakes.
+• Home screen in sections: the world first, then each country.
+• Department numbers and flags: a reference map, with or without names, shows the possible answers.
+• Help menu: about, what's new, keyboard shortcuts, report a problem, export and import your progress.
+• When typing, a recognized answer is submitted right away, whether it is right or wrong.

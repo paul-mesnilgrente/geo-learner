@@ -1,4 +1,6 @@
-Nouveautés de la version 0.3 :
-• Nouveau quiz : les cinq océans, avec leurs limites tracées sur la carte.
-• Nouveau quiz : 52 mers du monde, à jouer par océan ou par région (Méditerranée, Europe du Nord, Asie du Sud-Est…).
-• Nouvelle icône : un G autour du globe, sans fond, plus lisible dans la barre des tâches et le menu Démarrer.
+Nouveautés de la version 0.4 :
+• Quatre nouveaux quiz : les drapeaux du monde (trois façons de jouer, et une galerie pour les apprendre), les capitales du monde, 55 grands fleuves et 58 lacs.
+• Accueil rangé par sections : le monde d'abord, puis chaque pays.
+• Numéros des départements et drapeaux : une carte de repère, avec ou sans noms, montre les réponses possibles.
+• Menu d'aide : à propos, nouveautés, raccourcis clavier, signaler un problème, exporter et importer sa progression.
+• Au clavier, une réponse reconnue est validée tout de suite, qu'elle soit juste ou fausse.

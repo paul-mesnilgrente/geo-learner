@@ -1192,7 +1192,7 @@ dependencies = [
 
 [[package]]
 name = "geo-core"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "postcard",
  "serde",
@@ -1201,7 +1201,7 @@ dependencies = [
 
 [[package]]
 name = "geo-learner"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "cpal",
  "dirs",
@@ -2002,7 +2002,7 @@ dependencies = [
 
 [[package]]
 name = "mapgen"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "geo-core",
  "i_overlay",
