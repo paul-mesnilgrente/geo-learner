@@ -97,9 +97,10 @@ Dans `packaging/windows/release-notes/fr-fr.txt` et `en-us.txt`, à réécrire �
 ### Description
 
 > GeoLearner vous aide à retenir la carte du monde, et bien plus : les 197 pays, leurs drapeaux
-> et leurs capitales, les cinq océans et 52 mers, 55 grands fleuves et 58 lacs, les départements
-> et les régions de France, les 50 États des États-Unis, les provinces et territoires du Canada,
-> les États et territoires d'Australie.
+> et leurs capitales, les cinq océans et 52 mers, 55 grands fleuves et 58 lacs, les régions,
+> départements et préfectures de France, les 50 États des États-Unis et leurs capitales, les
+> provinces et territoires du Canada, les États et territoires d'Australie, les cantons suisses,
+> les provinces de Belgique et les régions de Nouvelle-Zélande.
 >
 > Trois façons de jouer :
 > • Tout citer : nommez tous les lieux d'une zone, dans l'ordre que vous voulez. Chaque réponse
@@ -130,9 +131,10 @@ Dans `packaging/windows/release-notes/fr-fr.txt` et `en-us.txt`, à réécrire �
 > publicité.
 
 > GeoLearner helps you learn the world map and more: all 197 countries, their flags and capitals,
-> the five oceans and 52 seas, 55 great rivers and 58 lakes, the 50 U.S. states, the provinces
-> and territories of Canada, the states and territories of Australia, and the regions and
-> departments of France.
+> the five oceans and 52 seas, 55 great rivers and 58 lakes, the 50 U.S. states and their
+> capitals, the provinces and territories of Canada, the states and territories of Australia,
+> the regions, departments and prefectures of France, the cantons of Switzerland, the provinces
+> of Belgium and the regions of New Zealand.
 >
 > Three ways to play:
 > • Name them all: list every place in an area, in any order. Each correct answer lights up on
@@ -165,7 +167,9 @@ Dans `packaging/windows/release-notes/fr-fr.txt` et `en-us.txt`, à réécrire �
 - 197 pays : les 193 membres de l'ONU, plus le Vatican, la Palestine, le Kosovo et Taïwan
 - Drapeaux (197), dans trois sens, et leur galerie ; capitales du monde (197)
 - Océans (5), mers (52), grands fleuves (55) et lacs (58)
-- Départements (101) et régions (18) de France, États-Unis (50), Canada (13), Australie (8)
+- Départements (101), régions (18) et préfectures (101) de France
+- États-Unis (50) et leurs capitales, Canada (13), Australie (8)
+- Cantons suisses (26), provinces de Belgique (11), régions de Nouvelle-Zélande (16)
 - Numéros des départements, dans les deux sens et par dizaine
 - Trois modes de jeu : tout citer, nommer, trouver sur la carte
 - Monde, continents, sous-régions et regroupements d'îles
@@ -179,7 +183,9 @@ Dans `packaging/windows/release-notes/fr-fr.txt` et `en-us.txt`, à réécrire �
 - 197 countries: the 193 UN members plus Vatican City, Palestine, Kosovo and Taiwan
 - Flags (197), three ways to play, and their gallery; world capitals (197)
 - Oceans (5), seas (52), great rivers (55) and lakes (58)
-- U.S. states (50), Canada (13), Australia (8), French departments (101) and regions (18)
+- U.S. states (50) and their capitals, Canada (13), Australia (8)
+- French departments (101), regions (18) and prefectures (101)
+- Cantons of Switzerland (26), provinces of Belgium (11), regions of New Zealand (16)
 - French department numbers, both ways and ten at a time
 - Three game modes: name them all, name it, find it on the map
 - World, continents, subregions and island groups

@@ -17,15 +17,17 @@
   <description>
     <p>
       GeoLearner helps you learn the world map and more: all 197 countries, their flags and
-      capitals, the five oceans and 52 seas, 55 great rivers and 58 lakes, the 50 U.S. states,
-      the provinces and territories of Canada, the states and territories of Australia, and the
-      regions and departments of France.
+      capitals, the five oceans and 52 seas, 55 great rivers and 58 lakes, the regions,
+      departments and prefectures of France, the 50 U.S. states and their capitals, the provinces
+      and territories of Canada, the states and territories of Australia, the cantons of
+      Switzerland, the provinces of Belgium and the regions of New Zealand.
     </p>
     <p xml:lang="fr">
       GeoLearner vous aide à retenir la carte du monde, et bien plus : les 197 pays, leurs
       drapeaux et leurs capitales, les cinq océans et 52 mers, 55 grands fleuves et 58 lacs, les
-      départements et les régions de France, les 50 États des États-Unis, les provinces et
-      territoires du Canada, les États et territoires d’Australie.
+      régions, départements et préfectures de France, les 50 États des États-Unis et leurs
+      capitales, les provinces et territoires du Canada, les États et territoires d’Australie,
+      les cantons suisses, les provinces de Belgique et les régions de Nouvelle-Zélande.
     </p>
     <p>Three ways to play:</p>
     <p xml:lang="fr">Trois façons de jouer :</p>
@@ -169,6 +171,15 @@
   </screenshots>
 
   <releases>
+    <release version="0.5.0" date="2026-11-11">
+      <description>
+        <ul>
+          <li>New quizzes: the 101 prefectures of France and the 50 U.S. state capitals, as dots on the map</li>
+          <li>New quizzes: the cantons of Switzerland, the provinces of Belgium and the regions of New Zealand</li>
+          <li>Voice input: the speech model download no longer fails on some Windows computers</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.4.0" date="2026-11-05">
       <description>
         <ul>

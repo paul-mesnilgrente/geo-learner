@@ -1,6 +1,4 @@
-Nouveautés de la version 0.4 :
-• Quatre nouveaux quiz : les drapeaux du monde (trois façons de jouer, et une galerie pour les apprendre), les capitales du monde, 55 grands fleuves et 58 lacs.
-• Accueil rangé par sections : le monde d'abord, puis chaque pays.
-• Numéros des départements et drapeaux : une carte de repère, avec ou sans noms, montre les réponses possibles.
-• Menu d'aide : à propos, nouveautés, raccourcis clavier, signaler un problème, exporter et importer sa progression.
-• Au clavier, une réponse reconnue est validée tout de suite, qu'elle soit juste ou fausse.
+Nouveautés de la version 0.5 :
+• Préfectures de France (101) et capitales des États-Unis (50) : des points posés sur la carte des départements ou des États, à nommer ou à retrouver.
+• Trois nouveaux pays : les cantons suisses, les provinces de Belgique et les régions de Nouvelle-Zélande.
+• Saisie vocale : le téléchargement du modèle de reconnaissance n'échoue plus sur certains ordinateurs.
