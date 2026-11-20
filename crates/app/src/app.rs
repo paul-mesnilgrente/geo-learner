@@ -115,6 +115,8 @@ pub enum Message {
     ToggleTimer,
     /// Active ou désactive la seconde chance des lieux ratés.
     ToggleSecondChance,
+    /// « Tout citer » : cliquer d'abord sur un lieu, puis le nommer.
+    ToggleClickFirst,
     /// Étiquettes de la carte de repère (numéros des départements, drapeaux).
     SetLabels(crate::settings::MapLabels),
     /// Mode « Pays → drapeau » : drapeau choisi (pays auquel il appartient).
@@ -268,6 +270,9 @@ struct Game {
     choices_for: Option<usize>,
     /// Fin de partie : liste des réponses affichée à la place de la carte (numéros, drapeaux).
     answers_list: bool,
+    /// « Tout citer » en cliquant d'abord : le lieu choisi sur la carte, à nommer.
+    click_first: bool,
+    picked: Option<usize>,
 }
 
 /// Drapeaux proposés en mode « Pays → drapeau ».
@@ -560,6 +565,10 @@ impl App {
         }
         game.quiz = game.quiz.with_second_chance(self.settings.second_chance);
         game.refresh_choices();
+        if let Some(code) = &demo.click {
+            game.click_first = game.quiz.mode() == Mode::Free;
+            game.picked = self.world().countries.iter().position(|c| &c.code == code);
+        }
         for code in &demo.answers {
             if let Some(c) = self.world().countries.iter().position(|c| &c.code == code) {
                 // « Pays → drapeau » : le drapeau refusé doit faire partie des choix affichés.
@@ -698,7 +707,8 @@ impl App {
             // légers (pulsation, flash) se contentent d'environ 25 images par seconde.
             let effects = game.flash.is_some()
                 || game.pending.is_some()
-                || (game.quiz.mode() == Mode::Identify && game.quiz.target().is_some());
+                || (game.quiz.mode() == Mode::Identify && game.quiz.target().is_some())
+                || game.picked.is_some();
             if game.animation.is_some() || game.locator.as_ref().is_some_and(Locator::animating) {
                 subs.push(time::every(Duration::from_millis(16)).map(Message::Tick));
             } else if effects {
@@ -828,6 +838,11 @@ impl App {
                     self.atlas = atlas;
                     self.region = 0;
                 }
+                // Le mode de l'étape conseillée (le premier si c'est « Découvrir »).
+                self.mode = match self.recommended_step() {
+                    Step::Play(mode) => mode,
+                    Step::Discover => modes(&self.world().info)[0],
+                };
                 self.open_quiz();
                 return operation::snap_to(HOME_SCROLL, operation::RelativeOffset::START);
             }
@@ -881,6 +896,7 @@ impl App {
             }
             Message::ToggleTimer => self.settings.toggle_timer(),
             Message::ToggleSecondChance => self.settings.toggle_second_chance(),
+            Message::ToggleClickFirst => self.settings.toggle_click_first(),
             Message::ShowMastery(show) => self.show_mastery = show,
             Message::ByContinent(by_continent) => self.settings.set_by_continent(by_continent),
             Message::StepTimer(up) => {
@@ -921,6 +937,7 @@ impl App {
                 let mut game =
                     Game::new(self.atlas, self.region, self.mode, limit, self.lang, review);
                 game.quiz = game.quiz.with_second_chance(self.settings.second_chance);
+                game.click_first = game.quiz.mode() == Mode::Free && self.settings.click_first;
                 self.game = Some(game);
                 return operation::focus(ANSWER_INPUT);
             }
@@ -1117,6 +1134,7 @@ impl App {
             MapEvent::Click(Some(country)) if game.map_answers() => {
                 self.on_click(country);
             }
+            MapEvent::Click(Some(country)) if game.click_first => game.pick(country),
             MapEvent::Globe(inset) => {
                 // Un second clic sur la même pastille referme la carte.
                 game.locator = match &game.locator {
@@ -1175,6 +1193,14 @@ impl App {
             return;
         };
         match game.quiz.mode() {
+            // Cliquer d'abord : comme « Nommer », tout nom reconnu est validé, juste ou faux.
+            Mode::Free if game.click_first => {
+                if matcher.can_extend(country) {
+                    game.pending = Some((country, game.now));
+                } else {
+                    game.answer_picked(country);
+                }
+            }
             Mode::Free if game.quiz.mark(country) == Some(Mark::Pending) => {
                 if is_prefix_of_other(game.world, &game.input, country, &game.quiz) {
                     game.pending = Some((country, game.now));
@@ -1243,6 +1269,7 @@ impl App {
         };
         let name = game.world.countries[country].name.get(game.lang).to_owned();
         match game.quiz.mode() {
+            Mode::Free if game.click_first => game.answer_picked(country),
             Mode::Free => match game.quiz.mark(country) {
                 Some(Mark::Pending) => {
                     let outcome = game.quiz.submit(country);
@@ -1330,6 +1357,12 @@ impl App {
         {
             game.pending = None;
             let submit = match game.quiz.mode() {
+                Mode::Free if game.click_first => {
+                    if !game.input.is_empty() {
+                        game.answer_picked(country);
+                    }
+                    false
+                }
                 Mode::Free => game.quiz.mark(country) == Some(Mark::Pending),
                 // Le champ n'a pas changé entre-temps (une réponse dictée l'aurait vidé).
                 _ => !game.input.is_empty(),
@@ -1337,6 +1370,8 @@ impl App {
             if submit {
                 let outcome = game.quiz.submit(country);
                 game.apply(outcome);
+                self.check_finished();
+            } else {
                 self.check_finished();
             }
         }
@@ -1371,6 +1406,19 @@ impl App {
         let earlier = self.voice.sentence.len();
         self.voice.sentence.extend(&countries);
         match game.quiz.mode() {
+            // Cliquer d'abord : comme « Nommer », une erreur n'est comptée qu'en fin de phrase.
+            Mode::Free if game.click_first => match game.picked {
+                Some(picked) if countries.contains(&picked) => {
+                    game.answer_picked(picked);
+                    self.voice.sentence.clear();
+                }
+                _ if done => {
+                    if let Some(&guess) = self.voice.sentence.first() {
+                        game.answer_picked(guess);
+                    }
+                }
+                _ => {}
+            },
             Mode::Free => {
                 for country in countries {
                     let outcome = game.quiz.submit(country);
@@ -1609,28 +1657,125 @@ impl App {
     }
 
     /// Mode, zone et lancement.
+    /// Étape conseillée dans la zone choisie : découvrir tant qu'aucune partie de ce quiz n'est
+    /// jouée, puis le premier mode où moins de 80 % des lieux de la zone sont acquis.
+    fn recommended_step(&self) -> Step {
+        let world = self.world();
+        let info = &world.info;
+        if !self.progress.sessions.iter().any(|s| s.atlas == info.id) {
+            return Step::Discover;
+        }
+        let zone = &world.regions[self.region];
+        let modes = modes(info);
+        for &mode in modes {
+            let mastery = self.progress.mastery(&info.id, mode);
+            let known = zone
+                .members
+                .iter()
+                .filter(|&&c| {
+                    mastery
+                        .get(&world.countries[c].code)
+                        .is_some_and(|m| m.level == Level::Known)
+                })
+                .count();
+            if (known as f32) < STEP_KNOWN * zone.members.len() as f32 {
+                return Step::Play(mode);
+            }
+        }
+        Step::Play(modes[modes.len() - 1])
+    }
+
+    /// Une étape du parcours : son numéro, « Conseillé » s'il y a lieu, son titre et ce qu'on y
+    /// fait.
+    fn step_card<'a>(
+        &self,
+        number: usize,
+        title: String,
+        description: String,
+        recommended: bool,
+        selected: bool,
+        message: Message,
+    ) -> Element<'a, Message> {
+        let mut head = row![
+            text(tr!(self.lang, "Étape {}", "Step {}", number))
+                .size(11)
+                .font(style::FONT_SEMIBOLD)
+                .color(style::MUTED)
+                .width(Fill)
+        ]
+        .align_y(Center);
+        if recommended {
+            head = head.push(
+                container(
+                    text(tr!(self.lang, "Conseillé", "Suggested"))
+                        .size(11)
+                        .font(style::FONT_SEMIBOLD)
+                        .color(Color::WHITE),
+                )
+                .padding([2, 8])
+                .style(|_: &Theme| container::Style {
+                    background: Some(style::SUCCESS.into()),
+                    border: iced::border::rounded(999),
+                    ..Default::default()
+                }),
+            );
+        }
+        button(
+            column![
+                head,
+                text(title).size(16).font(style::FONT_SEMIBOLD),
+                text(description).size(13).color(style::MUTED),
+            ]
+            .spacing(6),
+        )
+        .padding(16)
+        .width(Fill)
+        .height(146)
+        .style(style::option_card(selected))
+        .on_press(message)
+        .into()
+    }
+
     fn play_main(&self) -> Element<'_, Message> {
         let words = Words::of(&self.world().info, self.lang);
-        let modes = Row::with_children(modes(&self.world().info).iter().map(|&mode| {
-            button(
-                column![
-                    text(mode_title(mode, &self.world().info, self.lang))
-                        .size(16)
-                        .font(style::FONT_SEMIBOLD),
-                    text(mode_description(mode, &self.world().info, self.lang))
-                        .size(13)
-                        .color(style::MUTED),
-                ]
-                .spacing(6),
+        let info = &self.world().info;
+        let recommended = self.recommended_step();
+        // Découvrir : la galerie pour les drapeaux, la carte à explorer sinon.
+        let discover = self.step_card(
+            1,
+            tr!(self.lang, "Découvrir", "Discover"),
+            if info.flags {
+                tr!(
+                    self.lang,
+                    "Parcourir la galerie : chaque drapeau avec son pays.",
+                    "Browse the gallery: each flag with its country."
+                )
+            } else {
+                tr!(
+                    self.lang,
+                    "Explorer la carte, sans quiz : chaque lieu avec son nom.",
+                    "Explore the map, no quiz: each place with its name."
+                )
+            },
+            recommended == Step::Discover,
+            false,
+            if info.flags {
+                Message::OpenGallery
+            } else {
+                Message::OpenExplore
+            },
+        );
+        let steps = modes(info).iter().enumerate().map(|(i, &mode)| {
+            self.step_card(
+                i + 2,
+                mode_title(mode, info, self.lang),
+                mode_description(mode, info, self.lang),
+                recommended == Step::Play(mode),
+                self.mode == mode,
+                Message::SelectMode(mode),
             )
-            .padding(16)
-            .width(Fill)
-            .height(124)
-            .style(style::option_card(self.mode == mode))
-            .on_press(Message::SelectMode(mode))
-            .into()
-        }))
-        .spacing(12);
+        });
+        let modes = Row::with_children(std::iter::once(discover).chain(steps)).spacing(12);
 
         let selected = &self.world().regions[self.region];
         let open_continent = match selected.kind {
@@ -1734,10 +1879,14 @@ impl App {
                     ))
                     .size(14)
                     .color(style::MUTED),
-                    row![self.timer_setting(), self.second_chance_setting()]
-                        .spacing(16)
-                        .align_y(Center)
-                        .wrap(),
+                    row![
+                        self.timer_setting(),
+                        self.second_chance_setting(),
+                        self.click_first_setting()
+                    ]
+                    .spacing(16)
+                    .align_y(Center)
+                    .wrap(),
                 ]
                 .spacing(4)
                 .width(Fill),
@@ -1763,7 +1912,22 @@ impl App {
 
         column![
             column![
-                section_title(&tr!(self.lang, "Mode de jeu", "Game mode")),
+                row![
+                    section_title(&tr!(
+                        self.lang,
+                        "Apprendre, étape par étape",
+                        "Learn step by step"
+                    )),
+                    text(tr!(
+                        self.lang,
+                        "de la découverte à l'examen",
+                        "from discovery to the final test"
+                    ))
+                    .size(12)
+                    .color(style::MUTED),
+                ]
+                .spacing(10)
+                .align_y(Center),
                 modes
             ]
             .spacing(12),
@@ -1835,6 +1999,47 @@ impl App {
                     .color(style::MUTED),
             );
         }
+        container(setting)
+            .padding(iced::Padding::ZERO.top(8))
+            .into()
+    }
+
+    /// « Tout citer » : cliquer d'abord sur un lieu, puis le nommer (dans l'ordre qu'on veut,
+    /// mais en reliant chaque nom à sa forme).
+    fn click_first_setting(&self) -> Element<'_, Message> {
+        if self.mode != Mode::Free {
+            return space().into();
+        }
+        let on = self.settings.click_first;
+        let fg = if on { Color::WHITE } else { style::TEXT };
+        let mut setting = row![
+            button(
+                row![
+                    icon(Icon::Target, 14.0, fg),
+                    text(tr!(self.lang, "Cliquer d'abord", "Click first")).size(13)
+                ]
+                .spacing(6)
+                .align_y(Center),
+            )
+            .padding([6, 12])
+            .style(style::pill(on))
+            .on_press(Message::ToggleClickFirst),
+        ]
+        .spacing(8)
+        .align_y(Center);
+        setting = setting.push(
+            text(if on {
+                tr!(
+                    self.lang,
+                    "cliquer un lieu, puis le nommer",
+                    "click a place, then name it"
+                )
+            } else {
+                tr!(self.lang, "désactivé", "off")
+            })
+            .size(13)
+            .color(style::MUTED),
+        );
         container(setting)
             .padding(iced::Padding::ZERO.top(8))
             .into()
@@ -2208,11 +2413,14 @@ impl App {
             camera: game.camera,
             quiz,
             hover: game.hover,
-            target: quiz.target().filter(|_| game.shows_target()),
+            target: quiz
+                .target()
+                .filter(|_| game.shows_target())
+                .or(game.picked),
             flash,
             pulse,
             reveal_all: quiz.is_finished(),
-            clickable: game.map_answers() && !quiz.is_finished(),
+            clickable: (game.map_answers() || game.click_first) && !quiz.is_finished(),
             preview: false,
             situation: None,
             explore: false,
@@ -2364,6 +2572,29 @@ impl App {
 
     fn prompt<'a>(&'a self, game: &'a Game) -> Option<Element<'a, Message>> {
         let quiz = &game.quiz;
+        // Cliquer d'abord : la question suit le lieu choisi.
+        if game.click_first && !quiz.is_finished() {
+            let words = Words::of(&game.world.info, self.lang);
+            let ask = match game.picked {
+                Some(_) => text(words.which_is_this())
+                    .size(18)
+                    .font(style::FONT_SEMIBOLD),
+                None => text(tr!(
+                    self.lang,
+                    "Cliquez sur {} de la carte",
+                    "Click {} on the map",
+                    words.a()
+                ))
+                .size(16)
+                .color(style::MUTED),
+            };
+            return Some(
+                container(ask)
+                    .padding([12, 28])
+                    .style(style::floating)
+                    .into(),
+            );
+        }
         let target = quiz.target()?;
         let tries = quiz.wrong_tries();
         let flag = crate::flags::find(&game.world.countries[target].code)
@@ -2534,6 +2765,15 @@ impl App {
             Mode::Identify => match self.lang {
                 Lang::Fr => format!("Nom {} en surbrillance…", words.of_the()),
                 Lang::En => format!("Name the highlighted {}…", words.one()),
+            },
+            Mode::Free if game.click_first => match (game.picked, self.lang) {
+                (Some(_), Lang::Fr) => format!("Nom {} choisi…", words.of_the()),
+                (Some(_), Lang::En) => format!("Name the selected {}…", words.one()),
+                (None, _) => tr!(
+                    self.lang,
+                    "Cliquez d'abord sur la carte…",
+                    "Click on the map first…"
+                ),
             },
             _ => tr!(self.lang, "Nom {}…", "Name {}…", words.of_a()),
         };
@@ -3084,6 +3324,8 @@ impl Game {
             choices: Vec::new(),
             choices_for: None,
             answers_list: false,
+            click_first: false,
+            picked: None,
         }
         .with_choices()
     }
@@ -3118,6 +3360,62 @@ impl Game {
     }
 
     /// Les clics sur la carte répondent : « Trouver sur la carte », « Drapeau → carte ».
+    /// Cliquer d'abord : un lieu à trouver devient le lieu à nommer ; un lieu déjà trouvé
+    /// clignote.
+    fn pick(&mut self, country: usize) {
+        match self.quiz.mark(country) {
+            Some(Mark::Pending) => {
+                self.picked = Some(country);
+                self.pending = None;
+                self.input.clear();
+            }
+            Some(_) => {
+                let name = place_label(self.world, country, self.lang);
+                self.say(
+                    tr!(self.lang, "Déjà trouvé : {}", "Already found: {}", name),
+                    style::WARNING,
+                );
+                self.flash(country, style::WARNING, 900);
+            }
+            None => {}
+        }
+    }
+
+    /// Cliquer d'abord : un nom donné pour le lieu choisi. Juste, il est trouvé ; faux, le nom
+    /// donné est écarté (sans dire le bon).
+    fn answer_picked(&mut self, country: usize) {
+        let Some(picked) = self.picked else {
+            let words = Words::of(&self.world.info, self.lang);
+            self.say(
+                tr!(
+                    self.lang,
+                    "Cliquez d'abord sur {} de la carte",
+                    "First click {} on the map",
+                    words.a()
+                ),
+                style::MUTED,
+            );
+            return;
+        };
+        if country == picked {
+            let outcome = self.quiz.submit(country);
+            self.apply(outcome);
+            self.picked = None;
+        } else {
+            self.input.clear();
+            let name = place_label(self.world, country, self.lang);
+            self.say(
+                tr!(
+                    self.lang,
+                    "✕ Non, ce n'est pas : {}",
+                    "✕ No, that's not: {}",
+                    name
+                ),
+                style::DANGER,
+            );
+        }
+    }
+
     fn map_answers(&self) -> bool {
         self.quiz.mode() == Mode::Locate && !self.world.info.numbers
     }
@@ -3413,16 +3711,28 @@ fn section_title<'a>(label: &str) -> Element<'a, Message> {
         .into()
 }
 
-/// Modes proposés par un quiz : sans carte, seulement les deux sens numéro ↔ nom.
+/// Modes proposés par un quiz, dans l'ordre d'apprentissage : reconnaître avant de se
+/// rappeler, et l'ordre aléatoire de « Nommer » en dernier (sans carte, seulement les deux sens
+/// numéro ↔ nom).
 pub fn modes(info: &Info) -> &'static [Mode] {
     if info.flags {
-        &[Mode::Identify, Mode::Locate, Mode::Choose]
+        &[Mode::Choose, Mode::Locate, Mode::Identify]
     } else if info.numbers {
-        &[Mode::Identify, Mode::Locate]
+        &[Mode::Locate, Mode::Identify]
     } else {
-        &Mode::ALL
+        &[Mode::Locate, Mode::Free, Mode::Identify]
     }
 }
+
+/// Étape du parcours d'un quiz : découvrir la carte, puis chaque mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Step {
+    Discover,
+    Play(Mode),
+}
+
+/// Part des lieux acquis à partir de laquelle l'étape suivante est conseillée.
+const STEP_KNOWN: f32 = 0.8;
 
 /// « Tous les pays », « Nommer la région », « Numéro → nom » ; « All countries »…
 pub fn mode_title(mode: Mode, info: &Info, lang: Lang) -> String {
@@ -3604,6 +3914,45 @@ mod tests {
         let game = app.game.as_ref().unwrap();
         assert_eq!(game.quiz.wrong_tries(), 2);
         assert!(game.input.is_empty());
+    }
+
+    /// Tout citer en cliquant d'abord : un nom ne compte que pour le lieu choisi ; juste, il est
+    /// trouvé et le choix se libère ; faux ou sans choix, rien n'est trouvé.
+    #[test]
+    fn click_first_names_the_picked_place() {
+        let (mut app, _) = App::new();
+        let mut game = Game::new(0, 0, Mode::Free, None, Lang::Fr, None);
+        game.click_first = true;
+        app.game = Some(game);
+        let code = |c: &str| {
+            ATLASES[0]
+                .countries
+                .iter()
+                .position(|x| x.code == c)
+                .unwrap()
+        };
+        let (france, spain) = (code("FRA"), code("ESP"));
+
+        app.on_input("Espagne".into());
+        let game = app.game.as_mut().unwrap();
+        assert_eq!(
+            game.quiz.mark(spain),
+            Some(Mark::Pending),
+            "sans choix, rien"
+        );
+
+        game.pick(france);
+        game.input.clear();
+        app.on_input("Espagne".into());
+        let game = app.game.as_mut().unwrap();
+        assert_eq!(game.quiz.mark(spain), Some(Mark::Pending), "mauvais nom");
+        assert_eq!(game.picked, Some(france));
+        assert!(game.input.is_empty());
+
+        app.on_input("France".into());
+        let game = app.game.as_ref().unwrap();
+        assert!(matches!(game.quiz.mark(france), Some(Mark::Found { .. })));
+        assert_eq!(game.picked, None);
     }
 
     /// Durée de construction de l'aperçu (refait à chaque changement de zone).

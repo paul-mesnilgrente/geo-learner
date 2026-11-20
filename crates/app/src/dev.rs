@@ -54,6 +54,8 @@ pub struct Demo {
     pub big_flag: bool,
     /// Galerie des drapeaux ouverte, recherche éventuelle (`gallery=fr`).
     pub gallery: Option<String>,
+    /// « Tout citer » en cliquant d'abord, avec ce lieu choisi (`click=FRA`, `click=` : aucun).
+    pub click: Option<String>,
     /// Menu d'aide ouvert (`menu`), ou une de ses fenêtres (`menu=about`, `shortcuts`, `report`).
     pub menu: Option<String>,
     /// Langue imposée, en mémoire seulement (`lang=en`).
@@ -166,6 +168,7 @@ pub fn demo() -> Option<Demo> {
             "explore" => demo.explore = Some(value.to_owned()),
             "bigflag" => demo.big_flag = true,
             "gallery" => demo.gallery = Some(value.to_owned()),
+            "click" => demo.click = Some(value.to_owned()),
             "menu" => demo.menu = Some(value.to_owned()),
             "lang" => demo.lang = geo_core::Lang::from_locale(value),
             "review" => demo.review = value.split(',').map(str::to_owned).collect(),

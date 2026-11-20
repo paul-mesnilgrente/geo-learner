@@ -36,6 +36,9 @@ pub struct Settings {
     /// Modes Nommer et Localiser : un lieu raté revient quelques questions plus tard.
     #[serde(default = "enabled")]
     pub second_chance: bool,
+    /// Mode « Tout citer » : on clique d'abord sur un lieu, puis on le nomme.
+    #[serde(default)]
+    pub click_first: bool,
     /// Durées choisies par l'utilisateur (secondes), par atlas, mode et zone
     /// (`"monde/Free/europe"`).
     #[serde(default)]
@@ -58,6 +61,7 @@ impl Default for Settings {
             timer: false,
             by_continent: false,
             second_chance: true,
+            click_first: false,
             durations: BTreeMap::new(),
             labels: BTreeMap::new(),
             path: None,
@@ -157,6 +161,11 @@ impl Settings {
 
     pub fn toggle_second_chance(&mut self) {
         self.second_chance = !self.second_chance;
+        self.save();
+    }
+
+    pub fn toggle_click_first(&mut self) {
+        self.click_first = !self.click_first;
         self.save();
     }
 

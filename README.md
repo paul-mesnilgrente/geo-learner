@@ -202,11 +202,20 @@ Ensuite :
 
 ## Modes de jeu
 
-| Mode | Principe |
+La page d'un quiz présente les modes comme un **parcours**, du plus facile au plus exigeant :
+reconnaître avant de se rappeler, et l'ordre aléatoire de « Nommer » en dernier.
+
+| Étape | Principe |
 |---|---|
-| **Tous les pays** | Citer tous les pays de la zone, dans n'importe quel ordre. Un nom reconnu est validé dès qu'il est tapé, sans appuyer sur Entrée. |
-| **Nommer le pays** | Un pays s'allume sur la carte : il faut donner son nom. |
-| **Trouver sur la carte** | Un nom s'affiche : il faut cliquer sur le bon pays. |
+| 1. **Découvrir** | Explorer la carte sans quiz, chaque lieu avec son nom (la galerie pour les drapeaux). |
+| 2. **Trouver sur la carte** | Un nom s'affiche : il faut cliquer sur le bon pays. |
+| 3. **Tous les pays** | Citer tous les pays de la zone, dans n'importe quel ordre. Un nom reconnu est validé dès qu'il est tapé, sans appuyer sur Entrée. Avec l'option **« Cliquer d'abord »**, on clique un pays puis on le nomme : on relie chaque nom à sa forme, dans l'ordre qu'on veut (de proche en proche). |
+| 4. **Nommer le pays** | Un pays s'allume sur la carte, dans un ordre aléatoire : il faut donner son nom. |
+
+L'étape **conseillée** est marquée, et présélectionnée à l'ouverture du quiz : « Découvrir » tant
+qu'aucune partie du quiz n'est jouée, puis le premier mode où moins de 80 % des lieux de la zone
+sont acquis. Drapeaux : « Pays → drapeau », « Drapeau → carte », « Drapeau → pays » ; numéros :
+« Nom → numéro », puis « Numéro → nom ».
 
 Un **minuteur** facultatif s'active sur la page du quiz. Par défaut, il dure 15 minutes pour
 citer les 197 pays du monde, au prorata du nombre de pays de la zone, et un peu plus par pays en
@@ -423,6 +432,7 @@ Paramètres de `GEO_DEMO`, séparés par `;` :
 - `explore` : exploration ouverte, avec un lieu choisi (`explore=CA-PE`) ; avec `progress`, elle
   part de l'aperçu, carte de maîtrise comprise ;
 - `bigflag` : avec `explore`, le drapeau du lieu choisi montré en grand ;
+- `click=FRA` : « Tous les pays » en cliquant d'abord, avec ce lieu choisi (`click=` : aucun) ;
 - `gallery` : galerie des drapeaux ouverte, avec une recherche (`gallery=guin`) ; avec `bigflag`,
   le drapeau du premier pays de `answers` en grand ;
 - `menu` : menu d'aide ouvert sur l'accueil ; `menu=about`, `menu=shortcuts`, `menu=report` :
