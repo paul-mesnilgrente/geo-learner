@@ -1658,7 +1658,9 @@ impl App {
 
     /// Mode, zone et lancement.
     /// Étape conseillée dans la zone choisie : découvrir tant qu'aucune partie de ce quiz n'est
-    /// jouée, puis le premier mode où moins de 80 % des lieux de la zone sont acquis.
+    /// jouée ; ensuite, l'étape qui suit la plus avancée acquise (80 % des lieux de la zone
+    /// acquis dans ce mode), même si celles d'avant ne le sont pas : « Tous les… » acquis
+    /// conseille « Nommer », sans repasser par « Trouver ». Rien d'acquis : la première.
     fn recommended_step(&self) -> Step {
         let world = self.world();
         let info = &world.info;
@@ -1667,7 +1669,7 @@ impl App {
         }
         let zone = &world.regions[self.region];
         let modes = modes(info);
-        for &mode in modes {
+        let acquired = |mode: Mode| {
             let mastery = self.progress.mastery(&info.id, mode);
             let known = zone
                 .members
@@ -1678,11 +1680,12 @@ impl App {
                         .is_some_and(|m| m.level == Level::Known)
                 })
                 .count();
-            if (known as f32) < STEP_KNOWN * zone.members.len() as f32 {
-                return Step::Play(mode);
-            }
+            known as f32 >= STEP_KNOWN * zone.members.len() as f32
+        };
+        match modes.iter().rposition(|&mode| acquired(mode)) {
+            Some(i) => Step::Play(modes[(i + 1).min(modes.len() - 1)]),
+            None => Step::Play(modes[0]),
         }
-        Step::Play(modes[modes.len() - 1])
     }
 
     /// Une étape du parcours : son numéro, « Conseillé » s'il y a lieu, son titre et ce qu'on y
@@ -3953,6 +3956,53 @@ mod tests {
         let game = app.game.as_ref().unwrap();
         assert!(matches!(game.quiz.mark(france), Some(Mark::Found { .. })));
         assert_eq!(game.picked, None);
+    }
+
+    /// L'étape conseillée suit la plus avancée acquise : « Tous les pays » acquis conseille
+    /// « Nommer », sans repasser par « Trouver ».
+    #[test]
+    fn recommended_step_follows_the_furthest_acquired() {
+        let (mut app, _) = App::new();
+        app.progress = Progress::default();
+        app.atlas = 0;
+        app.region = ATLASES[0].region("europe").unwrap();
+        assert_eq!(app.recommended_step(), Step::Discover);
+
+        let zone = &ATLASES[0].regions[app.region];
+        let codes: Vec<String> = zone
+            .members
+            .iter()
+            .map(|&c| ATLASES[0].countries[c].code.clone())
+            .collect();
+        let game = |mode: Mode| Session {
+            when: progress::now(),
+            atlas: "monde".into(),
+            mode,
+            region: "europe".into(),
+            total: codes.len() as u32,
+            found: codes.len() as u32,
+            perfect: codes.len() as u32,
+            score: 1.0,
+            seconds: 300,
+            missed: vec![],
+            limit: None,
+            review: false,
+            answers: codes
+                .iter()
+                .map(|code| progress::Attempt {
+                    code: code.clone(),
+                    tries: Some(1),
+                    ms: 1000,
+                    wrong: vec![],
+                })
+                .collect(),
+        };
+        // Une partie parfaite : pas encore acquis (il en faut deux), on commence par « Trouver ».
+        app.progress.sessions.push(game(Mode::Free));
+        assert_eq!(app.recommended_step(), Step::Play(Mode::Locate));
+        // Deux parties parfaites de « Tous les pays » : acquis, « Nommer » est conseillé.
+        app.progress.sessions.push(game(Mode::Free));
+        assert_eq!(app.recommended_step(), Step::Play(Mode::Identify));
     }
 
     /// Durée de construction de l'aperçu (refait à chaque changement de zone).

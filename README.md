@@ -213,8 +213,9 @@ reconnaître avant de se rappeler, et l'ordre aléatoire de « Nommer » en dern
 | 4. **Nommer le pays** | Un pays s'allume sur la carte, dans un ordre aléatoire : il faut donner son nom. |
 
 L'étape **conseillée** est marquée, et présélectionnée à l'ouverture du quiz : « Découvrir » tant
-qu'aucune partie du quiz n'est jouée, puis le premier mode où moins de 80 % des lieux de la zone
-sont acquis. Drapeaux : « Pays → drapeau », « Drapeau → carte », « Drapeau → pays » ; numéros :
+qu'aucune partie du quiz n'est jouée, puis l'étape qui suit la plus avancée acquise (80 % des
+lieux de la zone acquis dans ce mode), même si celles d'avant ne le sont pas : « Tous les pays »
+acquis conseille « Nommer », sans repasser par « Trouver ». Rien d'acquis : « Trouver ». Drapeaux : « Pays → drapeau », « Drapeau → carte », « Drapeau → pays » ; numéros :
 « Nom → numéro », puis « Numéro → nom ».
 
 Un **minuteur** facultatif s'active sur la page du quiz. Par défaut, il dure 15 minutes pour
